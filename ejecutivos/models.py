@@ -17,3 +17,6 @@ class Ejecutivo(models.Model):
     activo = models.BooleanField(
         default=True
     )
+
+    def __str__(self):
+      return self.nombre

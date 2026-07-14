@@ -31,5 +31,5 @@ class PerfilUsuario(models.Model):
         default=True
     )
 
-    def __str__():
-        pass
+    def __str__(self):
+        return self.usuario.email

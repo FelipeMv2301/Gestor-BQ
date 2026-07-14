@@ -15,8 +15,7 @@ class Pedido(models.Model):
 
     #Normalizar tipos de entrega
     class TipoEntrega(models.TextChoices):
-        RETIRO_TIENDA = "RETIRO_EN_TIENDA", "Retiro en tienda"
-        RETIRO_BODEGA = "RETIRO_EN_BODEGA", "Retiro en bodega"
+        RETIRO_BIOQUIMICA = "RETIRO_BIOQUIMICA", "Retiro en Bioquimica"
         DESPACHO = "DESPACHO", "Despacho"
     
     #Normalizar origen de pedido
@@ -41,6 +40,11 @@ class Pedido(models.Model):
     class EstadoNotificacion(models.TextChoices):
         NO_NOTIFICADO = "NO_NOTIFICADO", "No notificado"
         NOTIFICADO = "NOTIFICADO", "Notificado"
+
+    class RetirarEn(models.TextChoices):
+        RETIRO_BODEGA_N3A = "RETIRO_BODEGA_N3A", "Retiro en Bodega (N3A)"
+        RETIRO_TIENDA_S2 = "RETIRO_TIENDA_S2", "Retiro en Tienda (S2)"
+        NO_APLICA = "NO_APLICA", "No aplica"
         
     origen = models.CharField(
         max_length=20,
@@ -57,6 +61,12 @@ class Pedido(models.Model):
     tipo_entrega = models.CharField(
         max_length=120,
         choices = TipoEntrega.choices
+    )
+
+    retirar_en = models.CharField(
+        blank = True,
+        max_length=120,
+        choices = RetirarEn.choices
     )
 
     transportation_code = models.IntegerField(
@@ -112,7 +122,7 @@ class Pedido(models.Model):
     )  
     
     direccion_depto = models.CharField(
-        max_length=20, 
+        max_length=120, 
         blank=True
     )
 

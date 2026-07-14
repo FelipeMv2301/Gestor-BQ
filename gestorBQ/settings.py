@@ -11,6 +11,34 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+#Llamar a dotenv para leer el .env
+from dotenv import load_dotenv
+
+#inicializar dotenv
+load_dotenv()
+
+#Llamar parametros de DB
+DB_NAME = os.getenv('DB_NAME')
+DB_USER = os.getenv('DB_USER')
+DB_PASSWORD = os.getenv('DB_PASSWORD')
+DB_PORT = os.getenv('DB_PORT')
+DB_HOST = os.getenv('DB_HOST')
+
+#Llamar parametros de Google OAuth
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
+GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
+
+#Llamar parametros de Token-SAP-BQ y URL de SAP
+TOKEN_SAP_BQ_URL = os.getenv('TOKEN_SAP_BQ_URL')
+TOKEN_SAP_BQ_USER = os.getenv('TOKEN_SAP_BQ_USER')
+TOKEN_SAP_BQ_PASS = os.getenv('TOKEN_SAP_BQ_PASS')
+SAP_URL = os.getenv('SAP_URL')
+
+#Llamar parametros de WooCommerce
+WOO_BASE_URL = os.getenv('WOO_BASE_URL')
+WOO_CONSUMER_KEY = os.getenv('WOO_CONSUMER_KEY')
+WOO_CONSUMER_SECRET = os.getenv('WOO_CONSUMER_SECRET')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,6 +55,26 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+SITE_ID = 1
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': GOOGLE_CLIENT_ID,
+            'secret': GOOGLE_CLIENT_SECRET,
+            'key': '',
+        },
+        'SCOPE': ['profile', 'email'],
+    }
+}
+
+SOCIALACCOUNT_ONLY = True
+
+SOCIALACCOUNT_ADAPTER = "cuentas.adapters.BioquimicaSocialAccountAdapter"
+
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+
+LOGIN_REDIRECT_URL = '/cuentas/inicio/'
 
 # Application definition
 
@@ -38,6 +86,14 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'cuentas',
+    'ejecutivos',
+    'pedidos',
+    'pedidosRechazados',
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
 ]
 
 MIDDLEWARE = [
@@ -48,6 +104,12 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
+]
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+      'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
 ROOT_URLCONF = 'gestorBQ.urls'
@@ -76,11 +138,11 @@ WSGI_APPLICATION = 'gestorBQ.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'gestor-bq',
-        'USER': 'admin',
-        'PASSWORD': 'bqcl2026',
-        'HOST': '192.168.0.165',      # IP del server Postgres remoto
-        'PORT': '5432',               # Puerto por defecto de PostgreSQL
+        'NAME': DB_NAME,
+        'USER': DB_USER,
+        'PASSWORD': DB_PASSWORD,
+        'HOST': DB_HOST,      # IP del server Postgres remoto
+        'PORT': DB_PORT,               # Puerto por defecto de PostgreSQL
     }
 }
 
