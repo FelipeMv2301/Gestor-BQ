@@ -165,9 +165,12 @@ class Pedido(models.Model):
         blank=True
     )
 
-    orden_transporte = models.CharField(
-        max_length=200, 
-        blank=True
+    envio = models.ForeignKey(
+        "envios.EnvioCourier", 
+        null=True, 
+        blank=True, 
+        on_delete=models.SET_NULL, 
+        related_name="pedidos"
     )
 
     creado_en = models.DateTimeField(
@@ -177,3 +180,5 @@ class Pedido(models.Model):
     modificado_en = models.DateTimeField(
         auto_now=True
     )
+
+

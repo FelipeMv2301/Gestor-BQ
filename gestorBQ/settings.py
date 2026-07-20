@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     'ejecutivos',
     'pedidos',
     'pedidosRechazados',
+    'envios',
     'django.contrib.sites',
     'allauth',
     'allauth.account',

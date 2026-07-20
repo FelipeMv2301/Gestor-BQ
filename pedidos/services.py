@@ -2,6 +2,10 @@ from integraciones import woo_client, sap_client
 from django.conf import settings
 from .models import Pedido
 from ejecutivos.models import Ejecutivo
+from cuentas.models import PerfilUsuario
+from django.forms.models import model_to_dict
+from pedidosRechazados.models import PedidoRechazado
+from . import permisos
 
 """
 Funciones para WooCommerce
@@ -116,7 +120,7 @@ def guardar_pedidos_sap(after=None, before=None):
 
         f"{settings.SAP_URL}/Orders",
         {
-            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,U_FolioRef,ContactPersonCode",
+            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,ContactPersonCode",
             "$filter": filtro,
         },
         cookies,
@@ -147,7 +151,6 @@ def guardar_pedidos_sap(after=None, before=None):
                 "direccion_comuna": addr_ext.get("ShipToCounty", ""),
                 "direccion_ciudad": addr_ext.get("ShipToCity") or "",
                 "ejecutivo": Ejecutivo.objects.filter(codigo_sap=codigo_ejecutivo).first(),
-                "orden_transporte": str(orden.get("U_FolioRef") or ""),
                 "observaciones": orden.get("Comments") or "",
             }
         )
@@ -158,4 +161,44 @@ def guardar_pedidos_sap(after=None, before=None):
             actualizados += 1
     
     return {"creados": creados, "actualizados": actualizados}
+
+"""
+Acciones del equipo
+"""
+
+#Esta función pasa un pedido de estado PENDIENTE a APROBADO, para que logística pueda trabajarlo. Solo el ejecutivo o admin pueden aprobar.
+#Usa el archivo de permisos.py para evaluar que puede y que no puede hacer el usuario.
+def aprobar_pedido(pedido, usuario):
+      if not permisos.puede_aprobar(usuario, pedido):
+          raise PermissionError("[!] Error: Solo el ejecutivo a cargo del pedido, o ADMIN, pueden aprobarlo.")
+
+      if pedido.estado_comercial != Pedido.EstadoComercial.PENDIENTE:
+          raise ValueError(f"[!] Error: Solo se puede aprobar un pedido en PENDIENTE. (Actual: {pedido.estado_comercial}).")
+
+      if not pedido.courier:
+          raise ValueError("[!] Error: Debes seleccionar un courier antes de aprobar.")
+
+      contacto_valido = bool(pedido.telefono_contacto or pedido.email_contacto)
+      direccion_valida = bool(pedido.direccion_calle and pedido.direccion_comuna)
+      if not (contacto_valido and direccion_valida):
+          raise ValueError("[!] Error: Faltan datos de contacto o dirección válidos.")
+
+      pedido.estado_comercial = Pedido.EstadoComercial.APROBADO
+      pedido.save(update_fields=["estado_comercial", "modificado_en"])
+      return pedido
+
+#Arma un Snapshot del pedido rechazado
+def rechazar_pedido(pedido, motivo, usuario):
+    if not permisos.puede_rechazar(usuario, pedido):
+        raise PermissionError("[!] Error: Solo un Administrador puede rechazar/cancelar un pedido.")
+
+    snapshot = model_to_dict(pedido)  # copia todos los campos del Pedido a un dict
+    PedidoRechazado.objects.create(
+        origen=pedido.origen,
+        num_pedido=pedido.num_pedido,
+        snapshot=snapshot,
+        motivo=motivo,
+        rechazado_por=usuario,
+    )
+    pedido.delete()
 

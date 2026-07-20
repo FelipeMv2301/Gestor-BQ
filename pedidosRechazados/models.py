@@ -3,6 +3,11 @@ from django.conf import settings
 
 class PedidoRechazado(models.Model):
 
+    origen = models.CharField(
+        max_length=30, 
+        blank=True
+    )
+
     num_pedido = models.CharField(
         max_length=120
     )
