@@ -3,7 +3,20 @@ from django.conf import settings
 
 """"Este archivo se encarga de almacenar todas las funciones con las que se llama a SAP"""
 
-def obtener_cookies_sap():
+#Obtiene las cookies de SAP (session y routeid) y genera el reintento mediante b1session_vencido
+def obtener_cookies_sap(b1session_vencido=None):
+
+    if b1session_vencido:
+        requests.post(
+            f"{settings.TOKEN_SAP_BQ_URL}/session/invalidate",
+            json={
+                "service_name": settings.TOKEN_SAP_BQ_USER,
+                "password": settings.TOKEN_SAP_BQ_PASS,
+                "b1session": b1session_vencido,
+            },
+            timeout=120,
+        )
+
     resp = requests.post(
         f"{settings.TOKEN_SAP_BQ_URL}/session",
         json = {
@@ -21,6 +34,18 @@ def obtener_cookies_sap():
 
     return cookies
 
+
+#Crea la llamada al endpoint con los parámetros que devuelvan las funciones.
+def solicitar_sap(metodo, url, cookies, params=None, timeout=60):
+    respuesta = requests.request(metodo, url, params=params, cookies=cookies, timeout=timeout)
+
+    if respuesta.status_code == 401:
+        cookies = obtener_cookies_sap(b1session_vencido=cookies.get("B1SESSION"))
+        respuesta = requests.request(metodo, url, params=params, cookies=cookies, timeout=timeout)
+
+    return respuesta, cookies
+
+
 def agregar_rango_fechas(filtro_base, campo_fecha, after=None, before=None):
     filtros = [f"({filtro_base})"]
 
@@ -32,32 +57,32 @@ def agregar_rango_fechas(filtro_base, campo_fecha, after=None, before=None):
     
     return " and ".join(filtros)
 
+
 def obtener_business_partner(card_code, cookies):
-    r = requests.get(
-        f"{settings.SAP_URL}/BusinessPartners('{card_code}')",
-        params={"$select": "CardCode,CardName,EmailAddress,Phone1,ContactEmployees"},
-        cookies=cookies,
-        timeout=60,
-    )
-    if r.status_code != 200:
+    url = f"{settings.SAP_URL}/BusinessPartners('{card_code}')"
+    params = {"$select": "CardCode,CardName,EmailAddress,Phone1,ContactEmployees"}
+
+    respuesta, cookies_actualizadas = solicitar_sap("GET", url, cookies, params=params)
+    if respuesta.status_code != 200:
         return {}
-    return r.json()
+    return respuesta.json()
+
 
 def obtener_todas_las_paginas(url, params, cookies):
-      resultados = []
+    resultados = []
 
-      while url:
-          r = requests.get(url, params=params, cookies=cookies, timeout=120)
-          r.raise_for_status()
-          datos = r.json()
+    while url:
+        respuesta, cookies = solicitar_sap("GET", url, cookies, params=params)
+        respuesta.raise_for_status()
+        datos = respuesta.json()
 
-          resultados.extend(datos.get("value", []))
+        resultados.extend(datos.get("value", []))
 
-          siguiente = datos.get("odata.nextLink")
-          if not siguiente:
-              break
+        siguiente = datos.get("odata.nextLink")
+        if not siguiente:
+            break
 
-          url = f"{settings.SAP_URL}/{siguiente}"
-          params = None  # el nextLink ya trae $skip incluido en la URL
+        url = f"{settings.SAP_URL}/{siguiente}"
+        params = None  # el nextLink ya trae $skip incluido en la URL
 
-      return resultados
+    return resultados

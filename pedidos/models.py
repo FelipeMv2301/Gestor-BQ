@@ -6,6 +6,13 @@ from ejecutivos.models import Ejecutivo
 class Pedido(models.Model):
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["origen", "num_pedido"],
+                name="pedido_por_origen",
+            )
+
+        ]
         indexes = [
             models.Index(fields=["num_pedido"]),
             models.Index(fields=["ejecutivo"]),
@@ -55,7 +62,6 @@ class Pedido(models.Model):
         max_length=120,
         blank=False,
         null=False,
-        unique=True
     )
 
     tipo_entrega = models.CharField(

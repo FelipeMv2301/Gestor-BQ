@@ -3,7 +3,9 @@ from django.conf import settings
 from .models import Pedido
 from ejecutivos.models import Ejecutivo
 
-"""Funciones para WooCommerce"""
+"""
+Funciones para WooCommerce
+"""
 
 #Valida si es Despacho o Retiro por pedido para WooCommerce
 def definir_tipo_entrega_woo(pedido_woo):
@@ -34,8 +36,8 @@ def guardar_pedidos_woo(after=None, before=None):
 
         pedido, creado = Pedido.objects.update_or_create(
             num_pedido = str(pedido_woo.get("number")),
+            origen = Pedido.Origen.WEB,
             defaults = {
-                "origen": Pedido.Origen.WEB,
                 "tipo_entrega": definir_tipo_entrega_woo(pedido_woo),
                 "ejecutivo": ejecutivo_web,
                 "rut": billing.get("tax_id", ""),
@@ -59,7 +61,9 @@ def guardar_pedidos_woo(after=None, before=None):
     
     return {"creados": creados, "actualizados": actualizados}
 
-"""Funciones para SAP"""
+"""
+Funciones para SAP
+"""
 
 #Traduce campos de SAP en texto legible por el gestor-bq
 def definir_tipo_entrega_sap(orden):
@@ -128,8 +132,8 @@ def guardar_pedidos_sap(after=None, before=None):
 
         pedido, creado = Pedido.objects.update_or_create(
             num_pedido = str(orden.get("DocNum")),
+            origen = Pedido.Origen.SAP,
             defaults = {
-                "origen": Pedido.Origen.SAP,
                 "tipo_entrega": definir_tipo_entrega_sap(orden),
                 "nombre_contacto": nombre_contacto,
                 "telefono_contacto": telefono_contacto,
