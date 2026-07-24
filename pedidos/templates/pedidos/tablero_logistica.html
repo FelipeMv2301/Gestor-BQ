@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}Despachos — Portal Bioquímica{% endblock %}
+{% block content %}
+<div class="mb-5">
+  <h1 class="text-2xl font-bold text-ink">Despachos</h1>
+  <p class="text-sm text-muted mt-1">Pedidos aprobados, listos para despachar y notificar al cliente.</p>
+</div>
+
+<form hx-get="{% url 'pedidos:despachos' %}" hx-target="#tabla-pedidos" hx-push-url="true"
+      hx-trigger="change, keyup delay:400ms from:input[type=search]"
+      class="flex flex-wrap items-center gap-3 justify-between mb-4">
+  <div class="inline-flex bg-appbg border border-line p-1 rounded-xl gap-1">
+    <label class="cursor-pointer"><input type="radio" name="vista" value="por_despachar" class="peer sr-only" {% if vista == 'por_despachar' %}checked{% endif %}>
+      <span class="block text-sm font-semibold text-muted px-3.5 py-1.5 rounded-lg peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Por despachar</span></label>
+    <label class="cursor-pointer"><input type="radio" name="vista" value="notificados" class="peer sr-only" {% if vista == 'notificados' %}checked{% endif %}>
+      <span class="block text-sm font-semibold text-muted px-3.5 py-1.5 rounded-lg peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Notificados</span></label>
+    <label class="cursor-pointer"><input type="radio" name="vista" value="todos" class="peer sr-only" {% if vista == 'todos' %}checked{% endif %}>
+      <span class="block text-sm font-semibold text-muted px-3.5 py-1.5 rounded-lg peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Todos</span></label>
+  </div>
+  <div class="relative">
+    <input type="search" name="q" value="{{ q }}" placeholder="Buscar N° / cliente / RUT…"
+           class="w-64 max-w-full text-sm rounded-lg border border-linestrong bg-white pl-9 pr-3 py-2 focus:border-brand focus:outline-none">
+    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">🔍</span>
+  </div>
+</form>
+
+<div id="tabla-pedidos">
+  {% include "pedidos/_tabla_pedidos.html" %}
+</div>
+{% endblock %}

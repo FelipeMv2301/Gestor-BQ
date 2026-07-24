@@ -1,7 +1,10 @@
 from .models import EnvioCourier
+from integraciones import chibra_client
 from pedidos.models import Pedido
+from pedidos.services  import notificar_pedido
+from django.db import transaction
 
-def despachar_pedidos(pedidos, courier, datos_courier):
+def despachar_pedidos(pedidos, courier, bultos, destinatario, datos_courier, usuario):
     if not pedidos:
         raise ValueError("[!] Error: Selecciona al menos un pedido")
     
@@ -19,16 +22,28 @@ def despachar_pedidos(pedidos, courier, datos_courier):
         if pedido.envio_id is not None:
             raise ValueError(f"Pedido N° {pedido.origen}-{pedido.num_pedido} ya tiene un envío asignado.")
         
-    resultado = {"orden_transporte": "TEST-0001"}
+    if courier == Pedido.Courier.CHIBRA:
+        resultado = chibra_client.documentar_envio(pedidos, bultos, destinatario, datos_courier)
+    else:
+        raise ValueError(f"[!] Error: No existe integración disponible para el courier {courier}.")
+        
+    with transaction.atomic():
+        envio = EnvioCourier.objects.create(
+            courier=courier,
+            datos_courier=datos_courier,
+            orden_transporte=resultado["numero_envio"],
+            estado=EnvioCourier.Estado.DESPACHADO,
+        )
 
-    envio = EnvioCourier.objects.create(
-        courier=courier,
-        datos_courier=datos_courier,
-        orden_transporte=resultado["orden_transporte"],
-        estado=EnvioCourier.Estado.DESPACHADO,
-    )
+        for pedido in pedidos:
+            pedido.envio = envio
+            pedido.save(update_fields=["envio"])
+
+    notificaciones_fallidas = []
     for pedido in pedidos:
-        pedido.envio = envio
-        pedido.save(update_fields=["envio"])
-    
-    return envio
+        try:
+            notificar_pedido(pedido, usuario)
+        except (PermissionError, ValueError) as exc:
+            notificaciones_fallidas.append((pedido, str(exc)))
+
+    return envio, notificaciones_fallidas

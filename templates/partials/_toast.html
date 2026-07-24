@@ -1,0 +1,30 @@
+<template id="tpl-toast">
+  <div class="toast flex items-center gap-3 min-w-[260px] bg-surface border border-line rounded-xl shadow-lg px-4 py-3 text-sm" style="border-left-width:3px;">
+    <span class="tk grid place-items-center w-6 h-6 rounded-full font-extrabold flex-none text-xs"></span>
+    <div><b class="text-ink block"></b><span class="tmsg text-muted"></span></div>
+  </div>
+</template>
+<script>
+  (function () {
+    const zone = document.getElementById('toasts');
+    const S = {
+      success: { c:'#7ab648', bg:'#eaf5dd', ink:'#466518', i:'✓' },
+      error:   { c:'#e0463a', bg:'#fbe4e2', ink:'#8c261d', i:'!' },
+      warning: { c:'#ef8f2a', bg:'#fdefdd', ink:'#965310', i:'!' },
+      info:    { c:'#0b8f9c', bg:'#dbf1f2', ink:'#076370', i:'i' },
+    };
+    window.showToast = function (o) {
+      const s = S[o.level] || S.info;
+      const el = document.getElementById('tpl-toast').content.cloneNode(true).querySelector('.toast');
+      el.style.borderLeftColor = s.c;
+      const tk = el.querySelector('.tk'); tk.textContent = s.i; tk.style.background = s.bg; tk.style.color = s.ink;
+      el.querySelector('b').textContent = o.title || '';
+      const m = el.querySelector('.tmsg'); m.textContent = o.body || ''; if (!o.body) m.remove();
+      zone.appendChild(el);
+      setTimeout(function () { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; setTimeout(function () { el.remove(); }, 300); }, 3600);
+    };
+    {% if messages %}{% for m in messages %}showToast({ level: '{{ m.tags }}', body: '{{ m|escapejs }}' });
+    {% endfor %}{% endif %}
+    document.body.addEventListener('toast', function (e) { showToast(e.detail); });
+  })();
+</script>

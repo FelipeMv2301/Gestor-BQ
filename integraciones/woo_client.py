@@ -40,7 +40,7 @@ def obtener_pedidos_woo(status, after=None, before=None):
     return resultados
 
 #Obtiene pedido individual a partir del número de pedido
-def obtener_pedido_woo(numero_pedido):
+def obtener_un_pedido_woo(numero_pedido):
     for status in ("processing", "completed"):
         pagina = 1
         while True:

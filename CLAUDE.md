@@ -88,6 +88,28 @@ memoria) que centraliza login/sesión SAP compartida (`b1session`+`routeid`+`sap
 va en variable de entorno / `.env`, nunca versionada). Desde `gestorBQ` se pega directo al Service
 Layer de SAP con las cookies recibidas — no se vuelve a llamar `/Login` desde este repo.
 
+**Exposición de red de Postgres (HU-0.4) — RESUELTO (2026-07-20)**: el servidor Postgres
+(`192.168.0.165`) es hardware propio en la LAN de la oficina, elegido para ahorrar costo de nube —
+no hay requisito de compliance que lo ate a esa red. Decisión de despliegue: **Django corre en el
+mismo servidor/LAN que Postgres**, no en Railway. Postgres nunca escucha fuera de `localhost`/LAN,
+sin excepción — no se abre 5432 a Internet ni se monta VPN para llegar a la base de datos.
+
+Se descartó Django-en-Railway + Postgres on-prem por fricción real, no solo teórica: Railway sin
+plan Pro no ofrece IP de salida fija, y el plan Pro la da **compartida** con otros clientes
+(`docs.railway.com/networking/static-outbound-ips`). Tailscale desde un contenedor de Railway solo
+corre en modo *userspace* (sin `/dev/net/tun`), lo que expone un proxy SOCKS5 local — pero
+`psycopg2`/libpq no soporta SOCKS5, así que no sirve para llegar a Postgres sin un forwarder TCP
+adicional y frágil.
+
+Acceso remoto (teletrabajo) para Comercial/Logística: **no** vía VPN por persona (Tailscale free
+=3 usuarios; con "muchas personas" pasaría a plan pago, contra el objetivo de ahorro). En vez de
+eso, el servidor expone solo el puerto **443** (HTTPS) hacia Django; la barrera de acceso real es el
+login Google OAuth restringido a `@bioquimica.cl` ya planeado (sección de arquitectura arriba), no
+la red. Postgres sigue sin tocar Internet en ningún escenario.
+
+Excepción: Tailscale (plan free) sí se usa para acceso de **administrador** directo a Postgres
+(`psql`/pgAdmin desde fuera de la oficina) — pocas personas, encaja en el límite gratuito.
+
 **Puntos todavía abiertos** (ver sección "Spikes" del plan antes de implementar):
 - Si el botón "Aprobar" además escribe `U_BQ_CrearEnvio='Y'` de vuelta a SAP (write-back) o el
   estado se maneja solo internamente (HU-3.3).
@@ -103,3 +125,4 @@ Layer de SAP con las cookies recibidas — no se vuelve a llamar `/Login` desde 
   codear la historia que dependa de ellos.
 - HU-0.4 (Postgres) y HU-1.4 (modelos/migraciones) son la base de la Fase 0-1 — no crear apps de
   dominio ni escribir modelos sin antes resolver el cambio de settings a Postgres.
+- No asumas nada que no sepas con certeza. Es mejor investigarlo y llegar a una respuesta coherente.

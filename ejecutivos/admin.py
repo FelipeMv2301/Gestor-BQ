@@ -41,3 +41,4 @@ class EjecutivoAdmin(admin.ModelAdmin):
                 level=messages.SUCCESS,
             )
         return redirect("admin:ejecutivos_ejecutivo_changelist")
+    

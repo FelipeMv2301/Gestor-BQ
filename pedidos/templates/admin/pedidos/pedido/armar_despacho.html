@@ -1,0 +1,167 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Despachar a courier: {{ courier }}</h1>
+
+<h2>Pedidos incluidos en este envío</h2>
+<ul>
+    {% for pedido in pedidos %}
+    <li>{{ pedido.origen }}-{{ pedido.num_pedido }} — {{ pedido.nombre_contacto }}</li>
+    {% endfor %}
+</ul>
+
+<form method="post" action="{% url 'admin:pedidos_pedido_armar_despacho' %}">
+    {% csrf_token %}
+    <input type="hidden" name="ids" value="{{ ids_texto }}">
+
+        <h2>Datos del destinatario</h2>
+    <p>
+        <label>Nombre/Razón social:</label>
+        <input type="text" name="destinatario_nombre" value="{{ pedidos.0.razon_social|default:pedidos.0.nombre_contacto }}">
+    </p>
+    <p>
+        <label>RUT:</label>
+        <input type="text" name="destinatario_rut" value="{{ pedidos.0.rut }}">
+    </p>
+    <p>
+        <label>Dirección:</label>
+        <input type="text" name="destinatario_direccion" value="{{ pedidos.0.direccion_calle }}">
+    </p>
+    <p>
+        <label>Comuna:</label>
+        <input type="text" name="destinatario_comuna" value="{{ pedidos.0.direccion_comuna }}">
+    </p>
+    <p>
+        <label>Teléfono:</label>
+        <input type="text" name="destinatario_telefono" value="{{ pedidos.0.telefono_contacto }}">
+    </p>
+    <p>
+        <label>Email:</label>
+        <input type="email" name="destinatario_email" value="{{ pedidos.0.email_contacto }}">
+    </p>
+
+    <h2>Datos del courier</h2>
+    <p>
+        <label>Centro remitente:</label>
+        <select name="centro" required>
+            <option value="02">02 - Biotecnología</option>
+            <option value="03">03 - Educación</option>
+            <option value="04">04 - Genérico</option>
+        </select>
+    </p>
+    <p>
+        <label>Servicio:</label>
+        <select name="servicio" required>
+            <option value="10">10 - Express</option>
+            <option value="20">20 - Terrestre</option>
+        </select>
+    </p>
+    <p>
+        <label>Valor declarado:</label>
+        <input type="number" name="valor_declarado" value="0">
+    </p>
+
+    <p>
+        <label>Observaciones:</label>
+        <textarea name="observaciones" maxlength="255"></textarea>
+    </p>
+
+    <h2>Bultos</h2>
+    <p>
+        <label><input type="radio" name="modo_bultos" value="detallado" checked onclick="mostrarModoBultos()"> Detallado</label>
+        <label><input type="radio" name="modo_bultos" value="simple" onclick="mostrarModoBultos()"> Simple</label>
+    </p>
+
+    <div id="bultos-simple" style="display:none;">
+        <p>
+            <label>Cantidad de bultos:</label>
+            <input type="number" name="simple_cantidad" value="1" min="1">
+        </p>
+        <p>
+            <label>Peso total (kg):</label>
+            <input type="number" name="simple_peso_total" step="0.01">
+        </p>
+        <p>
+            <label>Volumen total (opcional):</label>
+            <input type="text" name="volumen_total">
+        </p>
+        <p>
+            <label>Contenido:</label>
+            <select name="simple_tipo_contenido">
+                <option value="SECO">SECO</option>
+                <option value="REFRIGERADO">REFRIGERADO</option>
+                <option value="REFRIGERADO CON SENSOR">REFRIGERADO CON SENSOR</option>
+            </select>
+        </p>
+    </div>
+
+    <div id="bultos-detallado">
+        <table>
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Cantidad</th>
+                    <th>Alto</th>
+                    <th>Ancho</th>
+                    <th>Largo</th>
+                    <th>Peso (kg)</th>
+                    <th>Contenido</th>
+                </tr>
+            </thead>
+            <tbody id="filas-bultos">
+                <tr>
+                    <td>
+                        <select name="bulto_tipo">
+                            <option value="BULTO">BULTO</option>
+                            <option value="NEVERA L">NEVERA L</option>
+                            <option value="NEVERAS S">NEVERAS S</option>
+                            <option value="NEVERA M">NEVERA M</option>
+                            <option value="CAJA" selected>CAJA</option>
+                            <option value="SOBRE">SOBRE</option>
+                            <option value="VALIJA">VALIJA</option>
+                            <option value="PALLET">PALLET</option>
+                            <option value="BOLSO/MALETA">BOLSO/MALETA</option>
+                            <option value="CONTENEDOR">CONTENEDOR</option>
+                            <option value="NEVERA XL">NEVERA XL</option>
+                        </select>
+                    </td>
+                    <td><input type="number" name="bulto_cantidad" value="1" min="1"></td>
+                    <td><input type="text" name="bulto_alto"></td>
+                    <td><input type="text" name="bulto_ancho"></td>
+                    <td><input type="text" name="bulto_largo"></td>
+                    <td><input type="number" name="bulto_peso" step="0.01" required></td>
+                    <td>
+                        <select name="bulto_tipo_contenido">
+                            <option value="SECO">SECO</option>
+                            <option value="REFRIGERADO">REFRIGERADO</option>
+                            <option value="REFRIGERADO CON SENSOR">REFRIGERADO CON SENSOR</option>
+                        </select>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <button type="button" onclick="agregarFilaBulto()">+ Agregar bulto</button>
+    </div>
+
+    <p><button type="submit" class="button">Despachar</button></p>
+</form>
+
+<script>
+function agregarFilaBulto() {
+    var filaOriginal = document.querySelector("#filas-bultos tr");
+    var filaNueva = filaOriginal.cloneNode(true);
+    document.getElementById("filas-bultos").appendChild(filaNueva);
+}
+
+function mostrarModoBultos() {
+    var esSimple = document.querySelector('input[name="modo_bultos"][value="simple"]').checked;
+    document.getElementById('bultos-simple').style.display = esSimple ? 'block' : 'none';
+    document.getElementById('bultos-detallado').style.display = esSimple ? 'none' : 'block';
+
+    var camposPeso = document.getElementsByName('bulto_peso');
+    for (var i = 0; i < camposPeso.length; i++) {
+        camposPeso[i].required = !esSimple;
+    }
+}
+</script>
+{% endblock %}

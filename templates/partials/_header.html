@@ -1,0 +1,52 @@
+{% load static %}
+<header class="sticky top-0 z-40 flex items-center gap-5 px-6 py-2.5 bg-surface border-b border-line">
+  <a href="{% url 'inicio' %}" class="flex items-center shrink-0">
+    <img src="{% static 'images/logo.png' %}"        alt="bioquimica.cl" class="h-10 block dark:hidden"> <strong>Gestor-BQ</strong>
+    <img src="{% static 'images/logo_blanco.png' %}" alt="bioquimica.cl" class="h-10 hidden dark:block">
+  </a>
+
+  {% if user.is_authenticated and user.perfil.rol %}
+  <nav class="flex gap-1">
+    {% if user.perfil.rol == 'EJECUTIVO' or user.perfil.rol == 'ADMIN' %}
+      <a href="{% url 'pedidos:mis_pedidos' %}"
+         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Mis pedidos</a>
+    {% endif %}
+    {% if user.perfil.rol == 'LOGISTICA' or user.perfil.rol == 'ADMIN' %}
+       <a href="{% url 'pedidos:despachos' %}"
+         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Despachos</a>
+    {% endif %}
+    {% if user.perfil.rol == 'ADMIN' %}
+      <a href="{% url 'pedidos:anulados' %}"
+         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Anulados</a>
+    {% endif %}
+    {% if user.perfil.rol == 'ADMIN' %}
+      <a href="/admin/"
+         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Admin</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+
+  <span class="flex-1"></span>
+
+  {% if user.is_authenticated %}
+  <div id="campana" class="relative" hx-get="{% url 'pedidos:avisos_campana' %}" hx-trigger="load, every 30s" hx-swap="innerHTML"></div>
+  {% endif %}
+
+  <div class="flex items-center rounded-lg border border-line overflow-hidden">
+    <button onclick="setFont(-1)" title="Texto más chico" class="px-2.5 py-1.5 text-xs font-bold text-muted hover:bg-appbg hover:text-body">A−</button>
+    <button onclick="setFont(0)"  title="Tamaño normal"   class="px-2.5 py-1.5 text-sm font-bold text-muted hover:bg-appbg hover:text-body border-x border-line">A</button>
+    <button onclick="setFont(1)"  title="Texto más grande" class="px-2.5 py-1.5 text-base font-bold text-muted hover:bg-appbg hover:text-body">A+</button>
+  </div>
+
+  {% if user.is_authenticated %}
+  <div class="flex items-center gap-3">
+    <span class="text-right leading-tight hidden sm:block">
+      <b class="block text-ink text-sm font-semibold">{{ user.get_full_name|default:user.email }}</b>
+      <span class="text-muted text-xs">{{ user.perfil.get_rol_display|default:"Sin rol" }}</span>
+    </span>
+    <span class="w-9 h-9 rounded-full bg-brand text-white grid place-items-center font-bold text-xs">{{ user.email|first|upper }}</span>
+    <a href="{% url 'account_logout' %}"
+       class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-3 py-2 rounded-lg">Salir</a>
+  </div>
+  {% endif %}
+</header>

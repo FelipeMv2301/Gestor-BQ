@@ -1,13 +1,73 @@
 {% extends "admin/change_list.html" %}
 
 {% block object-tools-items %}
-<li>
-    <form action="{% url 'admin:pedidos_pedido_sincronizar' %}" method="post" style="display:inline-flex; gap:6px; align-items:center;">
-        {% csrf_token %}
-        <input type="date" name="after" required>
-        <input type="date" name="before">
-        <button type="submit" class="button">Sincronizar Pedidos</button>
-    </form>
+<li style="position: relative;">
+    <button type="button" class="button" onclick="document.getElementById('menu-sync').classList.toggle('abierto')">
+        Sincronizar Pedidos ▾
+    </button>
+
+    <div id="menu-sync" class="menu-sync-oculto">
+        <div class="menu-sync-tabs">
+            <button type="button" class="button" onclick="mostrarTab('fecha')">Por fecha</button>
+            <button type="button" class="button" onclick="mostrarTab('individual')">Individual</button>
+        </div>
+
+        <form id="tab-fecha" action="{% url 'admin:pedidos_pedido_sincronizar' %}" method="post" class="menu-sync-form">
+            {% csrf_token %}
+            <input type="date" name="after" required>
+            <input type="date" name="before">
+            <button type="submit" class="button">Sincronizar</button>
+        </form>
+
+        <form id="tab-individual" action="{% url 'admin:pedidos_pedido_cargar_individual' %}" method="post" class="menu-sync-form" style="display:none;">
+            {% csrf_token %}
+            <input type="text" name="num_pedido" placeholder="N° de pedido" required>
+            <select name="origen" required>
+                <option value="SAP">SAP</option>
+                <option value="WEB">WEB</option>
+            </select>
+            <button type="submit" class="button">Cargar</button>
+        </form>
+    </div>
 </li>
 {{ block.super }}
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .menu-sync-oculto {
+        display: none;
+        position: absolute;
+        top: 100%;
+        right: 0;
+        margin-top: 4px;
+        min-width: 280px;
+        padding: 10px;
+        z-index: 100;
+        background: var(--body-bg);
+        color: var(--body-fg);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+    }
+    .menu-sync-oculto.abierto {
+        display: block;
+    }
+    .menu-sync-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 10px;
+    }
+    .menu-sync-form {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+</style>
+<script>
+    function mostrarTab(nombre) {
+        document.getElementById('tab-fecha').style.display = (nombre === 'fecha') ? 'flex' : 'none';
+        document.getElementById('tab-individual').style.display = (nombre === 'individual') ? 'flex' : 'none';
+    }
+</script>
 {% endblock %}

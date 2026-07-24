@@ -1,0 +1,68 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Portal Bioquímica{% endblock %}</title>
+
+  <link rel="icon" type="image/svg+xml" href="{% static 'images/icono.svg' %}">
+  <link rel="icon" type="image/png" href="{% static 'images/icono.png' %}">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            appbg: '#edf4f4', surface: '#ffffff', line: '#dbe8e8', linestrong: '#c6d8d8',
+            body: '#1c2b2d', muted: '#5f7476', ink: '#12262a',
+            brand: { DEFAULT: '#0b8f9c', ink: '#076370', soft: '#dbf1f2' },
+            lime:  { DEFAULT: '#6faa38', ink: '#4a6f24', soft: '#eaf5dd' },
+            pend: { bg: '#fdefdd', ink: '#965310', dot: '#ef8f2a' },
+            apro: { bg: '#dbf1f2', ink: '#076370', dot: '#0b8f9c' },
+            noti: { bg: '#eaf5dd', ink: '#466518', dot: '#7ab648' },
+            rech: { bg: '#fbe4e2', ink: '#8c261d', dot: '#e0463a' },
+          },
+          fontFamily: {
+            sans: ['-apple-system','Segoe UI','system-ui','Roboto','sans-serif'],
+            mono: ['SF Mono','ui-monospace','Cascadia Mono','Roboto Mono','monospace'],
+          },
+        }
+      }
+    }
+  </script>
+  <script>
+    (function () {
+        var s = localStorage.getItem('fontScale');
+        if (s) document.documentElement.style.fontSize = s + '%';
+    })();
+   </script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+
+<script>
+  window.setFont = function (dir) {
+    var niveles = [90, 100, 110, 120];               // % del tamaño base
+    var actual = parseInt(localStorage.getItem('fontScale') || '100', 10);
+    var i = niveles.indexOf(actual); if (i < 0) i = 1;
+    if (dir === 0) i = 1;                             // reset a 100%
+    else i = Math.min(niveles.length - 1, Math.max(0, i + dir));
+    document.documentElement.style.fontSize = niveles[i] + '%';
+    localStorage.setItem('fontScale', niveles[i]);
+  };
+</script>
+
+<body class="min-h-screen bg-appbg text-body font-sans antialiased" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  {% if user.is_authenticated %}{% include "partials/_header.html" %}{% endif %}
+
+  <main class="{% block ancho %}max-w-[1600px]{% endblock %} w-full mx-auto px-6 py-7">
+    {% block content %}{% endblock %}
+  </main>
+
+  <div id="modal"></div>
+  <div id="toasts" class="fixed top-[70px] right-5 z-[60] flex flex-col gap-2.5"></div>
+  {% include "partials/_toast.html" %}
+</body>
+</html>

@@ -35,13 +35,16 @@ def obtener_cookies_sap(b1session_vencido=None):
     return cookies
 
 
+#No utilizar, solo para solicitar_sap()
+_session = requests.Session()
+
 #Crea la llamada al endpoint con los parámetros que devuelvan las funciones.
 def solicitar_sap(metodo, url, cookies, params=None, timeout=60):
-    respuesta = requests.request(metodo, url, params=params, cookies=cookies, timeout=timeout)
+    respuesta = _session.request(metodo, url, params=params, cookies=cookies, timeout=timeout)
 
     if respuesta.status_code == 401:
         cookies = obtener_cookies_sap(b1session_vencido=cookies.get("B1SESSION"))
-        respuesta = requests.request(metodo, url, params=params, cookies=cookies, timeout=timeout)
+        respuesta = _session.request(metodo, url, params=params, cookies=cookies, timeout=timeout)
 
     return respuesta, cookies
 
@@ -57,7 +60,7 @@ def agregar_rango_fechas(filtro_base, campo_fecha, after=None, before=None):
     
     return " and ".join(filtros)
 
-
+#Trae al socio de negocios de SAP para la información de los documentos
 def obtener_business_partner(card_code, cookies):
     url = f"{settings.SAP_URL}/BusinessPartners('{card_code}')"
     params = {"$select": "CardCode,CardName,EmailAddress,Phone1,ContactEmployees"}
@@ -67,7 +70,7 @@ def obtener_business_partner(card_code, cookies):
         return {}
     return respuesta.json()
 
-
+#Paginación
 def obtener_todas_las_paginas(url, params, cookies):
     resultados = []
 
@@ -86,3 +89,10 @@ def obtener_todas_las_paginas(url, params, cookies):
         params = None  # el nextLink ya trae $skip incluido en la URL
 
     return resultados
+
+#Obtiene el pedido (nota de venta) de SAP a partir del N° de documento.
+def obtener_un_resultado(url, params, cookies):
+    respuesta, cookies = solicitar_sap("GET", url, cookies, params=params)
+    respuesta.raise_for_status()
+    resultados = respuesta.json().get("value", [])
+    return resultados[0] if resultados else None

@@ -1,15 +1,36 @@
-from integraciones import woo_client, sap_client
+from integraciones import woo_client, sap_client, email_client
 from django.conf import settings
-from .models import Pedido
+from .models import Pedido, SkuCourier, Aviso
 from ejecutivos.models import Ejecutivo
-from cuentas.models import PerfilUsuario
 from django.forms.models import model_to_dict
 from pedidosRechazados.models import PedidoRechazado
 from . import permisos
+from django.db import transaction
+from cuentas.models import PerfilUsuario
 
 """
 Funciones para WooCommerce
 """
+
+#Herramienta que ayuda a estandarizar el mapeo de woo
+def _mapear_pedido_woo(pedido_woo, mapa_comunas, ejecutivo_web):
+    billing = pedido_woo.get("billing", {})
+    shipping = pedido_woo.get("shipping", {})
+    return{
+        "tipo_entrega": definir_tipo_entrega_woo(pedido_woo),
+        "ejecutivo": ejecutivo_web,
+        "estado_comercial": Pedido.EstadoComercial.APROBADO,
+        "rut": billing.get("tax_id", ""),
+        "razon_social": billing.get("company", ""),
+        "nombre_contacto": f"{billing.get('first_name', '')} {billing.get('last_name', '')}".strip(),
+        "telefono_contacto": billing.get("phone", ""),
+        "email_contacto": billing.get("email", ""),
+        "direccion_calle": shipping.get("address_1", ""),
+        "direccion_depto": shipping.get("address_2", ""),
+        "direccion_comuna": mapa_comunas.get(shipping.get("state", ""), shipping.get("state", "")),
+        "direccion_ciudad": shipping.get("city", ""),
+        "observaciones": pedido_woo.get("customer_note", ""),
+    }
 
 #Valida si es Despacho o Retiro por pedido para WooCommerce
 def definir_tipo_entrega_woo(pedido_woo):
@@ -23,7 +44,7 @@ def definir_tipo_entrega_woo(pedido_woo):
 def guardar_pedidos_woo(after=None, before=None):
     mapa_comunas = woo_client.obtener_mapa_comunas()
     pedidos_woo = []
-    ejecutivo_web = Ejecutivo.objects.filter(codigo_sap=25).first() #Llama a web a través del codigo_sap de la DB y lo mapea automáticamente
+    ejecutivo_web = Ejecutivo.objects.filter(codigo_sap=settings.EJECUTIVO_WEB_SAP).first() #Llama a web a través del codigo_sap de la DB y lo mapea automáticamente
 
     #Llama y filtra a los que pertenezcan a estos dos estados de Woo
     for status in ("processing", "completed"):
@@ -31,49 +52,101 @@ def guardar_pedidos_woo(after=None, before=None):
 
     #Almacena la cantidad de pedidos creados y actualizados para control
     creados = 0
-    actualizados = 0
+    omitidos = 0
 
     #Captura data de facturación y de envío
     for pedido_woo in pedidos_woo:
-        billing = pedido_woo.get("billing", {})
-        shipping = pedido_woo.get("shipping", {})
+        num_pedido = str(pedido_woo.get("number"))
 
-        pedido, creado = Pedido.objects.update_or_create(
-            num_pedido = str(pedido_woo.get("number")),
-            origen = Pedido.Origen.WEB,
-            defaults = {
-                "tipo_entrega": definir_tipo_entrega_woo(pedido_woo),
-                "ejecutivo": ejecutivo_web,
-                "rut": billing.get("tax_id", ""),
-                "razon_social": billing.get("company", ""),
-                "nombre_contacto": f"{billing.get('first_name', '')} {billing.get('last_name', '')}".strip(),
-                "telefono_contacto": billing.get("phone", ""),
-                "email_contacto": billing.get("email", ""),
-                "direccion_calle": shipping.get("address_1", ""),
-                "direccion_depto": shipping.get("address_2", ""),
-                "direccion_comuna": mapa_comunas.get(shipping.get("state", ""), shipping.get("state", "")),
-                "direccion_ciudad": shipping.get("city", ""),
-                "observaciones": pedido_woo.get("customer_note", ""),
+        if pedido_ya_existe(Pedido.Origen.WEB, num_pedido):
+            omitidos += 1
+            continue
 
-            }
+        if pedido_fue_rechazado(Pedido.Origen.WEB, num_pedido):
+            omitidos += 1
+            continue
+
+        Pedido.objects.create(
+            num_pedido=num_pedido,
+            origen=Pedido.Origen.WEB,
+            **_mapear_pedido_woo(pedido_woo, mapa_comunas, ejecutivo_web),
         )
-        if creado:
-            creados += 1
-        
-        else:
-            actualizados += 1
+        creados += 1
     
-    return {"creados": creados, "actualizados": actualizados}
+    return {"creados": creados, "omitidos":omitidos}
+
+def guardar_un_pedido_woo(num_pedido, ignorar_rechazado=False):
+    pedido_woo = woo_client.obtener_un_pedido_woo(num_pedido)
+    if pedido_woo is None:
+        raise ValueError(f"[!] Error: No se encontró el pedido WEB-{num_pedido} en WooCommerce.")
+
+    if pedido_ya_existe(Pedido.Origen.WEB, num_pedido):
+       raise ValueError(f"[!] Error: El pedido WEB-{num_pedido} ya existe. Puedes editarlo en la misma aplicación.")
+
+    if not ignorar_rechazado and pedido_fue_rechazado(Pedido.Origen.WEB, num_pedido):
+        raise ValueError(f"[!] Error: El pedido WEB-{num_pedido} ya fue rechazado antes, no se puede volver a ingresar.")
+    
+    mapa_comunas = woo_client.obtener_mapa_comunas()
+    ejecutivo_web = Ejecutivo.objects.filter(codigo_sap=settings.EJECUTIVO_WEB_SAP).first()
+
+    billing = pedido_woo.get("billing" ,{})
+    shipping = pedido_woo.get("shipping", {})
+
+    Pedido.objects.create(
+        num_pedido=str(pedido_woo.get("number")),
+        origen=Pedido.Origen.WEB,
+        **_mapear_pedido_woo(pedido_woo, mapa_comunas, ejecutivo_web),
+    )
+    return f"Pedido WEB-{num_pedido} creado desde WooCommerce."
+    
+
 
 """
 Funciones para SAP
 """
+
+#Herramienta que ayuda a estandarizar el mapeo de SAP
+def _mapear_orden_sap(orden, cache_bp, cookies, mapa_sku=None, mapa_ejecutivos=None):
+    if mapa_sku is None:
+        mapa_sku = {s.sku: s.courier for s in SkuCourier.objects.all()}
+
+    if mapa_ejecutivos is None:
+        mapa_ejecutivos = {e.codigo_sap: e for e in Ejecutivo.objects.all()}
+
+    addr_ext = orden.get("AddressExtension") or {}
+    nombre, telefono, email = obtener_datos_contacto_sap(orden, cache_bp, cookies)
+    return{
+        "tipo_entrega": definir_tipo_entrega_sap(orden),
+        "nombre_contacto": nombre,
+        "telefono_contacto": telefono,
+        "email_contacto": email,
+        "courier": detectar_courier_sap(orden, mapa_sku),
+        "transportation_code": orden.get("TransportationCode"),
+        "u_bq_tipo_entrega": orden.get("U_BQ_TipoEntrega") or "",
+        "u_bq_crear_envio": orden.get("U_BQ_CrearEnvio") or "",
+        "rut": limpiar_rut_sap(orden.get("CardCode")),
+        "razon_social": orden.get("CardName") or "",
+        "direccion_calle": addr_ext.get("ShipToStreet") or "",
+        "direccion_comuna": addr_ext.get("ShipToCounty", ""),
+        "direccion_ciudad": addr_ext.get("ShipToCity") or "",
+        "ejecutivo": mapa_ejecutivos.get(orden.get("SalesPersonCode")),
+        "observaciones": orden.get("Comments") or "",
+    }
+
 
 #Traduce campos de SAP en texto legible por el gestor-bq
 def definir_tipo_entrega_sap(orden):
     if orden.get("TransportationCode") == 3:
         return Pedido.TipoEntrega.RETIRO_BIOQUIMICA
     return Pedido.TipoEntrega.DESPACHO
+
+#Detecta al courier a través del SKU del despacho.
+def detectar_courier_sap(orden, mapa_sku):
+    for linea in (orden.get("DocumentLines") or []):
+        item_code = (linea.get("ItemCode") or "").upper()
+        if item_code in mapa_sku:
+            return mapa_sku[item_code]
+    return ""
 
 def limpiar_rut_sap(card_code):
       if not card_code:
@@ -109,10 +182,13 @@ def guardar_pedidos_sap(after=None, before=None):
     cookies = sap_client.obtener_cookies_sap()
     cache_bp = {}
 
+    mapa_sku = {s.sku: s.courier for s in SkuCourier.objects.all()} 
+    mapa_ejecutivos = {e.codigo_sap: e for e in Ejecutivo.objects.all()}
+
     filtro = sap_client.agregar_rango_fechas(
-        "TransportationCode eq 3 or (TransportationCode eq 1 and (U_BQ_TipoEntrega eq 'HOME' or U_BQ_TipoEntrega eq 'BRANCH'))", 
-        "CreationDate", 
-        after=after, 
+        "U_BQ_CrearEnvio eq 'Y' and (TransportationCode eq 3 or (TransportationCode eq 1 and (U_BQ_TipoEntrega eq 'HOME' or U_BQ_TipoEntrega eq 'BRANCH')))", 
+        "UpdateDate", 
+        after=after,
         before=before,
     )
 
@@ -120,47 +196,61 @@ def guardar_pedidos_sap(after=None, before=None):
 
         f"{settings.SAP_URL}/Orders",
         {
-            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,ContactPersonCode",
+            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,ContactPersonCode,DocumentLines",
             "$filter": filtro,
         },
         cookies,
     )
 
     creados = 0
-    actualizados = 0
+    omitidos = 0
 
     for orden in ordenes:
-        addr_ext = orden.get("AddressExtension") or {}
-        codigo_ejecutivo = orden.get("SalesPersonCode")
-        nombre_contacto, telefono_contacto, email_contacto = obtener_datos_contacto_sap(orden, cache_bp, cookies)
+        num_pedido = str(orden.get("DocNum"))
 
-        pedido, creado = Pedido.objects.update_or_create(
-            num_pedido = str(orden.get("DocNum")),
-            origen = Pedido.Origen.SAP,
-            defaults = {
-                "tipo_entrega": definir_tipo_entrega_sap(orden),
-                "nombre_contacto": nombre_contacto,
-                "telefono_contacto": telefono_contacto,
-                "email_contacto": email_contacto,
-                "transportation_code": orden.get("TransportationCode"),
-                "u_bq_tipo_entrega": orden.get("U_BQ_TipoEntrega") or "",
-                "u_bq_crear_envio": orden.get("U_BQ_CrearEnvio") or "",
-                "rut": limpiar_rut_sap(orden.get("CardCode")),
-                "razon_social": orden.get("CardName") or "",
-                "direccion_calle": addr_ext.get("ShipToStreet") or "",
-                "direccion_comuna": addr_ext.get("ShipToCounty", ""),
-                "direccion_ciudad": addr_ext.get("ShipToCity") or "",
-                "ejecutivo": Ejecutivo.objects.filter(codigo_sap=codigo_ejecutivo).first(),
-                "observaciones": orden.get("Comments") or "",
-            }
+        if pedido_ya_existe(Pedido.Origen.SAP, num_pedido):
+            omitidos += 1
+            continue
+        if pedido_fue_rechazado(Pedido.Origen.SAP, num_pedido):
+            omitidos += 1
+            continue
+
+        Pedido.objects.create(
+            num_pedido=num_pedido,
+            origen=Pedido.Origen.SAP,
+            **_mapear_orden_sap(orden, cache_bp, cookies, mapa_sku, mapa_ejecutivos),
         )
+        creados += 1
 
-        if creado:
-            creados += 1
-        else:
-            actualizados += 1
+    return {"creados": creados, "omitidos": omitidos}
+
+def guardar_un_pedido_sap(num_pedido, ignorar_rechazado=False):
+    cookies = sap_client.obtener_cookies_sap()
+    orden = sap_client.obtener_un_resultado(
+        f"{settings.SAP_URL}/Orders",
+        {
+            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,ContactPersonCode,DocumentLines",
+            "$filter": f"DocNum eq {num_pedido}",
+        },
+        cookies,
+    )
+    if orden is None:
+        raise ValueError(f"[!] Error: No se encontró el pedido SAP-{num_pedido} en SAP.")
     
-    return {"creados": creados, "actualizados": actualizados}
+    if pedido_ya_existe(Pedido.Origen.SAP, num_pedido):
+        raise ValueError(f"[!] Error: El pedido SAP-{num_pedido} ya existe. Puedes editarlo en la misma aplicación.")
+
+    if not ignorar_rechazado and pedido_fue_rechazado(Pedido.Origen.SAP, num_pedido):
+        raise ValueError(f"[!] Error: El pedido SAP-{num_pedido} ya fue rechazado antes, no se puede volver a ingresar.")
+
+    cache_bp = {}
+    Pedido.objects.create(
+        num_pedido=str(orden.get("DocNum")),
+        origen=Pedido.Origen.SAP,
+        **_mapear_orden_sap(orden, cache_bp, cookies),
+    )
+    return f"Pedido SAP-{num_pedido} creado desde SAP."
+
 
 """
 Acciones del equipo
@@ -193,12 +283,63 @@ def rechazar_pedido(pedido, motivo, usuario):
         raise PermissionError("[!] Error: Solo un Administrador puede rechazar/cancelar un pedido.")
 
     snapshot = model_to_dict(pedido)  # copia todos los campos del Pedido a un dict
-    PedidoRechazado.objects.create(
-        origen=pedido.origen,
-        num_pedido=pedido.num_pedido,
-        snapshot=snapshot,
-        motivo=motivo,
-        rechazado_por=usuario,
-    )
-    pedido.delete()
 
+    with transaction.atomic():
+        PedidoRechazado.objects.create(
+            origen=pedido.origen, num_pedido=pedido.num_pedido,
+            snapshot=snapshot, motivo=motivo, rechazado_por=usuario,
+        )
+        _avisar_ejecutivo(pedido, Aviso.Tipo.ANULADO,
+                          f"Tu pedido {pedido.origen}-{pedido.num_pedido} fue anulado."
+                          + (f" Motivo: {motivo}" if motivo else ""))
+        pedido.delete()
+
+#Reingresa un pedido anulado desde la fuente (SAP/Woo). Borra el archivo solo si la re-ingesta tuvo éxito.
+def reingresar_pedido(rechazado):
+    if rechazado.origen == Pedido.Origen.SAP:
+        mensaje = guardar_un_pedido_sap(rechazado.num_pedido, ignorar_rechazado=True)
+    else:
+        mensaje = guardar_un_pedido_woo(rechazado.num_pedido, ignorar_rechazado=True)
+    rechazado.delete()
+    return mensaje
+
+
+def notificar_pedido(pedido, usuario):
+    if not permisos.puede_notificar(usuario, pedido):
+        raise PermissionError("[!] Error: Solo Logística o Admin pueden notificar, y solo sobre un pedido APROBADO.")
+    
+    if pedido.estado_notificacion == Pedido.EstadoNotificacion.NOTIFICADO:
+        raise ValueError(f"[!] Error: Pedido N° {pedido.origen}-{pedido.num_pedido} ya fue notificado") 
+    
+    email_client.enviar_notificacion(pedido)
+
+    pedido.estado_notificacion = Pedido.EstadoNotificacion.NOTIFICADO
+    pedido.save(update_fields=["estado_notificacion", "modificado_en"])
+    _avisar_ejecutivo(pedido, Aviso.Tipo.NOTIFICADO,
+                      f"Tu pedido {pedido.origen}-{pedido.num_pedido} fue despachado y el cliente notificado.")
+    return pedido
+
+"""
+Funciones reutilizables
+"""
+
+#Valida si un pedido está en la lista de rechazados
+def pedido_fue_rechazado(origen, num_pedido):
+    return PedidoRechazado.objects.filter(origen=origen, num_pedido=num_pedido).exists()
+
+#Valida si un pedido ya existe en el sistema para evitar un upsert que pise la base de datos actual
+def pedido_ya_existe(origen, num_pedido):
+    return Pedido.objects.filter(origen=origen, num_pedido=num_pedido).exists()
+
+#Crea un aviso para el/los usuario(s) dueños del pedido (fan-out por codigo_sap del ejecutivo)
+def _avisar_ejecutivo(pedido, tipo, mensaje):
+    if pedido.ejecutivo_id is None:
+        return
+    perfiles = PerfilUsuario.objects.filter(
+        codigo_empleado_sap=pedido.ejecutivo.codigo_sap
+    ).select_related("usuario")
+    Aviso.objects.bulk_create([
+        Aviso(destinatario=p.usuario, tipo=tipo, mensaje=mensaje,
+              origen=pedido.origen, num_pedido=pedido.num_pedido, pedido=pedido)
+        for p in perfiles
+    ])

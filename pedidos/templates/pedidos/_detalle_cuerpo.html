@@ -1,0 +1,73 @@
+<div class="flex items-center justify-between gap-4 flex-wrap mb-5">
+  <div class="flex items-center gap-3">
+    <h1 class="text-2xl font-bold text-ink font-mono tabular-nums">{{ pedido.origen }}-{{ pedido.num_pedido }}</h1>
+    {% include "partials/_badge_estado.html" with pedido=pedido %}
+  </div>
+  <div class="flex gap-2.5">
+    {% if puede_editar %}
+    <button hx-get="{% url 'pedidos:editar' pedido.pk %}" hx-target="#detalle-cuerpo"
+            class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Editar</button>
+    {% endif %}
+    
+    {% if puede_notificar and pedido.estado_notificacion != 'NOTIFICADO' %}
+    <button hx-post="{% url 'pedidos:notificar' pedido.pk %}"
+            class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Notificar al cliente</button>
+    {% endif %}
+
+    {% if pedido.estado_comercial == 'PENDIENTE' %}
+    <button hx-post="{% url 'pedidos:aprobar' pedido.pk %}"
+            class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Enviar a Logística →</button>
+    {% endif %}
+    {% if puede_rechazar %}
+    <button hx-get="{% url 'pedidos:rechazar' pedido.pk %}" hx-target="#modal"
+            class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong text-rech-ink hover:bg-rech-bg">Anular</button>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid gap-4 items-start" style="grid-template-columns: 1.15fr .85fr;">
+  <div class="bg-surface border border-line rounded-2xl shadow-sm">
+    <div class="p-5">
+      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-3.5">Cliente</h3>
+      {% include "pedidos/_campo.html" with k="RUT" v=pedido.rut mono=True %}
+      {% include "pedidos/_campo.html" with k="Razón social" v=pedido.razon_social %}
+      {% include "pedidos/_campo.html" with k="Contacto" v=pedido.nombre_contacto %}
+      {% include "pedidos/_campo.html" with k="Teléfono" v=pedido.telefono_contacto mono=True %}
+      {% include "pedidos/_campo.html" with k="Email" v=pedido.email_contacto %}
+    </div>
+    <div class="p-5 border-t border-line">
+      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-3.5">Dirección de entrega</h3>
+      {% include "pedidos/_campo.html" with k="Calle" v=pedido.direccion_calle %}
+      {% include "pedidos/_campo.html" with k="Depto / Of." v=pedido.direccion_depto %}
+      {% include "pedidos/_campo.html" with k="Comuna" v=pedido.direccion_comuna %}
+      {% include "pedidos/_campo.html" with k="Ciudad" v=pedido.direccion_ciudad %}
+    </div>
+  </div>
+
+  <div class="bg-surface border border-line rounded-2xl shadow-sm">
+    <div class="p-5">
+      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-3.5">Envío</h3>
+      {% include "pedidos/_campo.html" with k="Tipo de entrega" v=pedido.get_tipo_entrega_display %}
+      {% include "pedidos/_campo.html" with k="Courier" v=pedido.get_courier_display %}
+      {% include "pedidos/_campo.html" with k="Orden transporte" v=pedido.envio.orden_transporte mono=True %}
+    </div>
+    <div class="p-5 border-t border-line">
+      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-3.5">Estado</h3>
+      <div class="flex items-center justify-between py-1.5 text-sm">
+        <span class="text-muted">Comercial</span>{% include "partials/_badge_estado.html" with pedido=pedido %}
+      </div>
+      <p class="text-xs text-muted mt-2 leading-relaxed">Al enviar a Logística, el pedido se bloquea para edición comercial y se avisa al equipo.</p>
+    </div>
+  </div>
+</div>
+
+{% if pedido.origen == 'SAP' %}
+<details class="mt-4 bg-surface border border-line rounded-2xl">
+  <summary class="cursor-pointer px-5 py-4 text-sm font-semibold text-body select-none">Datos SAP (auditoría)</summary>
+  <div class="grid gap-3 px-5 pb-4" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="bg-appbg border border-line rounded-lg px-3.5 py-3"><div class="text-xs text-muted font-mono">TransportationCode</div><div class="text-sm text-ink font-mono font-semibold mt-1">{{ pedido.transportation_code|default:"—" }}</div></div>
+    <div class="bg-appbg border border-line rounded-lg px-3.5 py-3"><div class="text-xs text-muted font-mono">U_BQ_TipoEntrega</div><div class="text-sm text-ink font-mono font-semibold mt-1">{{ pedido.u_bq_tipo_entrega|default:"—" }}</div></div>
+    <div class="bg-appbg border border-line rounded-lg px-3.5 py-3"><div class="text-xs text-muted font-mono">U_BQ_CrearEnvio</div><div class="text-sm text-ink font-mono font-semibold mt-1">{{ pedido.u_bq_crear_envio|default:"—" }}</div></div>
+  </div>
+</details>
+{% endif %}

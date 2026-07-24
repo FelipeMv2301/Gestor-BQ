@@ -1,10 +1,39 @@
 from django.db import models
+from django.conf import settings
 from ejecutivos.models import Ejecutivo
+from django.db.models import Q
 
+#Permite la creación y gestión de los filtros usados para las vistas
+class PedidoQuerySet(models.QuerySet):
+    def buscar(self, texto):
+        if not texto:
+            return self
+        return self.filter(
+            Q(num_pedido__icontains=texto) | Q(razon_social__icontains=texto)
+            | Q(nombre_contacto__icontains=texto) | Q(rut__icontains=texto)
+        )
+    
+    def con_estado_comercial(self, estado):
+        return self.filter(estado_comercial=estado) if estado else self
+    
+    def con_notificacion(self, valores):
+        return self.filter(estado_notificacion__in=valores) if valores else self
+    
+    def con_envio(self, valores):
+        if "enviado" in valores and "sin" not in valores:
+            return self.filter(envio__isnull=False)
+        if "sin" in valores and "enviado" not in valores:
+            return self.filter(envio__isnull=True)
+        return self
+    
+    def con_origen(self, valores):
+        return self.filter(origen__in=valores) if valores else self
 
-
+    def con_tipo_entrega(self, valores):
+        return self.filter(tipo_entrega__in=valores) if valores else self
+    
 class Pedido(models.Model):
-
+    objects = PedidoQuerySet.as_manager()
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -181,4 +210,44 @@ class Pedido(models.Model):
         auto_now=True
     )
 
+#Mapear los couriers por el SKU asignado en SAP
+class SkuCourier(models.Model):
+    class Sku(models.TextChoices):
+        SGCHIBRA = "SGCHIBRA", "sgchibra"
 
+    sku = models.CharField(
+        max_length=120,
+        choices=Sku.choices,
+        unique=True,
+    )
+
+    courier = models.CharField(
+        max_length=120, 
+        choices=Pedido.Courier.choices
+    )
+
+    def __str__(self):
+        return f"{self.sku} usa el courier {self.get_courier_display()}"
+    
+#Aviso interno: evento de un pedido dirigido a un usuario.
+class Aviso(models.Model):
+    class Tipo(models.TextChoices):
+        NOTIFICADO = "NOTIFICADO", "Notificado"
+        ANULADO = "ANULADO", "Anulado"
+
+    destinatario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="avisos")
+    mensaje = models.CharField(max_length=255)
+    tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    # Denormalizados: sobreviven aunque el Pedido se borre al anular
+    origen = models.CharField(max_length=20, blank=True)
+    num_pedido = models.CharField(max_length=120, blank=True)
+    pedido = models.ForeignKey(
+        "pedidos.Pedido", null=True, blank=True, on_delete=models.SET_NULL, related_name="avisos")
+    leida = models.BooleanField(default=False)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-creado_en"]
+        indexes = [models.Index(fields=["destinatario", "leida"])]
+    

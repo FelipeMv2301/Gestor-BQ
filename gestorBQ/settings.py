@@ -35,25 +35,50 @@ TOKEN_SAP_BQ_USER = os.getenv('TOKEN_SAP_BQ_USER')
 TOKEN_SAP_BQ_PASS = os.getenv('TOKEN_SAP_BQ_PASS')
 SAP_URL = os.getenv('SAP_URL')
 
+#Llamar al N° parametrizado de Ejecutivo web en SAP (Se puede cambiar en caso de que cambie algo en SAP, por eso SIEMPRE llamarlo desde aquí)
+EJECUTIVO_WEB_SAP = int(os.getenv("EJECUTIVO_WEB_SAP", "25"))
+
 #Llamar parametros de WooCommerce
 WOO_BASE_URL = os.getenv('WOO_BASE_URL')
 WOO_CONSUMER_KEY = os.getenv('WOO_CONSUMER_KEY')
 WOO_CONSUMER_SECRET = os.getenv('WOO_CONSUMER_SECRET')
 
+#Llamar parametros de Chibra
+CHIBRA_BASE_URL = os.getenv("CHIBRA_BASE_URL")
+CHIBRA_USER = os.getenv("CHIBRA_USER")
+CHIBRA_PASSWORD = os.getenv("CHIBRA_PASSWORD")
+CHIBRA_CLIENTE_REMITENTE = os.getenv("CHIBRA_CLIENTE_REMITENTE")
+
+#Parámetros de cuenta no-reply
+EMAIL_SENDER = os.getenv("EMAIL_SENDER")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+EMAIL_BCC = os.getenv("EMAIL_BCC", "informatica@bioquimica.cl,despachos@bioquimica.cl")
+EMAIL_PROMO_ACTIVA = os.getenv("EMAIL_PROMO_ACTIVA", "False").strip().upper() == "TRUE"
+EMAIL_PICKUP_PROMO_IMG_URL = os.getenv("EMAIL_PICKUP_PROMO_IMG_URL")
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+#Base de datos a utilizar
+DATABASE_VERSION = os.getenv('DATABASE_VERSION')
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.getenv('SECRET_KEY')
+
+DEBUG = os.getenv('DEBUG', 'False').strip().lower() == 'true'
+
+ALLOWED_HOSTS = ['*']
+
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-a=-a4#y7f$kdn53s3w3b&%y2wpy^l$346_!1&2czy+_vmbxcj&'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
-ALLOWED_HOSTS = []
+
+
 
 SITE_ID = 1
 
@@ -65,10 +90,13 @@ SOCIALACCOUNT_PROVIDERS = {
             'key': '',
         },
         'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'hd': 'bioquimica.cl'}, #Filtro para cuentas de bq
     }
 }
 
 SOCIALACCOUNT_ONLY = True
+
+SOCIALACCOUNT_LOGIN_ON_GET = True
 
 SOCIALACCOUNT_ADAPTER = "cuentas.adapters.BioquimicaSocialAccountAdapter"
 
@@ -115,10 +143,11 @@ AUTHENTICATION_BACKENDS = [
 
 ROOT_URLCONF = 'gestorBQ.urls'
 
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -130,23 +159,33 @@ TEMPLATES = [
     },
 ]
 
+
+
+
 WSGI_APPLICATION = 'gestorBQ.wsgi.application'
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': DB_NAME,
-        'USER': DB_USER,
-        'PASSWORD': DB_PASSWORD,
-        'HOST': DB_HOST,      # IP del server Postgres remoto
-        'PORT': DB_PORT,               # Puerto por defecto de PostgreSQL
+if DATABASE_VERSION == "SQLITE":
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
-
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': DB_NAME,
+            'USER': DB_USER,
+            'PASSWORD': DB_PASSWORD,
+            'HOST': DB_HOST,      # IP del server Postgres remoto
+            'PORT': DB_PORT,
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -170,9 +209,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es-cl'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Santiago'
 
 USE_I18N = True
 
@@ -183,6 +222,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

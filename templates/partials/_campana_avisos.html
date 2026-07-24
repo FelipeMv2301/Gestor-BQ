@@ -1,0 +1,31 @@
+<button type="button" onclick="document.getElementById('dropdown-avisos').classList.toggle('hidden')"
+        class="relative w-9 h-9 rounded-lg border border-line grid place-items-center text-muted hover:text-body">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+  {% if no_leidos %}
+  <span class="absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] px-1 bg-[#e0463a] text-white text-[0.65rem] font-bold rounded-full grid place-items-center">{{ no_leidos }}</span>
+  {% endif %}
+</button>
+
+<div id="dropdown-avisos" class="hidden absolute right-0 top-11 w-80 bg-surface border border-line rounded-2xl shadow-lg z-50 overflow-hidden">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-line">
+    <span class="text-sm font-bold text-ink">Avisos</span>
+    {% if no_leidos %}
+    <button hx-post="{% url 'pedidos:marcar_avisos_leidos' %}" hx-target="#campana" hx-swap="innerHTML"
+            class="text-xs font-semibold text-brand-ink hover:underline">Marcar leídos</button>
+    {% endif %}
+  </div>
+  <div class="max-h-80 overflow-y-auto">
+    {% for a in avisos %}
+    <button hx-post="{% url 'pedidos:marcar_aviso_leido' a.pk %}"
+            class="w-full text-left flex gap-3 px-4 py-3 border-b border-line hover:bg-appbg {% if not a.leida %}bg-brand-soft{% endif %}">
+      <span class="w-2 h-2 rounded-full mt-1.5 flex-none {% if a.leida %}bg-linestrong{% else %}bg-brand{% endif %}"></span>
+      <span>
+        <span class="block text-sm text-body">{{ a.mensaje }}</span>
+        <span class="text-xs text-muted">{{ a.creado_en|date:"d/m H:i" }}</span>
+      </span>
+    </button>
+    {% empty %}
+    <p class="px-4 py-6 text-center text-sm text-muted">Sin avisos.</p>
+    {% endfor %}
+  </div>
+</div>
