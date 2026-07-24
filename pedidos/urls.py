@@ -16,5 +16,8 @@ urlpatterns = [
     path("avisos/marcar-leidos/", views.marcar_avisos_leidos, name="marcar_avisos_leidos"),
     path("avisos/<int:pk>/leer/", views.marcar_aviso_leido, name="marcar_aviso_leido"),
     path("despachos/", views.tablero_logistica, name="despachos"),
+    path("lote/aprobar/", views.aprobar_lote, name="aprobar_lote"),
+    path("lote/notificar/", views.notificar_lote, name="notificar_lote"),
+    path("armar-despacho/", views.armar_despacho, name="armar_despacho"),
     path("<int:pk>/notificar/", views.notificar, name="notificar"),
 ]

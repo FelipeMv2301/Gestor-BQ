@@ -6,7 +6,7 @@
     <form hx-post="{% url 'pedidos:rechazar' pedido.pk %}" class="mt-4">
       <label class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Motivo (opcional)</label>
       <textarea name="motivo" rows="3" placeholder="Por qué se anula…"
-                class="w-full text-sm rounded-lg border border-linestrong bg-white px-3 py-2 focus:border-brand focus:outline-none"></textarea>
+                class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></textarea>
       <div class="flex justify-end gap-2.5 mt-5">
         <button type="button" onclick="document.getElementById('modal').innerHTML=''"
                 class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:bg-appbg">Cancelar</button>

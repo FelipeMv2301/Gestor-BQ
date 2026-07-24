@@ -9,6 +9,7 @@ from django.http import HttpResponse
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from . import services
+from envios.services import despachar_pedidos
 import json
 
 #Pantalla principal de la aplicación. Es aquí donde irán las funcionalidades de los filtros de búsqueda y el buscador
@@ -33,7 +34,7 @@ def mis_pedidos(request):
     )
 
     contexto = {
-        "pedidos": pedidos, "vista": vista, "q": request.GET.get("q", ""),
+        "pedidos": pedidos, "vista": vista, "q": request.GET.get("q", ""), "seleccionable": True,
         "sel_notif": request.GET.getlist("notif"), "sel_envio": request.GET.getlist("envio"),
         "sel_origen": request.GET.getlist("origen"), "sel_tipo": request.GET.getlist("tipo"),
     }
@@ -182,22 +183,68 @@ def tablero_logistica(request):
     if not permisos.es_logistica(request.user):
         return redirect("inicio")
 
-    vista = request.GET.get("vista", "por_despachar")
-    pedidos = Pedido.objects.con_estado_comercial(Pedido.EstadoComercial.APROBADO)
-    if vista == "por_despachar":
-        pedidos = pedidos.filter(envio__isnull=True)
-    elif vista == "notificados":
-        pedidos = pedidos.filter(estado_notificacion=Pedido.EstadoNotificacion.NOTIFICADO)
-    # "todos" → todos los APROBADO
+    pedidos = (
+        Pedido.objects.con_estado_comercial(Pedido.EstadoComercial.APROBADO)
+        .buscar(request.GET.get("q", "").strip())
+        .con_notificacion(request.GET.getlist("notif"))
+        .con_courier(request.GET.getlist("courier"))
+        .con_envio(request.GET.getlist("envio"))
+        .con_tipo_entrega(request.GET.getlist("tipo"))
+        .select_related("ejecutivo", "envio")
+        .order_by("-modificado_en")
+    )
 
-    pedidos = (pedidos
-               .buscar(request.GET.get("q", "").strip())
-               .select_related("ejecutivo", "envio")
-               .order_by("-modificado_en"))
-
-    contexto = {"pedidos": pedidos, "vista": vista, "q": request.GET.get("q", "")}
+    contexto = {
+        "pedidos": pedidos, "q": request.GET.get("q", ""), "seleccionable": True,
+        "sel_notif": request.GET.getlist("notif"), "sel_courier": request.GET.getlist("courier"),
+        "sel_envio": request.GET.getlist("envio"), "sel_tipo": request.GET.getlist("tipo"),
+    }
     plantilla = "pedidos/_tabla_pedidos.html" if request.headers.get("HX-Request") else "pedidos/tablero_logistica.html"
     return render(request, plantilla, contexto)
+
+@login_required
+@require_POST
+def aprobar_lote(request):
+    # Reusa aprobar_pedido en loop; junta ok/errores en un toast resumen.
+    ids = request.POST.getlist("ids")
+    pedidos = permisos.queryset_para_ver(request.user).filter(pk__in=ids)
+
+    aprobados = 0
+    for pedido in pedidos:
+        try:
+            services.aprobar_pedido(pedido, request.user)
+            aprobados += 1
+        except (PermissionError, ValueError) as exc:
+            messages.error(request, f"{pedido.origen}-{pedido.num_pedido}: {str(exc).replace('[!] Error: ', '')}")
+    if aprobados:
+        messages.success(request, f"{aprobados} pedido(s) enviado(s) a Logística.")
+
+    resp = HttpResponse(status=204)
+    resp["HX-Redirect"] = reverse("pedidos:mis_pedidos")
+    return resp
+
+
+@login_required
+@require_POST
+def notificar_lote(request):
+    # Reusa notificar_pedido en loop; toast resumen.
+    ids = request.POST.getlist("ids")
+    pedidos = permisos.queryset_para_ver(request.user).filter(pk__in=ids)
+
+    notificados = 0
+    for pedido in pedidos:
+        try:
+            services.notificar_pedido(pedido, request.user)
+            notificados += 1
+        except (PermissionError, ValueError) as exc:
+            messages.error(request, f"{pedido.origen}-{pedido.num_pedido}: {str(exc).replace('[!] Error: ', '')}")
+    if notificados:
+        messages.success(request, f"{notificados} cliente(s) notificado(s).")
+
+    resp = HttpResponse(status=204)
+    resp["HX-Redirect"] = reverse("pedidos:despachos")
+    return resp
+
 
 @login_required
 @require_POST
@@ -214,6 +261,77 @@ def notificar(request, pk):
     resp = HttpResponse(status=204)
     resp["HX-Redirect"] = reverse("pedidos:detalle", args=[pk])
     return resp
+
+@login_required
+def armar_despacho(request):
+    if not permisos.es_logistica(request.user):
+        return redirect("inicio")
+
+    ids_texto = request.GET.get("ids") or request.POST.get("ids")
+    if not ids_texto:
+        messages.error(request, "No se seleccionó ningún pedido.")
+        return redirect("pedidos:despachos")
+
+    ids = [int(x) for x in ids_texto.split(",") if x]
+    pedidos = list(Pedido.objects.filter(id__in=ids))
+    if not pedidos:
+        messages.error(request, "No se encontraron los pedidos seleccionados.")
+        return redirect("pedidos:despachos")
+
+    courier = pedidos[0].courier
+
+    if request.method == "POST":
+        if request.POST.get("modo_bultos") == "simple":
+            cantidad = int(request.POST.get("simple_cantidad") or 1)
+            peso_total = float(request.POST.get("simple_peso_total") or 0)
+            peso_unitario = round(peso_total / cantidad, 2) if cantidad else peso_total
+            bultos = [{"tipo": "CAJA", "cantidad": cantidad, "alto": "", "ancho": "", "largo": "",
+                       "peso": peso_unitario, "tipo_contenido": request.POST.get("simple_tipo_contenido")}]
+        else:
+            tipos = request.POST.getlist("bulto_tipo")
+            cantidades = request.POST.getlist("bulto_cantidad")
+            altos = request.POST.getlist("bulto_alto")
+            anchos = request.POST.getlist("bulto_ancho")
+            largos = request.POST.getlist("bulto_largo")
+            pesos = request.POST.getlist("bulto_peso")
+            contenidos = request.POST.getlist("bulto_tipo_contenido")
+            bultos = []
+            for i in range(len(pesos)):
+                bultos.append({"tipo": tipos[i], "cantidad": int(cantidades[i]), "alto": altos[i],
+                               "ancho": anchos[i], "largo": largos[i], "peso": float(pesos[i]),
+                               "tipo_contenido": contenidos[i]})
+
+        destinatario = {
+            "nombre": request.POST.get("destinatario_nombre"),
+            "rut": request.POST.get("destinatario_rut"),
+            "direccion": request.POST.get("destinatario_direccion"),
+            "comuna": request.POST.get("destinatario_comuna"),
+            "telefono": request.POST.get("destinatario_telefono"),
+            "email": request.POST.get("destinatario_email"),
+        }
+        datos_courier = {
+            "centro": request.POST.get("centro"),
+            "servicio": request.POST.get("servicio"),
+            "valor_declarado": request.POST.get("valor_declarado") or 0,
+            "volumen_total": request.POST.get("volumen_total"),
+            "observaciones": request.POST.get("observaciones"),
+        }
+
+        try:
+            envio, notificaciones_fallidas = despachar_pedidos(
+                pedidos, courier, bultos, destinatario, datos_courier, request.user)
+        except ValueError as exc:
+            messages.error(request, str(exc).replace("[!] Error: ", ""))
+            return redirect(f"{reverse('pedidos:armar_despacho')}?ids={ids_texto}")
+
+        messages.success(request, f"Envío #{envio.id} despachado a {courier}.")
+        for pedido, error in notificaciones_fallidas:
+            messages.warning(request, f"{pedido.origen}-{pedido.num_pedido} despachado pero no se notificó: {error}")
+        return redirect("pedidos:despachos")
+
+    return render(request, "pedidos/armar_despacho.html",
+                  {"pedidos": pedidos, "courier": courier, "ids_texto": ids_texto})
+
 
 """
 Helpers

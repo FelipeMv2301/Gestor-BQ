@@ -46,6 +46,11 @@
 
   <div class="bg-surface border border-line rounded-2xl shadow-sm">
     <div class="p-5">
+      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-3.5">Ejecutivo a cargo</h3>
+      {% include "pedidos/_campo.html" with k="Nombre" v=pedido.ejecutivo.nombre|default:"Sin asignar" %}
+      {% if pedido.ejecutivo.email %}{% include "pedidos/_campo.html" with k="Email" v=pedido.ejecutivo.email %}{% endif %}
+    </div>
+    <div class="p-5 border-t border-line">
       <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-3.5">Envío</h3>
       {% include "pedidos/_campo.html" with k="Tipo de entrega" v=pedido.get_tipo_entrega_display %}
       {% include "pedidos/_campo.html" with k="Courier" v=pedido.get_courier_display %}

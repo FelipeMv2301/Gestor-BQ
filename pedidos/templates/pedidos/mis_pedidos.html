@@ -22,7 +22,7 @@
 
       <div class="flex flex-col gap-1.5 border-t border-line pt-3">
         <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Estado de Courier</span>
-        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="enviado" class="accent-brand w-4 h-4" {% if 'enviado' in sel_envio %}checked{% endif %}> Enviado a courier</label>
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="enviado" class="accent-brand w-4 h-4" {% if 'enviado' in sel_envio %}checked{% endif %}> Cargado a courier</label>
         <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="sin" class="accent-brand w-4 h-4" {% if 'sin' in sel_envio %}checked{% endif %}> Sin enviar</label>
       </div>
 
@@ -55,7 +55,7 @@
 
         <div class="relative flex-1 min-w-[12rem] max-w-sm">
           <input type="search" name="q" value="{{ q }}" placeholder="Buscar N° / cliente / RUT…"
-                 class="w-full text-sm rounded-lg border border-linestrong bg-white pl-9 pr-3 py-2 focus:border-brand focus:outline-none">
+                 class="w-full text-sm rounded-lg border border-linestrong bg-field text-body pl-9 pr-3 py-2 focus:border-brand focus:outline-none">
           <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">🔍</span>
         </div>
       </div>
@@ -67,4 +67,10 @@
 
   </div>
 </form>
+
+<div data-barra-acciones class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-[#12262a] text-white rounded-full shadow-lg px-5 py-3">
+  <span class="text-sm font-semibold"><span data-conteo>0</span> seleccionados</span>
+  <button hx-post="{% url 'pedidos:aprobar_lote' %}" hx-include="input[name='ids']:checked"
+          class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink">Enviar a Logística →</button>
+</div>
 {% endblock %}

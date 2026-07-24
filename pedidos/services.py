@@ -315,8 +315,13 @@ def notificar_pedido(pedido, usuario):
 
     pedido.estado_notificacion = Pedido.EstadoNotificacion.NOTIFICADO
     pedido.save(update_fields=["estado_notificacion", "modificado_en"])
-    _avisar_ejecutivo(pedido, Aviso.Tipo.NOTIFICADO,
-                      f"Tu pedido {pedido.origen}-{pedido.num_pedido} fue despachado y el cliente notificado.")
+
+    referencia = f"{pedido.origen}-{pedido.num_pedido}"
+    if pedido.tipo_entrega == Pedido.TipoEntrega.RETIRO_BIOQUIMICA:
+        mensaje = f"Tu pedido {referencia} está disponible para retiro y el cliente fue notificado."
+    else:
+        mensaje = f"Tu pedido {referencia} fue despachado a courier y el cliente notificado."
+    _avisar_ejecutivo(pedido, Aviso.Tipo.NOTIFICADO, mensaje)
     return pedido
 
 """

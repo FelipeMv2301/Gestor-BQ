@@ -31,7 +31,10 @@ class PedidoQuerySet(models.QuerySet):
 
     def con_tipo_entrega(self, valores):
         return self.filter(tipo_entrega__in=valores) if valores else self
-    
+
+    def con_courier(self, valores):
+        return self.filter(courier__in=valores) if valores else self
+
 class Pedido(models.Model):
     objects = PedidoQuerySet.as_manager()
     class Meta:
@@ -209,6 +212,27 @@ class Pedido(models.Model):
     modificado_en = models.DateTimeField(
         auto_now=True
     )
+
+    #Estado de seguimiento unificado (comercial + logística + notificación + tipo de entrega).
+    #Única fuente de verdad para el badge. Devuelve (etiqueta, clave_color) con clave ∈ pend/apro/noti.
+    @property
+    def estado_seguimiento(self):
+        if self.estado_comercial == self.EstadoComercial.PENDIENTE:
+            return ("Pendiente de carga", "pend")
+
+        notificado = self.estado_notificacion == self.EstadoNotificacion.NOTIFICADO
+
+        if self.tipo_entrega == self.TipoEntrega.RETIRO_BIOQUIMICA:
+            if notificado:
+                return ("Retiro disponible", "noti")
+            return ("Preparando retiro", "apro")
+
+        # Despacho
+        if notificado:
+            return ("Cargado a courier", "noti")
+        if self.envio_id:
+            return ("Despachado (sin notificar)", "apro")
+        return ("Por despachar", "apro")
 
 #Mapear los couriers por el SKU asignado en SAP
 class SkuCourier(models.Model):

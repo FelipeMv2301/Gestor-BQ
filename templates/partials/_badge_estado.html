@@ -1,10 +1,12 @@
-{% if pedido.estado_notificacion == 'NOTIFICADO' %}
-  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-noti-bg text-noti-ink">
-    <span class="w-1.5 h-1.5 rounded-full bg-noti-dot"></span>Notificado</span>
-{% elif pedido.estado_comercial == 'APROBADO' %}
-  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-apro-bg text-apro-ink">
-    <span class="w-1.5 h-1.5 rounded-full bg-apro-dot"></span>Cargado a Logística</span>
+{% with seguimiento=pedido.estado_seguimiento %}
+{% if seguimiento.1 == 'noti' %}
+  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-noti-bg text-noti-ink">
+    <span class="w-1.5 h-1.5 rounded-full bg-noti-dot"></span>{{ seguimiento.0 }}</span>
+{% elif seguimiento.1 == 'apro' %}
+  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-apro-bg text-apro-ink">
+    <span class="w-1.5 h-1.5 rounded-full bg-apro-dot"></span>{{ seguimiento.0 }}</span>
 {% else %}
-  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-pend-bg text-pend-ink">
-    <span class="w-1.5 h-1.5 rounded-full bg-pend-dot"></span>Pendiente de carga</span>
+  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-pend-bg text-pend-ink">
+    <span class="w-1.5 h-1.5 rounded-full bg-pend-dot"></span>{{ seguimiento.0 }}</span>
 {% endif %}
+{% endwith %}

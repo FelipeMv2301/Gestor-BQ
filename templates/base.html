@@ -16,14 +16,15 @@
       theme: {
         extend: {
           colors: {
-            appbg: '#edf4f4', surface: '#ffffff', line: '#dbe8e8', linestrong: '#c6d8d8',
-            body: '#1c2b2d', muted: '#5f7476', ink: '#12262a',
-            brand: { DEFAULT: '#0b8f9c', ink: '#076370', soft: '#dbf1f2' },
-            lime:  { DEFAULT: '#6faa38', ink: '#4a6f24', soft: '#eaf5dd' },
-            pend: { bg: '#fdefdd', ink: '#965310', dot: '#ef8f2a' },
-            apro: { bg: '#dbf1f2', ink: '#076370', dot: '#0b8f9c' },
-            noti: { bg: '#eaf5dd', ink: '#466518', dot: '#7ab648' },
-            rech: { bg: '#fbe4e2', ink: '#8c261d', dot: '#e0463a' },
+            appbg: 'var(--appbg)', surface: 'var(--surface)', field: 'var(--field)',
+            line: 'var(--line)', linestrong: 'var(--linestrong)',
+            body: 'var(--body)', muted: 'var(--muted)', ink: 'var(--ink)',
+            brand: { DEFAULT: 'var(--brand)', ink: 'var(--brand-ink)', soft: 'var(--brand-soft)' },
+            lime:  { DEFAULT: 'var(--lime)', ink: 'var(--lime-ink)', soft: 'var(--lime-soft)' },
+            pend: { bg: 'var(--pend-bg)', ink: 'var(--pend-ink)', dot: 'var(--pend-dot)' },
+            apro: { bg: 'var(--apro-bg)', ink: 'var(--apro-ink)', dot: 'var(--apro-dot)' },
+            noti: { bg: 'var(--noti-bg)', ink: 'var(--noti-ink)', dot: 'var(--noti-dot)' },
+            rech: { bg: 'var(--rech-bg)', ink: 'var(--rech-ink)', dot: 'var(--rech-dot)' },
           },
           fontFamily: {
             sans: ['-apple-system','Segoe UI','system-ui','Roboto','sans-serif'],
@@ -33,10 +34,33 @@
       }
     }
   </script>
+  <style>
+    :root {
+      --appbg:#edf4f4; --surface:#ffffff; --field:#ffffff; --line:#dbe8e8; --linestrong:#c6d8d8;
+      --body:#1c2b2d; --muted:#5f7476; --ink:#12262a;
+      --brand:#0b8f9c; --brand-ink:#076370; --brand-soft:#dbf1f2;
+      --lime:#6faa38; --lime-ink:#4a6f24; --lime-soft:#eaf5dd;
+      --pend-bg:#fdefdd; --pend-ink:#965310; --pend-dot:#ef8f2a;
+      --apro-bg:#dbf1f2; --apro-ink:#076370; --apro-dot:#0b8f9c;
+      --noti-bg:#eaf5dd; --noti-ink:#466518; --noti-dot:#7ab648;
+      --rech-bg:#fbe4e2; --rech-ink:#8c261d; --rech-dot:#e0463a;
+    }
+    .dark {
+      --appbg:#0e1417; --surface:#161c21; --field:#1c242a; --line:#29323a; --linestrong:#3a454e;
+      --body:#dfe7ec; --muted:#93a1ab; --ink:#eef4f6;
+      --brand:#2cbae2; --brand-ink:#8bdcef; --brand-soft:#0c2c34;
+      --lime:#8fc85a; --lime-ink:#a9d167; --lime-soft:#1f2c12;
+      --pend-bg:#352a12; --pend-ink:#f0b46a; --pend-dot:#ef8f2a;
+      --apro-bg:#0c2c34; --apro-ink:#6fd2dd; --apro-dot:#2cbae2;
+      --noti-bg:#1f2c12; --noti-ink:#a9d167; --noti-dot:#7ab648;
+      --rech-bg:#351512; --rech-ink:#ef8579; --rech-dot:#e0463a;
+    }
+  </style>
   <script>
     (function () {
         var s = localStorage.getItem('fontScale');
         if (s) document.documentElement.style.fontSize = s + '%';
+        if (localStorage.getItem('tema') === 'dark') document.documentElement.classList.add('dark');
     })();
    </script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
@@ -52,17 +76,46 @@
     document.documentElement.style.fontSize = niveles[i] + '%';
     localStorage.setItem('fontScale', niveles[i]);
   };
+  window.alternarTema = function () {
+    var oscuro = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('tema', oscuro ? 'dark' : 'claro');
+  };
 </script>
 
 <body class="min-h-screen bg-appbg text-body font-sans antialiased" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% if user.is_authenticated %}{% include "partials/_header.html" %}{% endif %}
 
-  <main class="{% block ancho %}max-w-[1600px]{% endblock %} w-full mx-auto px-6 py-7">
+  <main class="{% block ancho %}max-w-[1600px]{% endblock %} w-full mx-auto px-6 pt-7 pb-28">
     {% block content %}{% endblock %}
   </main>
 
   <div id="modal"></div>
   <div id="toasts" class="fixed top-[70px] right-5 z-[60] flex flex-col gap-2.5"></div>
   {% include "partials/_toast.html" %}
+
+  <script>
+    // Selección por lote: cuenta marcados y muestra/oculta la(s) barra(s) de acciones.
+    function avisarSeleccion() {
+      var marcados = document.querySelectorAll('input[name="ids"]:checked').length;
+      document.querySelectorAll('[data-barra-acciones]').forEach(function (barra) {
+        barra.classList.toggle('hidden', marcados === 0);
+        var conteo = barra.querySelector('[data-conteo]');
+        if (conteo) conteo.textContent = marcados;
+      });
+    }
+    function seleccionarTodo(origen) {
+      document.querySelectorAll('input[name="ids"]').forEach(function (cb) { cb.checked = origen.checked; });
+      avisarSeleccion();
+    }
+    // Al recargar la tabla por filtro/HTMX, los checkboxes se resetean → recontar.
+    document.body.addEventListener('htmx:afterSwap', function (e) {
+      if (e.target.id === 'tabla-pedidos') avisarSeleccion();
+    });
+    // Navega al form de despacho llevando los ids seleccionados en la URL.
+    function despacharSeleccion(boton) {
+      var ids = Array.from(document.querySelectorAll('input[name="ids"]:checked')).map(function (c) { return c.value; });
+      if (ids.length) window.location = boton.dataset.url + '?ids=' + ids.join(',');
+    }
+  </script>
 </body>
 </html>

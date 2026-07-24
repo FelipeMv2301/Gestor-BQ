@@ -68,13 +68,9 @@ def queryset_visible(usuario, queryset):
         return queryset.filter(estado_comercial=Pedido.EstadoComercial.APROBADO)
     return queryset.none()
 
-def queryset_pedidos_ejecutivo(usuario, estado=None):
+def queryset_pedidos_ejecutivo(usuario):
     perfil = getattr(usuario, "perfil", None)
-    query = Pedido.objects.filter(ejecutivo__codigo_sap=perfil.codigo_empleado_sap)
-
-    if estado:
-        query = query.filter(estado_comercial=estado)
-    return query
+    return Pedido.objects.filter(ejecutivo__codigo_sap=perfil.codigo_empleado_sap)
 
 #Permiso para disparar la notificación al cliente
 def puede_notificar(usuario, pedido):
@@ -105,7 +101,7 @@ CAMPOS_EDITABLES_EJECUTIVO = [
     "rut", "razon_social",
     "nombre_contacto", "telefono_contacto", "email_contacto",
     "direccion_calle", "direccion_depto", "direccion_comuna", "direccion_ciudad",
-    "courier",
+    "tipo_entrega", "courier",
     "observaciones",
 ]
 
@@ -113,7 +109,7 @@ CAMPOS_EDITABLES_LOGISTICA = [
     "rut", "razon_social",
     "nombre_contacto", "telefono_contacto", "email_contacto",
     "direccion_calle", "direccion_depto", "direccion_comuna", "direccion_ciudad",
-    "courier", "retirar_en",
+    "tipo_entrega", "courier", "retirar_en",
     "observaciones",
 ]
 
