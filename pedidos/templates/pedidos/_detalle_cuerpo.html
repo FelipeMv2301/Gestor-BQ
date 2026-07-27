@@ -9,6 +9,11 @@
             class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Editar</button>
     {% endif %}
     
+    {% if puede_despachar %}
+    <a href="{% url 'pedidos:armar_despacho' %}?ids={{ pedido.pk }}"
+       class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Despachar a courier</a>
+    {% endif %}
+
     {% if puede_notificar and pedido.estado_notificacion != 'NOTIFICADO' %}
     <button hx-post="{% url 'pedidos:notificar' pedido.pk %}"
             class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Notificar al cliente</button>

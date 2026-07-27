@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block titulo %}Perfiles — Portal Bioquímica{% endblock %}
+{% block ancho %}max-w-6xl{% endblock %}
+{% block content %}
+<a href="{% url 'pedidos:panel_admin' %}"
+   class="inline-flex items-center gap-1.5 text-sm font-semibold text-body bg-surface border border-linestrong rounded-full px-4 py-2 hover:border-brand hover:text-brand-ink shadow-sm mb-4">← Volver a Administración</a>
+
+<div class="mb-5">
+  <h1 class="text-2xl font-bold text-ink">Perfiles de usuario</h1>
+  <p class="text-sm text-muted mt-1">Asigna el rol (Ejecutivo / Logística / Administrador) y el código SAP de cada cuenta. Las cuentas se crean solas al iniciar sesión por primera vez.</p>
+</div>
+
+<div class="grid gap-5 md:grid-cols-[minmax(0,1fr)_20rem]">
+
+  <!-- Listado, scrolleable -->
+  <div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
+    <div class="overflow-auto max-h-[70vh]">
+      <table class="w-full text-sm min-w-[560px]">
+        <thead class="sticky top-0 z-10">
+          <tr class="bg-appbg text-xs uppercase tracking-wide text-muted">
+            <th class="text-left font-semibold px-4 py-3">Nombre</th>
+            <th class="text-left font-semibold px-4 py-3">Email</th>
+            <th class="text-left font-semibold px-4 py-3">Código SAP</th>
+            <th class="text-left font-semibold px-4 py-3">Rol</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for perfil in perfiles %}
+            {% include "cuentas/_fila_perfil.html" with perfil=perfil %}
+          {% empty %}
+          <tr><td colspan="5" class="px-4 py-10 text-center text-muted text-sm">No hay cuentas cargadas todavía.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Form de edición, fijo -->
+  <div class="bg-surface border border-line rounded-2xl shadow-sm p-6 h-max md:sticky md:top-20" id="panel-editar-perfil">
+    <p class="text-sm text-muted">Selecciona un usuario de la lista para editar su rol o código SAP.</p>
+  </div>
+
+</div>
+{% endblock %}

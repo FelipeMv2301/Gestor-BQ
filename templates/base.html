@@ -8,6 +8,7 @@
 
   <link rel="icon" type="image/svg+xml" href="{% static 'images/icono.svg' %}">
   <link rel="icon" type="image/png" href="{% static 'images/icono.png' %}">
+  <link rel="stylesheet" href="{% static 'vendor/tom-select/tom-select-2.3.1.min.css' %}">
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -63,7 +64,8 @@
         if (localStorage.getItem('tema') === 'dark') document.documentElement.classList.add('dark');
     })();
    </script>
-  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script src="{% static 'vendor/htmx-2.0.4.min.js' %}"></script>
+  <script src="{% static 'vendor/tom-select/tom-select-2.3.1.complete.min.js' %}"></script>
 </head>
 
 <script>
@@ -89,6 +91,7 @@
     {% block content %}{% endblock %}
   </main>
 
+  {{ COMUNAS_CL|json_script:"comunas-data" }}
   <div id="modal"></div>
   <div id="toasts" class="fixed top-[70px] right-5 z-[60] flex flex-col gap-2.5"></div>
   {% include "partials/_toast.html" %}
@@ -111,10 +114,56 @@
     document.body.addEventListener('htmx:afterSwap', function (e) {
       if (e.target.id === 'tabla-pedidos') avisarSeleccion();
     });
+
+    // Tom Select en los campos de comuna (input[data-comuna]). Reusa la lista COMUNAS_CL inyectada como #comunas-data.
+    function initComunas(scope) {
+      if (typeof TomSelect === 'undefined') return;
+      var datos = document.getElementById('comunas-data');
+      var lista = datos ? JSON.parse(datos.textContent) : [];
+      (scope || document).querySelectorAll('input[data-comuna]').forEach(function (el) {
+        if (el.tomselect) return;                       // no re-inicializar
+        new TomSelect(el, {
+          options: lista.map(function (c) { return { value: c, text: c }; }),
+          create: true, maxItems: 1, persist: false,    // create:true preserva el valor precargado de SAP/Woo
+        });
+      });
+    }
+    document.addEventListener('DOMContentLoaded', function () { initComunas(); });
+    document.body.addEventListener('htmx:afterSwap', function (e) { initComunas(e.target); });
+
+    // En el form de editar pedido: Retiro en Bioquímica no usa courier (se deshabilita y limpia) pero
+    // sí usa Retiro en; Despacho es lo inverso. Al cambiar Tipo de entrega, ambos se ajustan solos.
+    function actualizarCourierPorTipoEntrega(scope) {
+      var tipoEntrega = (scope || document).querySelector('#id_tipo_entrega');
+      var courier = (scope || document).querySelector('#id_courier');
+      var retirarEn = (scope || document).querySelector('#id_retirar_en');
+      if (!tipoEntrega || (!courier && !retirarEn)) return;
+      function aplicar() {
+        var esRetiro = tipoEntrega.value === 'RETIRO_BIOQUIMICA';
+        if (courier) {
+          courier.disabled = esRetiro;
+          if (esRetiro) courier.value = '';
+        }
+        if (retirarEn) {
+          retirarEn.disabled = !esRetiro;
+          if (!esRetiro) retirarEn.value = 'NO_APLICA';
+        }
+      }
+      tipoEntrega.addEventListener('change', aplicar);
+      aplicar();
+    }
+    document.body.addEventListener('htmx:afterSwap', function (e) { actualizarCourierPorTipoEntrega(e.target); });
     // Navega al form de despacho llevando los ids seleccionados en la URL.
     function despacharSeleccion(boton) {
       var ids = Array.from(document.querySelectorAll('input[name="ids"]:checked')).map(function (c) { return c.value; });
-      if (ids.length) window.location = boton.dataset.url + '?ids=' + ids.join(',');
+      if (!ids.length) { showToast({level: 'error', body: 'Selecciona al menos un pedido.'}); return; }
+      window.location = boton.dataset.url + '?ids=' + ids.join(',');
+    }
+    // Notifica los pedidos seleccionados (mismo chequeo de selección vacía que despacharSeleccion).
+    function notificarSeleccion(boton) {
+      var ids = Array.from(document.querySelectorAll('input[name="ids"]:checked')).map(function (c) { return c.value; });
+      if (!ids.length) { showToast({level: 'error', body: 'Selecciona al menos un pedido.'}); return; }
+      htmx.ajax('POST', boton.dataset.url, {values: {ids: ids}});
     }
   </script>
 </body>

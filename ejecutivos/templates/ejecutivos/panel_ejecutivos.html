@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block titulo %}Ejecutivos — Portal Bioquímica{% endblock %}
+{% block ancho %}max-w-4xl{% endblock %}
+{% block content %}
+<a href="{% url 'pedidos:panel_admin' %}"
+   class="inline-flex items-center gap-1.5 text-sm font-semibold text-body bg-surface border border-linestrong rounded-full px-4 py-2 hover:border-brand hover:text-brand-ink shadow-sm mb-4">← Volver a Administración</a>
+
+<div class="mb-5">
+  <h1 class="text-2xl font-bold text-ink">Ejecutivos</h1>
+  <p class="text-sm text-muted mt-1">Maestro de ejecutivos comerciales. Reemplaza el mapeo hardcodeado; se vincula al perfil por código SAP.</p>
+</div>
+
+<div class="flex flex-col gap-4">
+
+  <!-- Sincronizar desde SAP -->
+  <div class="bg-surface border border-line rounded-2xl p-6 flex items-center justify-between gap-4 flex-wrap">
+    <div>
+      <h2 class="text-sm font-bold text-ink mb-1">Sincronizar desde SAP</h2>
+      <p class="text-xs text-muted">Crea/actualiza ejecutivos desde SalesPersons, marca inactivos a los que ya no están y vincula perfiles por email.</p>
+    </div>
+    <form hx-post="{% url 'ejecutivos:sincronizar' %}" hx-indicator="#spinner-sync-ejec">
+      <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Sincronizar</button>
+      <span id="spinner-sync-ejec" class="htmx-indicator text-sm text-muted ml-2">Sincronizando…</span>
+    </form>
+  </div>
+
+  <!-- Nuevo ejecutivo -->
+  <div class="bg-surface border border-line rounded-2xl p-6">
+    <h2 class="text-sm font-bold text-ink mb-1">Nuevo ejecutivo</h2>
+    <p class="text-xs text-muted mb-4">Alta manual (ej. mientras no está aún en SAP).</p>
+    <form hx-post="{% url 'ejecutivos:crear' %}" hx-indicator="#spinner-crear-ejec" class="flex flex-wrap items-end gap-3">
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Código SAP</span>
+        {{ form.codigo_sap }}</label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Nombre</span>
+        {{ form.nombre }}</label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Email</span>
+        {{ form.email }}</label>
+      <label class="flex items-center gap-2 cursor-pointer text-sm text-body pb-2">
+        {{ form.activo }} Activo</label>
+      <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Crear</button>
+      <span id="spinner-crear-ejec" class="htmx-indicator text-sm text-muted">Creando…</span>
+    </form>
+  </div>
+
+  <!-- Listado -->
+  <div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm min-w-[720px]">
+        <thead>
+          <tr class="bg-appbg text-xs uppercase tracking-wide text-muted">
+            <th class="text-left font-semibold px-4 py-3">Código SAP</th>
+            <th class="text-left font-semibold px-4 py-3">Nombre</th>
+            <th class="text-left font-semibold px-4 py-3">Email</th>
+            <th class="text-left font-semibold px-4 py-3">Estado</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ejecutivo in ejecutivos %}
+          <tr class="border-t border-line hover:bg-appbg" id="fila-ejecutivo-{{ ejecutivo.pk }}">
+            <td class="px-4 py-3 font-mono text-xs font-semibold text-ink tabular-nums">{{ ejecutivo.codigo_sap }}</td>
+            <td class="px-4 py-3 text-body">{{ ejecutivo.nombre }}</td>
+            <td class="px-4 py-3 text-muted">{{ ejecutivo.email|default:"—" }}</td>
+            <td class="px-4 py-3">
+              {% if ejecutivo.activo %}
+                <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-noti-bg text-noti-ink">
+                  <span class="w-1.5 h-1.5 rounded-full bg-noti-dot"></span>Activo</span>
+              {% else %}
+                <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-rech-bg text-rech-ink">
+                  <span class="w-1.5 h-1.5 rounded-full bg-rech-dot"></span>Inactivo</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-right whitespace-nowrap">
+              <button type="button" onclick="alternarEdicionEjecutivo({{ ejecutivo.pk }})"
+                      class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-2.5 py-1.5 rounded-lg">Editar</button>
+              <button hx-post="{% url 'ejecutivos:eliminar' ejecutivo.pk %}"
+                      hx-confirm="¿Eliminar a {{ ejecutivo.nombre }}? Sus pedidos ya asignados quedan sin ejecutivo."
+                      class="text-sm font-semibold text-rech-ink hover:bg-rech-bg px-2.5 py-1.5 rounded-lg">Eliminar</button>
+            </td>
+          </tr>
+          <tr class="hidden border-t border-line bg-appbg" id="fila-editar-ejecutivo-{{ ejecutivo.pk }}">
+            <td colspan="5" class="px-4 py-3">
+              <form hx-post="{% url 'ejecutivos:editar' ejecutivo.pk %}" class="flex flex-wrap items-end gap-3">
+                <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Código SAP</span>
+                  <input type="number" name="codigo_sap" value="{{ ejecutivo.codigo_sap }}" required
+                         class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+                <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Nombre</span>
+                  <input type="text" name="nombre" value="{{ ejecutivo.nombre }}" required
+                         class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+                <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Email</span>
+                  <input type="email" name="email" value="{{ ejecutivo.email }}"
+                         class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+                <label class="flex items-center gap-2 cursor-pointer text-sm text-body pb-2">
+                  <input type="checkbox" name="activo" {% if ejecutivo.activo %}checked{% endif %} class="accent-brand w-4 h-4"> Activo</label>
+                <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Guardar</button>
+                <button type="button" onclick="alternarEdicionEjecutivo({{ ejecutivo.pk }})"
+                        class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:bg-appbg">Cancelar</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="px-4 py-10 text-center text-muted text-sm">No hay ejecutivos cargados. Sincroniza desde SAP o crea uno manual.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function alternarEdicionEjecutivo(pk) {
+    document.getElementById('fila-ejecutivo-' + pk).classList.toggle('hidden');
+    document.getElementById('fila-editar-ejecutivo-' + pk).classList.toggle('hidden');
+  }
+</script>
+{% endblock %}

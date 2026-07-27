@@ -32,7 +32,7 @@
       <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Dirección</span>
         <input type="text" name="destinatario_direccion" value="{{ pedidos.0.direccion_calle }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
       <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Comuna</span>
-        <input type="text" name="destinatario_comuna" value="{{ pedidos.0.direccion_comuna }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+        <input type="text" name="destinatario_comuna" data-comuna value="{{ pedidos.0.direccion_comuna }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
       <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Teléfono</span>
         <input type="text" name="destinatario_telefono" value="{{ pedidos.0.telefono_contacto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
       <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Email</span>
@@ -51,9 +51,11 @@
         </select></label>
       <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Servicio</span>
         <select name="servicio" required class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
-          <option value="10">10 - Express</option>
-          <option value="20">20 - Terrestre</option>
-        </select></label>
+          <option value="10" {% if pedidos.0.servicio_courier_codigo == "10" %}selected{% endif %}>10 - Express</option>
+          <option value="20" {% if pedidos.0.servicio_courier_codigo == "20" %}selected{% endif %}>20 - Terrestre</option>
+        </select>
+        {% if pedidos.0.servicio_courier_nombre %}<p class="text-xs text-muted mt-1">Detectado desde SAP: {{ pedidos.0.servicio_courier_nombre }}. Puedes cambiarlo si hace falta.</p>{% endif %}
+      </label>
       <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Valor declarado</span>
         <input type="number" name="valor_declarado" value="0" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
       <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Observaciones</span>

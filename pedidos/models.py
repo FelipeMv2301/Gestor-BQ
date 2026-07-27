@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from ejecutivos.models import Ejecutivo
 from django.db.models import Q
+from utils import Courier
 
 #Permite la creación y gestión de los filtros usados para las vistas
 class PedidoQuerySet(models.QuerySet):
@@ -11,6 +12,7 @@ class PedidoQuerySet(models.QuerySet):
         return self.filter(
             Q(num_pedido__icontains=texto) | Q(razon_social__icontains=texto)
             | Q(nombre_contacto__icontains=texto) | Q(rut__icontains=texto)
+            | Q(envio__orden_transporte__icontains=texto)
         )
     
     def con_estado_comercial(self, estado):
@@ -68,9 +70,6 @@ class Pedido(models.Model):
         N = "N", "No"
 
     #Listado de couriers (y los que se conectarán a las plataformas correspondientes)
-    class Courier(models.TextChoices):
-        CHIBRA = "CHIBRA", "Chibra"
-        MOVEUP = "MOVEUP", "MoveUP"
 
     class EstadoComercial(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"
@@ -129,6 +128,18 @@ class Pedido(models.Model):
         max_length=20,
         choices = Courier.choices,
         blank=True
+    )
+
+    #Código y nombre de servicio del courier (ej. Chibra: "10"/"Express", "20"/"Terrestre").
+    #Texto libre y no atado a Chibra: cada courier define su propia nomenclatura vía SkuCourier.
+    servicio_courier_codigo = models.CharField(
+        max_length=20,
+        blank=True,
+    )
+
+    servicio_courier_nombre = models.CharField(
+        max_length=60,
+        blank=True,
     )
 
     rut = models.CharField(
@@ -213,6 +224,14 @@ class Pedido(models.Model):
         auto_now=True
     )
 
+    #Valor combinado "COURIER|CODIGO_SERVICIO" (o solo courier si no hay servicio detectado/elegido).
+    #Matchea el value de las opciones armadas por services.opciones_courier_servicio.
+    @property
+    def valor_courier_servicio(self):
+        if self.servicio_courier_codigo:
+            return f"{self.courier}|{self.servicio_courier_codigo}"
+        return self.courier
+
     #Estado de seguimiento unificado (comercial + logística + notificación + tipo de entrega).
     #Única fuente de verdad para el badge. Devuelve (etiqueta, clave_color) con clave ∈ pend/apro/noti.
     @property
@@ -236,19 +255,21 @@ class Pedido(models.Model):
 
 #Mapear los couriers por el SKU asignado en SAP
 class SkuCourier(models.Model):
-    class Sku(models.TextChoices):
-        SGCHIBRA = "SGCHIBRA", "sgchibra"
-
-    sku = models.CharField(
-        max_length=120,
-        choices=Sku.choices,
-        unique=True,
-    )
+    sku = models.CharField(max_length=120, unique=True)
 
     courier = models.CharField(
-        max_length=120, 
-        choices=Pedido.Courier.choices
+        max_length=120,
+        choices=Courier.choices
     )
+
+    #Código que ese courier espera recibir en su propia API (ej. Chibra: CODIGO_PRODUCTO_SERVICIO).
+    #Texto libre a propósito: cada courier tiene su propia nomenclatura de servicios.
+    servicio_codigo = models.CharField(max_length=20, blank=True)
+    servicio_nombre = models.CharField(max_length=60, blank=True)
+
+    def save(self, *args, **kwargs):
+        self.sku = self.sku.strip().upper()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.sku} usa el courier {self.get_courier_display()}"

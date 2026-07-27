@@ -102,6 +102,10 @@ SOCIALACCOUNT_ADAPTER = "cuentas.adapters.BioquimicaSocialAccountAdapter"
 
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 
+#El link "Salir" del header es un <a> con GET; sin esto, allauth muestra antes una
+#pantalla de confirmación ("¿Seguro que quieres salir?") en vez de cerrar sesión directo.
+ACCOUNT_LOGOUT_ON_GET = True
+
 LOGIN_REDIRECT_URL = '/cuentas/inicio/'
 
 # Application definition
@@ -154,6 +158,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'pedidos.context_processors.datos_referencia',
             ],
         },
     },

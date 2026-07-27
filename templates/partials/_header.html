@@ -1,8 +1,9 @@
 {% load static %}
 <header class="sticky top-0 z-40 flex items-center gap-5 px-6 py-2.5 bg-surface border-b border-line">
   <a href="{% url 'inicio' %}" class="flex items-center shrink-0">
-    <img src="{% static 'images/logo.png' %}"        alt="bioquimica.cl" class="h-10 block dark:hidden"> <strong>Gestor-BQ</strong>
-    <img src="{% static 'images/logo_blanco.png' %}" alt="bioquimica.cl" class="h-10 hidden dark:block">
+    <img src="{% static 'images/logo.png' %}"        alt="bioquimica.cl" class="h-10 block dark:hidden"> 
+    <img src="{% static 'images/logo_blanco.png' %}" alt="bioquimica.cl" class="h-12 hidden dark:block">
+    <strong>Gestor-BQ</strong>
   </a>
 
   {% if user.is_authenticated and user.perfil.rol %}
@@ -13,14 +14,16 @@
     {% endif %}
     {% if user.perfil.rol == 'LOGISTICA' or user.perfil.rol == 'ADMIN' %}
        <a href="{% url 'pedidos:despachos' %}"
-         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Despachos</a>
+         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Pedidos a Despachar</a>
+       <a href="{% url 'envios:lista' %}"
+         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Envíos Realizados</a>
     {% endif %}
-    {% if user.perfil.rol == 'ADMIN' %}
+    {% if user.perfil.rol == 'EJECUTIVO' or user.perfil.rol == 'ADMIN' %}
       <a href="{% url 'pedidos:anulados' %}"
          class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Anulados</a>
     {% endif %}
     {% if user.perfil.rol == 'ADMIN' %}
-      <a href="/admin/"
+      <a href="{% url 'pedidos:panel_admin' %}"
          class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Admin</a>
     {% endif %}
   </nav>

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block titulo %}SKU-Courier — Portal Bioquímica{% endblock %}
+{% block ancho %}max-w-4xl{% endblock %}
+{% block content %}
+<a href="{% url 'pedidos:panel_admin' %}"
+   class="inline-flex items-center gap-1.5 text-sm font-semibold text-body bg-surface border border-linestrong rounded-full px-4 py-2 hover:border-brand hover:text-brand-ink shadow-sm mb-4">← Volver a Administración</a>
+
+<div class="mb-5">
+  <h1 class="text-2xl font-bold text-ink">SKU-Courier</h1>
+  <p class="text-sm text-muted mt-1">Mapea el SKU (ItemCode de SAP) al courier correspondiente, para que la ingesta detecte el courier solo. Se guarda siempre en mayúsculas.</p>
+</div>
+
+<div class="flex flex-col gap-4">
+
+  <!-- Nuevo mapeo -->
+  <div class="bg-surface border border-line rounded-2xl p-6">
+    <h2 class="text-sm font-bold text-ink mb-1">Nuevo mapeo</h2>
+    <p class="text-xs text-muted mb-4">El SKU debe coincidir con el ItemCode tal como llega desde SAP (no importa mayúsculas/minúsculas al tipear).</p>
+    <form hx-post="{% url 'pedidos:crear_sku' %}" hx-indicator="#spinner-crear-sku" class="flex flex-wrap items-end gap-3">
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">{{ form.sku.label }}</span>
+        {{ form.sku }}</label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">{{ form.courier.label }}</span>
+        {{ form.courier }}</label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Servicio (código)</span>
+        {{ form.servicio_codigo }}</label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Servicio (nombre)</span>
+        {{ form.servicio_nombre }}</label>
+      <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Crear</button>
+      <span id="spinner-crear-sku" class="htmx-indicator text-sm text-muted">Creando…</span>
+    </form>
+  </div>
+
+  <!-- Listado -->
+  <div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm min-w-[560px]">
+        <thead>
+          <tr class="bg-appbg text-xs uppercase tracking-wide text-muted">
+            <th class="text-left font-semibold px-4 py-3">SKU</th>
+            <th class="text-left font-semibold px-4 py-3">Courier</th>
+            <th class="text-left font-semibold px-4 py-3">Servicio</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sku_courier in skus %}
+          <tr class="border-t border-line hover:bg-appbg" id="fila-sku-{{ sku_courier.pk }}">
+            <td class="px-4 py-3 font-mono text-xs font-semibold text-ink tabular-nums">{{ sku_courier.sku }}</td>
+            <td class="px-4 py-3 text-body">{{ sku_courier.get_courier_display }}</td>
+            <td class="px-4 py-3 text-body">
+              {% if sku_courier.servicio_nombre %}{{ sku_courier.servicio_nombre }}
+                <span class="text-xs text-muted font-mono">({{ sku_courier.servicio_codigo }})</span>
+              {% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td class="px-4 py-3 text-right whitespace-nowrap">
+              <button type="button" onclick="alternarEdicionSku({{ sku_courier.pk }})"
+                      class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-2.5 py-1.5 rounded-lg">Editar</button>
+              <button hx-post="{% url 'pedidos:eliminar_sku' sku_courier.pk %}"
+                      hx-confirm="¿Eliminar el mapeo de {{ sku_courier.sku }}? La próxima ingesta ya no detectará el courier para ese SKU."
+                      class="text-sm font-semibold text-rech-ink hover:bg-rech-bg px-2.5 py-1.5 rounded-lg">Eliminar</button>
+            </td>
+          </tr>
+          <tr class="hidden border-t border-line bg-appbg" id="fila-editar-sku-{{ sku_courier.pk }}">
+            <td colspan="4" class="px-4 py-3">
+              <form hx-post="{% url 'pedidos:editar_sku' sku_courier.pk %}" class="flex flex-wrap items-end gap-3">
+                <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">SKU</span>
+                  <input type="text" name="sku" value="{{ sku_courier.sku }}" required
+                         class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+                <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Courier</span>
+                  <select name="courier" class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+                    {% for valor, etiqueta in courier_choices %}
+                    <option value="{{ valor }}" {% if valor == sku_courier.courier %}selected{% endif %}>{{ etiqueta }}</option>
+                    {% endfor %}
+                  </select></label>
+                <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Servicio (código)</span>
+                  <input type="text" name="servicio_codigo" value="{{ sku_courier.servicio_codigo }}"
+                         class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+                <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Servicio (nombre)</span>
+                  <input type="text" name="servicio_nombre" value="{{ sku_courier.servicio_nombre }}"
+                         class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+                <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Guardar</button>
+                <button type="button" onclick="alternarEdicionSku({{ sku_courier.pk }})"
+                        class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:bg-appbg">Cancelar</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="px-4 py-10 text-center text-muted text-sm">No hay mapeos SKU-Courier cargados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function alternarEdicionSku(pk) {
+    document.getElementById('fila-sku-' + pk).classList.toggle('hidden');
+    document.getElementById('fila-editar-sku-' + pk).classList.toggle('hidden');
+  }
+</script>
+{% endblock %}

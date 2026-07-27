@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block titulo %}Administración — Portal Bioquímica{% endblock %}
+{% block ancho %}max-w-3xl{% endblock %}
+{% block content %}
+<div class="mb-5">
+  <h1 class="text-2xl font-bold text-ink">Administración</h1>
+  <p class="text-sm text-muted mt-1">Sincronización de pedidos y gestión.</p>
+</div>
+
+<div class="flex flex-col gap-4">
+
+  <!-- Sincronizar por rango de fechas -->
+  <div class="bg-surface border border-line rounded-2xl p-6">
+    <h2 class="text-sm font-bold text-ink mb-1">Sincronizar por rango de fechas</h2>
+    <p class="text-xs text-muted mb-4">Trae NV de SAP y pedidos Woo que califican en el rango. La primera búsqueda del día puede tardar (login SAP frío).</p>
+    <form hx-post="{% url 'pedidos:sincronizar' %}" hx-indicator="#spinner-sync" class="flex flex-wrap items-end gap-3">
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Desde</span>
+        <input type="date" name="after" required class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Hasta</span>
+        <input type="date" name="before" class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Sincronizar</button>
+      <span id="spinner-sync" class="htmx-indicator text-sm text-muted">Sincronizando…</span>
+    </form>
+  </div>
+
+  <!-- Sincronizar un pedido (individual) -->
+  <div class="bg-surface border border-line rounded-2xl p-6">
+    <h2 class="text-sm font-bold text-ink mb-1">Sincronizar un pedido</h2>
+    <p class="text-xs text-muted mb-4">Trae un pedido puntual por N° y origen.</p>
+    <form hx-post="{% url 'pedidos:cargar_individual' %}" hx-indicator="#spinner-ind" class="flex flex-wrap items-end gap-3">
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Origen</span>
+        <select name="origen" class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+          <option value="SAP">SAP</option>
+          <option value="WEB">WEB (tienda)</option>
+        </select></label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">N° de pedido</span>
+        <input type="text" name="num_pedido" required class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Cargar pedido</button>
+      <span id="spinner-ind" class="htmx-indicator text-sm text-muted">Cargando…</span>
+    </form>
+  </div>
+
+  <!-- Perfiles de usuario -->
+  <a href="{% url 'panel_perfiles' %}"
+     class="bg-surface border border-line rounded-2xl p-6 hover:border-brand flex items-center justify-between gap-4">
+    <div>
+      <h2 class="text-sm font-bold text-ink">Perfiles de usuario</h2>
+      <p class="text-xs text-muted mt-1">Asignar rol (Ejecutivo/Logística/Admin) y código SAP a cada cuenta.</p>
+    </div>
+    <span class="text-brand-ink font-bold text-lg">→</span>
+  </a>
+
+  <!-- Ejecutivos -->
+  <a href="{% url 'ejecutivos:panel' %}"
+     class="bg-surface border border-line rounded-2xl p-6 hover:border-brand flex items-center justify-between gap-4">
+    <div>
+      <h2 class="text-sm font-bold text-ink">Ejecutivos</h2>
+      <p class="text-xs text-muted mt-1">Ver/editar el maestro de ejecutivos y sincronizar desde SAP.</p>
+    </div>
+    <span class="text-brand-ink font-bold text-lg">→</span>
+  </a>
+
+  <!-- SKU-Courier -->
+  <a href="{% url 'pedidos:panel_skus' %}"
+     class="bg-surface border border-line rounded-2xl p-6 hover:border-brand flex items-center justify-between gap-4">
+    <div>
+      <h2 class="text-sm font-bold text-ink">SKU-Courier</h2>
+      <p class="text-xs text-muted mt-1">Mapeo de SKU (ItemCode SAP) a courier, para la detección automática en la ingesta.</p>
+    </div>
+    <span class="text-brand-ink font-bold text-lg">→</span>
+  </a>
+
+  <!-- Pedidos rechazados / anulados -->
+  <a href="{% url 'pedidos:anulados' %}"
+     class="bg-surface border border-line rounded-2xl p-6 hover:border-brand flex items-center justify-between gap-4">
+    <div>
+      <h2 class="text-sm font-bold text-ink">Pedidos rechazados / anulados</h2>
+      <p class="text-xs text-muted mt-1">Ver archivados y reingresar desde la fuente.</p>
+    </div>
+    <span class="text-brand-ink font-bold text-lg">→</span>
+  </a>
+
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+<div>
+  <h2 class="text-sm font-bold text-ink">{{ perfil.usuario.get_full_name|default:perfil.usuario.email }}</h2>
+  <p class="text-xs text-muted font-mono mt-0.5 mb-4">{{ perfil.usuario.email }}</p>
+
+  <form hx-post="{% url 'editar_perfil' perfil.pk %}" hx-target="#panel-editar-perfil" class="flex flex-col gap-4">
+    <label class="block">
+      <span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">{{ form.rol.label }}</span>
+      {{ form.rol }}
+      {% if form.rol.errors %}<p class="text-xs text-rech-ink mt-1">{{ form.rol.errors|striptags }}</p>{% endif %}
+    </label>
+    <label class="block">
+      <span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">{{ form.codigo_empleado_sap.label }}</span>
+      {{ form.codigo_empleado_sap }}
+      {% if form.codigo_empleado_sap.errors %}<p class="text-xs text-rech-ink mt-1">{{ form.codigo_empleado_sap.errors|striptags }}</p>{% endif %}
+    </label>
+    <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Guardar</button>
+  </form>
+</div>

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block titulo %}Envío #{{ envio.id }} — Portal Bioquímica{% endblock %}
+{% block ancho %}max-w-4xl{% endblock %}
+{% block content %}
+<a href="{% url 'envios:lista' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-body bg-surface border border-linestrong rounded-full px-4 py-2 hover:border-brand hover:text-brand-ink shadow-sm mb-4">← Volver a Envíos</a>
+
+<div class="flex items-center gap-3 mb-5">
+  <h1 class="text-2xl font-bold text-ink font-mono tabular-nums">Envío #{{ envio.id }}</h1>
+  {% include "partials/_badge_estado_envio.html" with envio=envio %}
+</div>
+
+<div class="grid gap-4 items-start" style="grid-template-columns: 1.15fr .85fr;">
+  <div class="bg-surface border border-line rounded-2xl shadow-sm">
+    <div class="p-5">
+      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-3.5">Pedidos incluidos</h3>
+      <div class="flex flex-col gap-2">
+        {% for pedido in envio.pedidos.all %}
+        <a href="{% url 'pedidos:detalle' pedido.pk %}" class="flex items-center justify-between gap-3 text-sm bg-appbg border border-line rounded-lg px-3 py-2 hover:border-brand">
+          <span class="font-mono font-semibold text-ink">{{ pedido.origen }}-{{ pedido.num_pedido }}</span>
+          <span class="text-muted truncate">{{ pedido.razon_social|default:pedido.nombre_contacto|default:"—" }}</span>
+        </a>
+        {% empty %}
+        <p class="text-sm text-muted">Este envío no tiene pedidos asociados.</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="p-5 border-t border-line">
+      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-3.5">Datos enviados al courier</h3>
+      {% if envio.datos_courier %}
+      <dl class="flex flex-col gap-2 text-sm">
+        {% for clave, valor in envio.datos_courier.items %}
+        <div class="flex items-start justify-between gap-4 py-1 border-b border-line last:border-0">
+          <dt class="text-muted font-mono text-xs uppercase tracking-wide shrink-0">{{ clave }}</dt>
+          <dd class="text-ink text-right">
+            {% if valor|length and valor.0.tipo %}
+              {% for bulto in valor %}
+                <div class="font-mono text-xs">{% for campo, dato in bulto.items %}{{ campo }}={{ dato }} {% endfor %}</div>
+              {% endfor %}
+            {% else %}
+              {{ valor }}
+            {% endif %}
+          </dd>
+        </div>
+        {% endfor %}
+      </dl>
+      {% else %}
+      <p class="text-sm text-muted">Sin datos guardados.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="bg-surface border border-line rounded-2xl shadow-sm">
+    <div class="p-5">
+      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-3.5">Envío</h3>
+      {% include "pedidos/_campo.html" with k="Courier" v=envio.get_courier_display %}
+      {% include "pedidos/_campo.html" with k="Orden de transporte" v=envio.orden_transporte mono=True %}
+      {% include "pedidos/_campo.html" with k="Creado" v=envio.creado_en|date:"d/m/Y H:i" %}
+      {% include "pedidos/_campo.html" with k="Actualizado" v=envio.actualizado_en|date:"d/m/Y H:i" %}
+    </div>
+    <div class="p-5 border-t border-line flex flex-col gap-2.5">
+      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-1">Marcar estado</h3>
+      <p class="text-xs text-muted mb-1">Nada del flujo automático marca Entregado ni Error — es manual, según lo que confirme el courier.</p>
+      {% if envio.estado != 'ENTREGADO' %}
+      <form method="post" action="{% url 'envios:cambiar_estado' envio.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="estado" value="ENTREGADO">
+        <button type="submit" class="w-full text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Marcar Entregado</button>
+      </form>
+      {% endif %}
+      {% if envio.estado != 'ERROR' %}
+      <form method="post" action="{% url 'envios:cambiar_estado' envio.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="estado" value="ERROR">
+        <button type="submit" class="w-full text-sm font-semibold px-4 py-2 rounded-full border border-linestrong text-rech-ink hover:bg-rech-bg">Marcar Error</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -2,7 +2,11 @@
 {% block titulo %}{{ pedido.origen }}-{{ pedido.num_pedido }} — Portal Bioquímica{% endblock %}
 {% block ancho %}max-w-5xl{% endblock %}
 {% block content %}
-<a href="{% url 'pedidos:mis_pedidos' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-body mb-3">← Volver a Mis pedidos</a>
+{% if user.perfil.rol == 'LOGISTICA' %}
+<a href="{% url 'pedidos:despachos' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-body bg-surface border border-linestrong rounded-full px-4 py-2 hover:border-brand hover:text-brand-ink shadow-sm mb-4">← Volver a Despachos</a>
+{% else %}
+<a href="{% url 'pedidos:mis_pedidos' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-body bg-surface border border-linestrong rounded-full px-4 py-2 hover:border-brand hover:text-brand-ink shadow-sm mb-4">← Volver a Mis pedidos</a>
+{% endif %}
 <div id="detalle-cuerpo">
   {% include "pedidos/_detalle_cuerpo.html" %}
 </div>

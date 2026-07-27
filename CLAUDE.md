@@ -126,3 +126,23 @@ Excepción: Tailscale (plan free) sí se usa para acceso de **administrador** di
 - HU-0.4 (Postgres) y HU-1.4 (modelos/migraciones) son la base de la Fase 0-1 — no crear apps de
   dominio ni escribir modelos sin antes resolver el cambio de settings a Postgres.
 - No asumas nada que no sepas con certeza. Es mejor investigarlo y llegar a una respuesta coherente.
+
+## Convenciones de colaboración con Claude (2026-07-27)
+
+- **Solo asesoría / control de Felipe:** no codear sin indicación explícita de "hazlo tú". Ante una
+  tarea, proponer + explicar; codear solo cuando Felipe lo pide.
+- **Reparto del front actual:** el **frontend (templates)** lo puede hacer Claude; cualquier función
+  **Python/Django/backend** (views, urls, permisos, servicios, modelos) Felipe prefiere escribirla él —
+  Claude indica **qué y dónde**.
+- **Reusar, nunca reescribir lógica:** las reglas de negocio viven en `pedidos/services.py`,
+  `pedidos/permisos.py`, `pedidos/models.py::PedidoQuerySet`, `integraciones/*`, `envios/services.py`.
+  Las vistas solo orquestan + presentan. Antes de escribir algo nuevo, buscar si ya existe y reusarlo.
+- **Front:** Tailwind (CDN en dev) + HTMX. Diseño **"Design B" teal** con tokens CSS-var en `base.html`
+  (soportan claro/oscuro). Usar unidades **rem**, nunca px fijo, para que el control de tamaño A−/A+ escale.
+  Libs de terceros **vendorizadas** en `static/vendor/` (no CDN), con la versión en el nombre del archivo.
+- **Nombres de variables legibles**, no placeholders compactos.
+- **codegraph** está indexado (`.codegraph/`) — usarlo para mapear la lógica existente antes de tocar código.
+- **Estado real y deuda técnica** del frontend: `backlog_proyecto/backlog-frontend-portal.md`
+  (sección "Corte de estado real"). El dominio: `backlog_historias_...md`.
+- **Tests** en `pedidos/tests/` (paquete): `permisos`, `estado_seguimiento`, `PedidoQuerySet`, servicios.
+  Correr `python manage.py test pedidos` antes de refactorizar.

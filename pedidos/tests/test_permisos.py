@@ -1,0 +1,109 @@
+from django.test import TestCase
+from cuentas.models import PerfilUsuario
+from pedidos.models import Pedido
+from pedidos import permisos
+from .factories import crear_usuario, crear_ejecutivo, crear_pedido
+
+Rol = PerfilUsuario.Rol
+EC = Pedido.EstadoComercial
+EN = Pedido.EstadoNotificacion
+
+
+class PermisosTest(TestCase):
+    def setUp(self):
+        self.ejec = crear_ejecutivo(codigo_sap=10)
+        self.pedido = crear_pedido(ejecutivo=self.ejec, estado_comercial=EC.PENDIENTE)
+
+        self.dueno = crear_usuario("dueno@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=10)
+        self.ajeno = crear_usuario("ajeno@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=20)
+        self.logi = crear_usuario("logi@bioquimica.cl", Rol.LOGISTICA)
+        self.admin = crear_usuario("admin@bioquimica.cl", Rol.ADMIN)
+        self.sin_rol = crear_usuario("nuevo@bioquimica.cl", None)
+
+    # --- obtener_rol / responsable ---
+    def test_obtener_rol(self):
+        self.assertEqual(permisos.obtener_rol(self.dueno), Rol.EJECUTIVO)
+        self.assertIsNone(permisos.obtener_rol(self.sin_rol))
+
+    def test_responsable_del_pedido(self):
+        self.assertTrue(permisos.responsable_del_pedido(self.dueno, self.pedido))
+        self.assertFalse(permisos.responsable_del_pedido(self.ajeno, self.pedido))
+
+    # --- aprobar ---
+    def test_puede_aprobar(self):
+        self.assertTrue(permisos.puede_aprobar(self.dueno, self.pedido))
+        self.assertTrue(permisos.puede_aprobar(self.admin, self.pedido))
+        self.assertFalse(permisos.puede_aprobar(self.ajeno, self.pedido))
+        self.assertFalse(permisos.puede_aprobar(self.logi, self.pedido))
+
+    # --- rechazar (solo Admin) ---
+    def test_solo_admin_rechaza(self):
+        self.assertTrue(permisos.puede_rechazar(self.admin, self.pedido))
+        self.assertFalse(permisos.puede_rechazar(self.dueno, self.pedido))
+        self.assertFalse(permisos.puede_rechazar(self.logi, self.pedido))
+
+    # --- reingresar: Admin siempre; Ejecutivo solo los suyos ---
+    def test_puede_reingresar(self):
+        from pedidos import services
+        from pedidosRechazados.models import PedidoRechazado
+        # anular el pedido (dueño = ejec código 10) → archiva con snapshot["ejecutivo"] = ejec.pk
+        services.rechazar_pedido(self.pedido, "test", self.admin)
+        rech = PedidoRechazado.objects.get(num_pedido=self.pedido.num_pedido)
+        self.assertTrue(permisos.puede_reingresar(self.admin, rech))    # admin, cualquiera
+        self.assertTrue(permisos.puede_reingresar(self.dueno, rech))    # ejecutivo dueño
+        self.assertFalse(permisos.puede_reingresar(self.ajeno, rech))   # otro ejecutivo
+        self.assertFalse(permisos.puede_reingresar(self.logi, rech))    # logística no
+
+    # --- editar por estado/rol ---
+    def test_editar_segun_estado(self):
+        self.assertTrue(permisos.puede_editar(self.dueno, self.pedido))   # PENDIENTE, dueño
+        self.assertFalse(permisos.puede_editar(self.logi, self.pedido))   # LOGISTICA no toca PENDIENTE
+        self.pedido.estado_comercial = EC.APROBADO
+        self.assertFalse(permisos.puede_editar(self.dueno, self.pedido))  # ya salió de Comercial
+        self.assertTrue(permisos.puede_editar(self.logi, self.pedido))    # ahora Logística
+
+    def test_notificado_bloquea_edicion_salvo_admin(self):
+        self.pedido.estado_comercial = EC.APROBADO
+        self.pedido.estado_notificacion = EN.NOTIFICADO
+        self.assertFalse(permisos.puede_editar(self.logi, self.pedido))
+        self.assertTrue(permisos.puede_editar(self.admin, self.pedido))
+
+    # --- notificar / es_logistica ---
+    def test_puede_notificar(self):
+        self.pedido.estado_comercial = EC.APROBADO
+        self.assertTrue(permisos.puede_notificar(self.logi, self.pedido))
+        self.assertTrue(permisos.puede_notificar(self.admin, self.pedido))
+        self.assertFalse(permisos.puede_notificar(self.dueno, self.pedido))
+        self.pedido.estado_comercial = EC.PENDIENTE
+        self.assertFalse(permisos.puede_notificar(self.logi, self.pedido))
+
+    def test_es_logistica(self):
+        self.assertTrue(permisos.es_logistica(self.logi))
+        self.assertTrue(permisos.es_logistica(self.admin))
+        self.assertFalse(permisos.es_logistica(self.dueno))
+
+    # --- querysets ---
+    def test_queryset_visible(self):
+        todos = Pedido.objects.all()
+        self.assertEqual(permisos.queryset_visible(self.admin, todos).count(), 1)
+        self.assertEqual(permisos.queryset_visible(self.dueno, todos).count(), 1)   # PENDIENTE + dueño
+        self.assertEqual(permisos.queryset_visible(self.ajeno, todos).count(), 0)
+        self.assertEqual(permisos.queryset_visible(self.logi, todos).count(), 0)    # no hay APROBADO
+        self.assertEqual(permisos.queryset_visible(self.sin_rol, todos).count(), 0)
+
+    def test_queryset_para_ver(self):
+        self.assertEqual(permisos.queryset_para_ver(self.admin).count(), 1)
+        self.assertEqual(permisos.queryset_para_ver(self.dueno).count(), 1)
+        self.assertEqual(permisos.queryset_para_ver(self.ajeno).count(), 0)
+        self.assertEqual(permisos.queryset_para_ver(self.sin_rol).count(), 0)
+
+    # --- campos editables ---
+    def test_campos_editables(self):
+        self.assertIsNone(permisos.campos_editables(self.admin, self.pedido))       # sin restricción
+        ejec = permisos.campos_editables(self.dueno, self.pedido)
+        logi = permisos.campos_editables(self.logi, self.pedido)
+        self.assertIn("tipo_entrega", ejec)
+        self.assertNotIn("retirar_en", ejec)        # ejecutivo NO edita dónde retirar
+        self.assertIn("retirar_en", logi)           # logística SÍ
+        self.assertNotIn("estado_comercial", ejec)  # estado nunca por edición directa
+        self.assertEqual(permisos.campos_editables(self.sin_rol, self.pedido), [])

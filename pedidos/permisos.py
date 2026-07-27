@@ -36,8 +36,13 @@ def puede_rechazar(usuario, pedido):
     return obtener_rol(usuario) == PerfilUsuario.Rol.ADMIN
 
 #Permiso para reingresar un pedido anulado (solo Admin)
-def puede_reingresar(usuario):
-    return obtener_rol(usuario) == PerfilUsuario.Rol.ADMIN
+def puede_reingresar(usuario, rechazado):
+    rol = obtener_rol(usuario)
+    if rol == PerfilUsuario.Rol.ADMIN:
+        return True
+    if rol == PerfilUsuario.Rol.EJECUTIVO:
+        return rechazado.snapshot.get("ejecutivo") == _ejecutivo_pk(usuario)
+    return False
 
 #Permiso específico para editar un pedido dependiendo del estado. Si es notificado, no se puede 
 def puede_editar(usuario, pedido):
@@ -72,12 +77,30 @@ def queryset_pedidos_ejecutivo(usuario):
     perfil = getattr(usuario, "perfil", None)
     return Pedido.objects.filter(ejecutivo__codigo_sap=perfil.codigo_empleado_sap)
 
+#Permiso para editar el courier inline desde la tabla (mismo criterio que la edición completa,
+#más el chequeo de que "courier" esté en los campos que el rol puede tocar)
+def puede_editar_courier(usuario, pedido):
+    if not puede_editar(usuario, pedido):
+        return False
+    permitidos = campos_editables(usuario, pedido)
+    return permitidos is None or "courier" in permitidos
+
 #Permiso para disparar la notificación al cliente
 def puede_notificar(usuario, pedido):
     rol = obtener_rol(usuario)
     if rol not in (PerfilUsuario.Rol.LOGISTICA, PerfilUsuario.Rol.ADMIN):
         return False
     return pedido.estado_comercial == Pedido.EstadoComercial.APROBADO
+
+#Permiso para despachar un pedido individual a courier desde el detalle
+def puede_despachar(usuario, pedido):
+    if obtener_rol(usuario) not in (PerfilUsuario.Rol.LOGISTICA, PerfilUsuario.Rol.ADMIN):
+        return False
+    return (
+        pedido.estado_comercial == Pedido.EstadoComercial.APROBADO
+        and pedido.envio_id is None
+        and bool(pedido.courier)
+    )
 
 def queryset_para_ver(usuario):
     rol = obtener_rol(usuario)
@@ -92,6 +115,29 @@ def queryset_para_ver(usuario):
 
 def es_logistica(usuario):
     return obtener_rol(usuario) in (PerfilUsuario.Rol.LOGISTICA, PerfilUsuario.Rol.ADMIN)
+
+def es_admin(usuario):
+    return obtener_rol(usuario) == PerfilUsuario.Rol.ADMIN
+
+# pk del Ejecutivo del usuario (para acotar rechazados a "los suyos")
+#Básicamente ayuda a que las funciones como rechazar pedido, sigan vinculadas al ejecutivo comercial del pedido y así los cambios sean visibles para él
+def _ejecutivo_pk(usuario):
+    from ejecutivos.models import Ejecutivo
+    codigo = getattr(getattr(usuario, "perfil", None), "codigo_empleado_sap", None)
+    if codigo is None:
+        return None
+    ejec = Ejecutivo.objects.filter(codigo_sap=codigo).first()
+    return ejec.pk if ejec else None
+
+def queryset_rechazados(usuario):
+    from pedidosRechazados.models import PedidoRechazado
+    rol = obtener_rol(usuario)
+    if rol == PerfilUsuario.Rol.ADMIN:
+        return PedidoRechazado.objects.all()
+    if rol == PerfilUsuario.Rol.EJECUTIVO:
+        pk = _ejecutivo_pk(usuario)
+        return PedidoRechazado.objects.filter(snapshot__ejecutivo=pk) if pk else PedidoRechazado.objects.none()
+    return PedidoRechazado.objects.none()
 
 """
 Campos que los usuarios podran editar en el proyecto

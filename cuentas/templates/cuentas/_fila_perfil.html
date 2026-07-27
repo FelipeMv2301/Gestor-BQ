@@ -1,0 +1,17 @@
+<tr class="border-t border-line hover:bg-appbg" id="fila-perfil-{{ perfil.pk }}" {% if oob %}hx-swap-oob="true"{% endif %}>
+  <td class="px-4 py-3 text-body">{{ perfil.usuario.get_full_name|default:"—" }}</td>
+  <td class="px-4 py-3 text-xs text-muted font-mono">{{ perfil.usuario.email }}</td>
+  <td class="px-4 py-3 text-xs font-mono tabular-nums">{{ perfil.codigo_empleado_sap|default:"—" }}</td>
+  <td class="px-4 py-3">
+    {% if perfil.rol %}
+      <span class="text-sm text-ink">{{ perfil.get_rol_display }}</span>
+    {% else %}
+      <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-pend-bg text-pend-ink">
+        <span class="w-1.5 h-1.5 rounded-full bg-pend-dot"></span>Sin rol</span>
+    {% endif %}
+  </td>
+  <td class="px-4 py-3 text-right whitespace-nowrap">
+    <button hx-get="{% url 'editar_perfil' perfil.pk %}" hx-target="#panel-editar-perfil"
+            class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-2.5 py-1.5 rounded-lg">Editar</button>
+  </td>
+</tr>

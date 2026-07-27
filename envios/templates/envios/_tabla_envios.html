@@ -1,0 +1,44 @@
+<div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[760px]">
+      <thead>
+        <tr class="bg-appbg text-xs uppercase tracking-wide text-muted">
+          <th class="text-left font-semibold px-4 py-3">Envío</th>
+          <th class="text-left font-semibold px-4 py-3">Courier</th>
+          <th class="text-left font-semibold px-4 py-3">OT</th>
+          <th class="text-left font-semibold px-4 py-3">Pedidos</th>
+          <th class="text-left font-semibold px-4 py-3">Estado</th>
+          <th class="text-left font-semibold px-4 py-3">Fecha</th>
+          <th class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for envio in envios %}
+        <tr class="border-t border-line hover:bg-appbg">
+          <td class="px-4 py-3 font-mono text-sm font-semibold text-ink whitespace-nowrap tabular-nums">#{{ envio.id }}</td>
+          <td class="px-4 py-3 text-body">{{ envio.get_courier_display }}</td>
+          <td class="px-4 py-3 font-mono text-xs text-muted whitespace-nowrap">{{ envio.orden_transporte|default:"—" }}</td>
+          <td class="px-4 py-3">
+            <div class="flex flex-wrap gap-1">
+              {% for pedido in envio.pedidos.all %}
+              <span class="text-xs font-mono bg-appbg border border-line rounded-full px-2 py-0.5">{{ pedido.origen }}-{{ pedido.num_pedido }}</span>
+              {% endfor %}
+            </div>
+          </td>
+          <td class="px-4 py-3">{% include "partials/_badge_estado_envio.html" with envio=envio %}</td>
+          <td class="px-4 py-3 text-xs text-muted font-mono tabular-nums whitespace-nowrap">{{ envio.creado_en|date:"d/m/y H:i" }}</td>
+          <td class="px-4 py-3 text-right whitespace-nowrap">
+            <a href="{% url 'envios:detalle' envio.pk %}" class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-2.5 py-1.5 rounded-lg">Ver</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="px-4 py-10 text-center text-muted">
+          <div class="text-sm">No hay envíos que coincidan.</div>
+          <div class="text-xs mt-1">Prueba a quitar filtros o cambiar la búsqueda.</div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<p class="text-xs text-muted mt-2">{{ envios|length }} envío{{ envios|length|pluralize }}.</p>

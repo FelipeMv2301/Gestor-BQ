@@ -1,0 +1,13 @@
+{% if envio.estado == 'ENTREGADO' %}
+  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-noti-bg text-noti-ink">
+    <span class="w-1.5 h-1.5 rounded-full bg-noti-dot"></span>{{ envio.get_estado_display }}</span>
+{% elif envio.estado == 'DESPACHADO' %}
+  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-apro-bg text-apro-ink">
+    <span class="w-1.5 h-1.5 rounded-full bg-apro-dot"></span>{{ envio.get_estado_display }}</span>
+{% elif envio.estado == 'ERROR' %}
+  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-rech-bg text-rech-ink">
+    <span class="w-1.5 h-1.5 rounded-full bg-rech-dot"></span>{{ envio.get_estado_display }}</span>
+{% else %}
+  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-pend-bg text-pend-ink">
+    <span class="w-1.5 h-1.5 rounded-full bg-pend-dot"></span>{{ envio.get_estado_display }}</span>
+{% endif %}

@@ -6,24 +6,25 @@
   {% endif %}
 </button>
 
-<div id="dropdown-avisos" class="hidden absolute right-0 top-11 w-80 bg-surface border border-line rounded-2xl shadow-lg z-50 overflow-hidden">
+<div id="dropdown-avisos" class="{% if not abierto %}hidden {% endif %}absolute right-0 top-11 w-80 bg-surface border border-line rounded-2xl shadow-lg z-50 overflow-hidden">
   <div class="flex items-center justify-between px-4 py-3 border-b border-line">
     <span class="text-sm font-bold text-ink">Avisos</span>
-    {% if no_leidos %}
+    {% if avisos %}
     <button hx-post="{% url 'pedidos:marcar_avisos_leidos' %}" hx-target="#campana" hx-swap="innerHTML"
             class="text-xs font-semibold text-brand-ink hover:underline">Marcar leídos</button>
     {% endif %}
   </div>
   <div class="max-h-80 overflow-y-auto">
     {% for a in avisos %}
-    <button hx-post="{% url 'pedidos:marcar_aviso_leido' a.pk %}"
-            class="w-full text-left flex gap-3 px-4 py-3 border-b border-line hover:bg-appbg {% if not a.leida %}bg-brand-soft{% endif %}">
-      <span class="w-2 h-2 rounded-full mt-1.5 flex-none {% if a.leida %}bg-linestrong{% else %}bg-brand{% endif %}"></span>
-      <span>
+    <div class="flex items-start gap-2 px-4 py-3 border-b border-line hover:bg-appbg">
+      <span class="w-2 h-2 rounded-full mt-1.5 flex-none bg-brand"></span>
+      <button hx-post="{% url 'pedidos:marcar_aviso_leido' a.pk %}" class="flex-1 text-left">
         <span class="block text-sm text-body">{{ a.mensaje }}</span>
         <span class="text-xs text-muted">{{ a.creado_en|date:"d/m H:i" }}</span>
-      </span>
-    </button>
+      </button>
+      <button hx-post="{% url 'pedidos:descartar_aviso' a.pk %}" hx-target="#campana" hx-swap="innerHTML"
+              title="Descartar" class="flex-none text-muted hover:text-rech-ink px-1 text-lg leading-none">&times;</button>
+    </div>
     {% empty %}
     <p class="px-4 py-6 text-center text-sm text-muted">Sin avisos.</p>
     {% endfor %}

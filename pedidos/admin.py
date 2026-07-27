@@ -11,7 +11,7 @@ import datetime
 #Modelo para detectar match entre courier y sku de la nota de venta (SOLO SAP)
 @admin.register(SkuCourier)
 class SkuCourierAdmin(admin.ModelAdmin):
-    list_display = ("sku", "courier")
+    list_display = ("sku", "courier", "servicio_codigo", "servicio_nombre")
 
 #Campos que aparecerán en la pantalla de admin del proyecto
 @admin.register(Pedido)

@@ -1,0 +1,25 @@
+{% load pedidos_extras %}
+<td class="px-4 py-3">
+  {% if pedido.tipo_entrega == 'RETIRO_BIOQUIMICA' %}
+    <span class="text-xs text-muted">No aplica</span>
+  {% else %}
+  {% puede_editar_courier user pedido as courier_editable %}
+  {% if courier_editable %}
+  <select name="courier" form="fuera-de-filtros" hx-post="{% url 'pedidos:cambiar_courier' pedido.pk %}"
+          hx-trigger="change" hx-target="closest td" hx-swap="outerHTML"
+          class="text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5 focus:border-brand focus:outline-none">
+    {% for valor, etiqueta in courier_servicio_opciones %}
+    <option value="{{ valor }}" {% if valor == pedido.valor_courier_servicio %}selected{% endif %}>{{ etiqueta }}</option>
+    {% endfor %}
+  </select>
+  {% if pedido.envio %}<div class="text-xs text-muted font-mono mt-1">{{ pedido.envio.orden_transporte }}</div>{% endif %}
+  {% else %}
+    {% if pedido.courier %}
+      {{ pedido.get_courier_display }}{% if pedido.servicio_courier_nombre %} ({{ pedido.servicio_courier_nombre }}){% endif %}{% if pedido.envio %}
+      <span class="text-xs text-muted font-mono">· {{ pedido.envio.orden_transporte }}</span>{% endif %}
+    {% else %}
+      <span class="text-xs text-pend-ink bg-pend-bg px-2 py-0.5 rounded font-semibold whitespace-nowrap">⚠ Falta courier</span>
+    {% endif %}
+  {% endif %}
+  {% endif %}
+</td>

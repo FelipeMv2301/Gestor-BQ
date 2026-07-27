@@ -1,20 +1,25 @@
 <div class="flex flex-col gap-1.5">
   <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Notificación</span>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="notif" value="NOTIFICADO" class="accent-brand w-4 h-4" {% if 'NOTIFICADO' in sel_notif %}checked{% endif %}> Notificado</label>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="notif" value="NO_NOTIFICADO" class="accent-brand w-4 h-4" {% if 'NO_NOTIFICADO' in sel_notif %}checked{% endif %}> No notificado</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="notif" value="NOTIFICADO" data-filtro class="accent-brand w-4 h-4" {% if 'NOTIFICADO' in sel_notif %}checked{% endif %}> Notificado</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="notif" value="NO_NOTIFICADO" data-filtro class="accent-brand w-4 h-4" {% if 'NO_NOTIFICADO' in sel_notif %}checked{% endif %}> No notificado</label>
 </div>
 <div class="flex flex-col gap-1.5 border-t border-line pt-3">
   <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Courier</span>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="courier" value="CHIBRA" class="accent-brand w-4 h-4" {% if 'CHIBRA' in sel_courier %}checked{% endif %}> Chibra</label>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="courier" value="MOVEUP" class="accent-brand w-4 h-4" {% if 'MOVEUP' in sel_courier %}checked{% endif %}> MoveUP</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="courier" value="CHIBRA" data-filtro class="accent-brand w-4 h-4" {% if 'CHIBRA' in sel_courier %}checked{% endif %}> Chibra</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="courier" value="MOVEUP" data-filtro class="accent-brand w-4 h-4" {% if 'MOVEUP' in sel_courier %}checked{% endif %}> MoveUP</label>
 </div>
 <div class="flex flex-col gap-1.5 border-t border-line pt-3">
   <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Envío</span>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="enviado" class="accent-brand w-4 h-4" {% if 'enviado' in sel_envio %}checked{% endif %}> Enviado a courier</label>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="sin" class="accent-brand w-4 h-4" {% if 'sin' in sel_envio %}checked{% endif %}> Sin enviar</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="enviado" data-filtro class="accent-brand w-4 h-4" {% if 'enviado' in sel_envio %}checked{% endif %}> Enviado a courier</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="sin" data-filtro class="accent-brand w-4 h-4" {% if 'sin' in sel_envio %}checked{% endif %}> Sin enviar</label>
 </div>
 <div class="flex flex-col gap-1.5 border-t border-line pt-3">
   <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Entrega</span>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="tipo" value="DESPACHO" class="accent-brand w-4 h-4" {% if 'DESPACHO' in sel_tipo %}checked{% endif %}> Despacho</label>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="tipo" value="RETIRO_BIOQUIMICA" class="accent-brand w-4 h-4" {% if 'RETIRO_BIOQUIMICA' in sel_tipo %}checked{% endif %}> Retiro en Bioquímica</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="tipo" value="DESPACHO" data-filtro class="accent-brand w-4 h-4" {% if 'DESPACHO' in sel_tipo %}checked{% endif %}> Despacho</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="tipo" value="RETIRO_BIOQUIMICA" data-filtro class="accent-brand w-4 h-4" {% if 'RETIRO_BIOQUIMICA' in sel_tipo %}checked{% endif %}> Retiro en Bioquímica</label>
+</div>
+<div class="flex flex-col gap-1.5 border-t border-line pt-3">
+  <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Origen</span>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="origen" value="SAP" data-filtro class="accent-brand w-4 h-4" {% if 'SAP' in sel_origen %}checked{% endif %}> SAP</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="origen" value="WEB" data-filtro class="accent-brand w-4 h-4" {% if 'WEB' in sel_origen %}checked{% endif %}> WEB (tienda)</label>
 </div>

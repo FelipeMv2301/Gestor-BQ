@@ -7,6 +7,26 @@ from pedidosRechazados.models import PedidoRechazado
 from . import permisos
 from django.db import transaction
 from cuentas.models import PerfilUsuario
+from utils import Courier
+
+#Arma las opciones de courier+servicio combinadas en una sola ("CHIBRA|10" -> "Chibra — Express"),
+#leyendo los servicios configurados en SkuCourier. Reusado por PedidoEditForm y por el select rápido
+#de la tabla (_celda_courier.html) — un solo lugar decide qué combinaciones existen.
+def opciones_courier_servicio():
+    filas_servicio = (
+        SkuCourier.objects.exclude(servicio_codigo="")
+        .values_list("courier", "servicio_codigo", "servicio_nombre").distinct()
+        .order_by("courier", "servicio_nombre")
+    )
+    etiquetas_courier = dict(Courier.choices)
+
+    opciones = [("", "— Sin courier —")]
+    for courier_valor, codigo, nombre in filas_servicio:
+        etiqueta_courier = etiquetas_courier.get(courier_valor, courier_valor)
+        opciones.append((f"{courier_valor}|{codigo}", f"{etiqueta_courier} — {nombre}"))
+    for courier_valor, etiqueta_courier in Courier.choices:
+        opciones.append((courier_valor, f"{etiqueta_courier} (elegir servicio)"))
+    return opciones
 
 """
 Funciones para WooCommerce
@@ -108,19 +128,22 @@ Funciones para SAP
 #Herramienta que ayuda a estandarizar el mapeo de SAP
 def _mapear_orden_sap(orden, cache_bp, cookies, mapa_sku=None, mapa_ejecutivos=None):
     if mapa_sku is None:
-        mapa_sku = {s.sku: s.courier for s in SkuCourier.objects.all()}
+        mapa_sku = _armar_mapa_sku()
 
     if mapa_ejecutivos is None:
         mapa_ejecutivos = {e.codigo_sap: e for e in Ejecutivo.objects.all()}
 
     addr_ext = orden.get("AddressExtension") or {}
     nombre, telefono, email = obtener_datos_contacto_sap(orden, cache_bp, cookies)
+    deteccion = detectar_courier_sap(orden, mapa_sku)
     return{
         "tipo_entrega": definir_tipo_entrega_sap(orden),
         "nombre_contacto": nombre,
         "telefono_contacto": telefono,
         "email_contacto": email,
-        "courier": detectar_courier_sap(orden, mapa_sku),
+        "courier": deteccion["courier"],
+        "servicio_courier_codigo": deteccion["servicio_codigo"],
+        "servicio_courier_nombre": deteccion["servicio_nombre"],
         "transportation_code": orden.get("TransportationCode"),
         "u_bq_tipo_entrega": orden.get("U_BQ_TipoEntrega") or "",
         "u_bq_crear_envio": orden.get("U_BQ_CrearEnvio") or "",
@@ -140,13 +163,20 @@ def definir_tipo_entrega_sap(orden):
         return Pedido.TipoEntrega.RETIRO_BIOQUIMICA
     return Pedido.TipoEntrega.DESPACHO
 
-#Detecta al courier a través del SKU del despacho.
+#Arma el mapa sku -> {courier, servicio_codigo, servicio_nombre} desde SkuCourier.
+def _armar_mapa_sku():
+    return {
+        s.sku: {"courier": s.courier, "servicio_codigo": s.servicio_codigo, "servicio_nombre": s.servicio_nombre}
+        for s in SkuCourier.objects.all()
+    }
+
+#Detecta courier + servicio a través del SKU del despacho.
 def detectar_courier_sap(orden, mapa_sku):
     for linea in (orden.get("DocumentLines") or []):
         item_code = (linea.get("ItemCode") or "").upper()
         if item_code in mapa_sku:
             return mapa_sku[item_code]
-    return ""
+    return {"courier": "", "servicio_codigo": "", "servicio_nombre": ""}
 
 def limpiar_rut_sap(card_code):
       if not card_code:
@@ -182,7 +212,7 @@ def guardar_pedidos_sap(after=None, before=None):
     cookies = sap_client.obtener_cookies_sap()
     cache_bp = {}
 
-    mapa_sku = {s.sku: s.courier for s in SkuCourier.objects.all()} 
+    mapa_sku = _armar_mapa_sku()
     mapa_ejecutivos = {e.codigo_sap: e for e in Ejecutivo.objects.all()}
 
     filtro = sap_client.agregar_rango_fechas(

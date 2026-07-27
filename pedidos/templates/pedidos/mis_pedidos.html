@@ -7,7 +7,7 @@
 </div>
 
 <form hx-get="{% url 'pedidos:mis_pedidos' %}" hx-target="#tabla-pedidos" hx-push-url="true"
-      hx-trigger="change, keyup delay:400ms from:input[type=search]">
+      hx-trigger="change from:[data-filtro], keyup delay:400ms from:input[type=search]">
   <div class="grid gap-5 md:grid-cols-[15rem_minmax(0,1fr)]">
 
     <!-- Sidebar de filtros -->
@@ -16,26 +16,32 @@
 
       <div class="flex flex-col gap-1.5">
         <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Notificación a cliente</span>
-        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="notif" value="NOTIFICADO" class="accent-brand w-4 h-4" {% if 'NOTIFICADO' in sel_notif %}checked{% endif %}> Notificado</label>
-        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="notif" value="NO_NOTIFICADO" class="accent-brand w-4 h-4" {% if 'NO_NOTIFICADO' in sel_notif %}checked{% endif %}> No notificado</label>
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="notif" value="NOTIFICADO" data-filtro class="accent-brand w-4 h-4" {% if 'NOTIFICADO' in sel_notif %}checked{% endif %}> Notificado</label>
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="notif" value="NO_NOTIFICADO" data-filtro class="accent-brand w-4 h-4" {% if 'NO_NOTIFICADO' in sel_notif %}checked{% endif %}> No notificado</label>
       </div>
 
       <div class="flex flex-col gap-1.5 border-t border-line pt-3">
         <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Estado de Courier</span>
-        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="enviado" class="accent-brand w-4 h-4" {% if 'enviado' in sel_envio %}checked{% endif %}> Cargado a courier</label>
-        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="sin" class="accent-brand w-4 h-4" {% if 'sin' in sel_envio %}checked{% endif %}> Sin enviar</label>
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="enviado" data-filtro class="accent-brand w-4 h-4" {% if 'enviado' in sel_envio %}checked{% endif %}> Cargado a courier</label>
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="sin" data-filtro class="accent-brand w-4 h-4" {% if 'sin' in sel_envio %}checked{% endif %}> Sin enviar</label>
+      </div>
+
+      <div class="flex flex-col gap-1.5 border-t border-line pt-3">
+        <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Courier</span>
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="courier" value="CHIBRA" data-filtro class="accent-brand w-4 h-4" {% if 'CHIBRA' in sel_courier %}checked{% endif %}> Chibra</label>
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="courier" value="MOVEUP" data-filtro class="accent-brand w-4 h-4" {% if 'MOVEUP' in sel_courier %}checked{% endif %}> MoveUP</label>
       </div>
 
       <div class="flex flex-col gap-1.5 border-t border-line pt-3">
         <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Origen del Pedido</span>
-        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="origen" value="SAP" class="accent-brand w-4 h-4" {% if 'SAP' in sel_origen %}checked{% endif %}> SAP</label>
-        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="origen" value="WEB" class="accent-brand w-4 h-4" {% if 'WEB' in sel_origen %}checked{% endif %}> WEB (tienda)</label>
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="origen" value="SAP" data-filtro class="accent-brand w-4 h-4" {% if 'SAP' in sel_origen %}checked{% endif %}> SAP</label>
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="origen" value="WEB" data-filtro class="accent-brand w-4 h-4" {% if 'WEB' in sel_origen %}checked{% endif %}> WEB (tienda)</label>
       </div>
 
       <div class="flex flex-col gap-1.5 border-t border-line pt-3">
         <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Tipo de Entrega</span>
-        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="tipo" value="DESPACHO" class="accent-brand w-4 h-4" {% if 'DESPACHO' in sel_tipo %}checked{% endif %}> Despacho</label>
-        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="tipo" value="RETIRO_BIOQUIMICA" class="accent-brand w-4 h-4" {% if 'RETIRO_BIOQUIMICA' in sel_tipo %}checked{% endif %}> Retiro en Bioquimica.cl</label>
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="tipo" value="DESPACHO" data-filtro class="accent-brand w-4 h-4" {% if 'DESPACHO' in sel_tipo %}checked{% endif %}> Despacho</label>
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="tipo" value="RETIRO_BIOQUIMICA" data-filtro class="accent-brand w-4 h-4" {% if 'RETIRO_BIOQUIMICA' in sel_tipo %}checked{% endif %}> Retiro en Bioquimica.cl</label>
       </div>
 
       <a href="{% url 'pedidos:mis_pedidos' %}" class="text-xs font-semibold text-brand-ink hover:underline mt-1">Limpiar filtros</a>
@@ -43,18 +49,27 @@
 
     <!-- Columna principal: toolbar + tabla -->
     <div class="flex flex-col gap-4 min-w-0">
+      <div class="flex justify-end gap-2.5">
+        <button hx-post="{% url 'pedidos:aprobar_lote' %}" hx-include="input[name='ids']:checked"
+                class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Enviar a Logística →</button>
+        {% if user.perfil.rol == 'ADMIN' %}
+        <button hx-post="{% url 'pedidos:eliminar_lote' %}" hx-include="input[name='ids']:checked"
+                hx-confirm="¿Eliminar los pedidos seleccionados de forma PERMANENTE? No queda registro, no se puede deshacer."
+                class="text-sm font-semibold px-4 py-2 rounded-full border border-[#e0463a] bg-[#e0463a] text-white hover:bg-white hover:text-[#e0463a] shadow-sm">Eliminar</button>
+        {% endif %}
+      </div>
       <div class="flex flex-wrap items-center gap-3 justify-between">
         <div class="inline-flex bg-appbg border border-line p-1 rounded-xl gap-1">
-          <label class="cursor-pointer"><input type="radio" name="vista" value="pendientes" class="peer sr-only" {% if vista == 'pendientes' %}checked{% endif %}>
+          <label class="cursor-pointer"><input type="radio" name="vista" value="pendientes" data-filtro class="peer sr-only" {% if vista == 'pendientes' %}checked{% endif %}>
             <span class="block text-sm font-semibold text-muted px-3.5 py-1.5 rounded-lg peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Pendiente de carga</span></label>
-          <label class="cursor-pointer"><input type="radio" name="vista" value="cargados" class="peer sr-only" {% if vista == 'cargados' %}checked{% endif %}>
+          <label class="cursor-pointer"><input type="radio" name="vista" value="cargados" data-filtro class="peer sr-only" {% if vista == 'cargados' %}checked{% endif %}>
             <span class="block text-sm font-semibold text-muted px-3.5 py-1.5 rounded-lg peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Cargado a Logística</span></label>
-          <label class="cursor-pointer"><input type="radio" name="vista" value="todos" class="peer sr-only" {% if vista == 'todos' %}checked{% endif %}>
+          <label class="cursor-pointer"><input type="radio" name="vista" value="todos" data-filtro class="peer sr-only" {% if vista == 'todos' %}checked{% endif %}>
             <span class="block text-sm font-semibold text-muted px-3.5 py-1.5 rounded-lg peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Todos</span></label>
         </div>
 
         <div class="relative flex-1 min-w-[12rem] max-w-sm">
-          <input type="search" name="q" value="{{ q }}" placeholder="Buscar N° / cliente / RUT…"
+          <input type="search" name="q" value="{{ q }}" placeholder="Buscar N° / cliente / RUT / OT…"
                  class="w-full text-sm rounded-lg border border-linestrong bg-field text-body pl-9 pr-3 py-2 focus:border-brand focus:outline-none">
           <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">🔍</span>
         </div>
