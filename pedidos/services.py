@@ -5,6 +5,7 @@ from ejecutivos.models import Ejecutivo
 from django.forms.models import model_to_dict
 from pedidosRechazados.models import PedidoRechazado
 from . import permisos
+import datetime
 from django.db import transaction
 from cuentas.models import PerfilUsuario
 from utils import Courier
@@ -378,3 +379,15 @@ def _avisar_ejecutivo(pedido, tipo, mensaje):
               origen=pedido.origen, num_pedido=pedido.num_pedido, pedido=pedido)
         for p in perfiles
     ])
+
+#Para el cron: trae lo del día anterior + el actual (mismo filtro UpdateDate que ya usa guardar_pedidos_sap).
+def sincronizar_sap_reciente():
+    hoy = datetime.date.today()
+    ayer = hoy - datetime.timedelta(days=1)
+    return guardar_pedidos_sap(after=ayer.isoformat(), before=hoy.isoformat())
+
+#Mismo criterio de rango que sincronizar_sap_reciente, pero Woo exige datetime ISO completo (con hora), no fecha simple.
+def sincronizar_woo_reciente():
+    hoy = datetime.date.today()
+    ayer = hoy - datetime.timedelta(days=1)
+    return guardar_pedidos_woo(after=f"{ayer.isoformat()}T00:00:00", before=f"{hoy.isoformat()}T23:59:59")

@@ -295,4 +295,10 @@ class Aviso(models.Model):
     class Meta:
         ordering = ["-creado_en"]
         indexes = [models.Index(fields=["destinatario", "leida"])]
+
+#Class que guarda la ejecución del cron para no levantar servicios repetidos
+class LockTarea(models.Model):
+    nombre = models.CharField(max_length=100, unique=True)
+    tomado_en = models.DateTimeField(auto_now=True)
+    pid = models.IntegerField()
     

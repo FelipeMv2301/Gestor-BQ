@@ -62,6 +62,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 #Base de datos a utilizar
 DATABASE_VERSION = os.getenv('DATABASE_VERSION')
 
+#Configuración del cron
+INTERVALO_SYNC_PEDIDOS = int(os.getenv('INTERVALO_SYNC_PEDIDOS', '10'))
+CRON_SAP_ACTIVO = os.getenv('CRON_SAP_ACTIVO', 'True').strip().lower() == 'true'
+CRON_WOO_ACTIVO = os.getenv('CRON_WOO_ACTIVO', 'True').strip().lower() == 'true'
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY')
 
