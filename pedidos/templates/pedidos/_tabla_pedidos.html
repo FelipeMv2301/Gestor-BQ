@@ -1,7 +1,7 @@
 {% load pedidos_extras %}
 <div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
   <div class="overflow-x-auto">
-    <table class="w-full text-sm min-w-[900px]">
+    <table class="w-full text-sm min-w-[1040px]">
       <thead>
         <tr class="bg-appbg text-xs uppercase tracking-wide text-muted">
           {% if seleccionable %}<th class="px-4 py-3 w-10"><input type="checkbox" onchange="event.stopPropagation(); seleccionarTodo(this)" class="accent-brand w-4 h-4" aria-label="Seleccionar todo"></th>{% endif %}
@@ -10,6 +10,7 @@
           <th class="text-left font-semibold px-4 py-3">Dirección</th>
           <th class="text-left font-semibold px-4 py-3">Entrega</th>
           <th class="text-left font-semibold px-4 py-3">Courier</th>
+          <th class="text-left font-semibold px-4 py-3">Observaciones</th>
           <th class="text-left font-semibold px-4 py-3">Estado</th>
           <th class="text-left font-semibold px-4 py-3">Actualizado</th>
           <th class="px-4 py-3"></th>
@@ -37,6 +38,7 @@
             {% endif %}
           </td>
           {% include "pedidos/_celda_courier.html" with pedido=pedido %}
+          <td class="px-4 py-3 text-muted max-w-[16rem] truncate" title="{{ pedido.observaciones }}">{{ pedido.observaciones|default:"—" }}</td>
           <td class="px-4 py-3">{% include "partials/_badge_estado.html" with pedido=pedido %}</td>
           <td class="px-4 py-3 text-xs text-muted font-mono tabular-nums whitespace-nowrap">{{ pedido.modificado_en|date:"d/m/y H:i" }}</td>
           <td class="px-4 py-3 text-right whitespace-nowrap">
@@ -45,7 +47,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="{% if seleccionable %}9{% else %}8{% endif %}" class="px-4 py-10 text-center text-muted">
+        <tr><td colspan="{% if seleccionable %}10{% else %}9{% endif %}" class="px-4 py-10 text-center text-muted">
           <div class="text-sm">No hay pedidos que coincidan.</div>
           <div class="text-xs mt-1">Prueba a quitar filtros o cambiar la búsqueda.</div>
         </td></tr>
