@@ -36,4 +36,4 @@ COMUNAS_CL = ['Algarrobo', 'Alhué', 'Alto Biobío', 'Alto Hospicio', 'Alto del 
 
 class Courier(models.TextChoices):
     CHIBRA = "CHIBRA", "Chibra"
-    #MOVEUP = "MOVEUP", "MoveUP"
+    MOVEUP = "MOVEUP", "MoveUP"

@@ -5,6 +5,21 @@ from pedidos.services  import notificar_pedido
 from django.db import transaction
 from utils import Courier
 
+
+"""
+Helpers
+"""
+def _despachar_chibra(pedidos, destinatario, datos_courier):
+    resultado = chibra_client.documentar_envio(
+        pedidos, datos_courier.get("bultos", []), destinatario, datos_courier
+    )
+    return {"orden_transporte": resultado["numero_envio"]}
+
+SELECCIONAR_COURIER = {
+    Courier.CHIBRA: _despachar_chibra,
+    #Courier.MOVEUP: _despachar_moveup,
+}
+
 #Valida que un grupo de pedidos pueda agruparse en un solo despacho. Se usa apenas se selecciona
 #el grupo (para fallar rápido, antes de mostrar el formulario) y de nuevo al confirmar el despacho.
 #Devuelve el courier común (ya validado) para no volver a inferirlo con pedidos[0].
@@ -42,16 +57,19 @@ def validar_pedidos_para_despacho(pedidos):
 def despachar_pedidos(pedidos, courier, bultos, destinatario, datos_courier, usuario):
     validar_pedidos_para_despacho(pedidos)   # re-valida por seguridad, aunque la vista ya haya chequeado
 
-    if courier == Courier.CHIBRA:
-        resultado = chibra_client.documentar_envio(pedidos, bultos, destinatario, datos_courier)
-    else:
+    courier_despacho = SELECCIONAR_COURIER.get(courier)
+
+    if not courier_despacho:
         raise ValueError(f"[!] Error: No existe integración disponible para el courier {courier}.")
-        
+    
+    datos_courier_completo = {**datos_courier, "bultos": bultos}
+    resultado = courier_despacho(pedidos, destinatario, datos_courier_completo)
+   
     with transaction.atomic():
         envio = EnvioCourier.objects.create(
             courier=courier,
-            datos_courier={**datos_courier, "bultos": bultos},
-            orden_transporte=resultado["numero_envio"],
+            datos_courier=datos_courier_completo,
+            orden_transporte=resultado["orden_transporte"],
             estado=EnvioCourier.Estado.DESPACHADO,
         )
 
