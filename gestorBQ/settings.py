@@ -253,6 +253,11 @@ LOGGING = {
     },
     "loggers": {
         "pedidos": {"handlers": ["console"], "level": "INFO"},
+        #TEMPORAL: diagnóstico del login Google en gestor-test (2026-07-29) — allauth atrapa el
+        #OAuth2Error/RequestException del intercambio de token y muestra su propia pantalla de
+        #error sin loguear nada, así que sin esto el traceback real queda invisible. Sacar cuando
+        #se resuelva.
+        "allauth": {"handlers": ["console"], "level": "DEBUG"},
     },
 }
 

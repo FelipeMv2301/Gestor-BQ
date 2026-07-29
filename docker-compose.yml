@@ -5,5 +5,13 @@ services:
     ports:
       #APP_PORT: 8002 para producción, 8003 para el ambiente de prueba (gestor-test) — se define
       #en el .env de cada clon, así conviven en el mismo servidor sin pisarse.
-      - "127.0.0.1:${APP_PORT:-8002}:8000"
+      #Bind en todas las interfaces (no solo 127.0.0.1): Caddy corre en OTRO contenedor (el de
+      #mirastock) y necesita llegar por "host.docker.internal", que no es la loopback real del
+      #host. Sigue sin quedar expuesto afuera: ufw deniega todo lo no permitido explícitamente,
+      #y este puerto no tiene regla de entrada.
+      - "${APP_PORT:-8002}:8000"
+    #Postgres corre nativo en el host, no en Docker — el contenedor necesita este alias para llegar
+    #a "127.0.0.1" del servidor real (su propio 127.0.0.1 es el contenedor, no el host).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
