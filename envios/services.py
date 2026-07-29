@@ -32,6 +32,10 @@ def validar_pedidos_para_despacho(pedidos):
             raise ValueError(f"Pedido N° {pedido.origen}-{pedido.num_pedido} no está APROBADO.")
         if pedido.envio_id is not None:
             raise ValueError(f"Pedido N° {pedido.origen}-{pedido.num_pedido} ya tiene un envío asignado.")
+        contacto_valido = bool(pedido.telefono_contacto or pedido.email_contacto)
+        direccion_valida = bool(pedido.direccion_calle and pedido.direccion_comuna)
+        if not (contacto_valido and direccion_valida):
+            raise ValueError(f"Pedido N° {pedido.origen}-{pedido.num_pedido} no tiene datos de contacto o dirección válidos (puedes editarlo).")
 
     return courier
 
@@ -46,7 +50,7 @@ def despachar_pedidos(pedidos, courier, bultos, destinatario, datos_courier, usu
     with transaction.atomic():
         envio = EnvioCourier.objects.create(
             courier=courier,
-            datos_courier=datos_courier,
+            datos_courier={**datos_courier, "bultos": bultos},
             orden_transporte=resultado["numero_envio"],
             estado=EnvioCourier.Estado.DESPACHADO,
         )
@@ -59,7 +63,44 @@ def despachar_pedidos(pedidos, courier, bultos, destinatario, datos_courier, usu
     for pedido in pedidos:
         try:
             notificar_pedido(pedido, usuario)
-        except (PermissionError, ValueError) as exc:
+        except Exception as exc:  # incluye errores de SMTP (no solo PermissionError/ValueError) — que uno falle no bloquea al resto del lote
             notificaciones_fallidas.append((pedido, str(exc)))
 
     return envio, notificaciones_fallidas
+
+#Lee los bultos del formulario de despachos, y lo estandariza en todo lugar que se vaya a utilizar
+def parsear_bultos(request):
+    if request.POST.get("modo_bultos") == "simple":
+        cantidad = int(request.POST.get("simple_cantidad") or 1)
+        peso_total = float(request.POST.get("simple_peso_total") or 0)
+        peso_por_bulto = round(peso_total / cantidad, 2) if cantidad else peso_total
+        return [{
+            "tipo": "CAJA",
+            "cantidad": cantidad,
+            "alto": "",
+            "ancho": "",
+            "largo": "",
+            "peso": peso_por_bulto,
+            "tipo_contenido": request.POST.get("simple_tipo_contenido")
+        }]
+
+    tipos = request.POST.getlist("bulto_tipo")
+    cantidades = request.POST.getlist("bulto_cantidad")
+    altos = request.POST.getlist("bulto_alto")
+    anchos = request.POST.getlist("bulto_ancho")
+    largos = request.POST.getlist("bulto_largo")
+    pesos = request.POST.getlist("bulto_peso")
+    contenidos = request.POST.getlist("bulto_tipo_contenido")
+
+    bultos = []
+    for i in range(len(pesos)):
+        bultos.append({
+            "tipo": tipos[i],
+            "cantidad": int(cantidades[i]),
+            "alto": altos[i],
+            "ancho": anchos[i],
+            "largo": largos[i],
+            "peso": float(pesos[i]),
+            "tipo_contenido": contenidos[i],
+        })
+    return bultos

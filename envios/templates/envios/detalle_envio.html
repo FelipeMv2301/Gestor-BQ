@@ -4,9 +4,19 @@
 {% block content %}
 <a href="{% url 'envios:lista' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-body bg-surface border border-linestrong rounded-full px-4 py-2 hover:border-brand hover:text-brand-ink shadow-sm mb-4">← Volver a Envíos</a>
 
-<div class="flex items-center gap-3 mb-5">
-  <h1 class="text-2xl font-bold text-ink font-mono tabular-nums">Envío #{{ envio.id }}</h1>
-  {% include "partials/_badge_estado_envio.html" with envio=envio %}
+<div class="flex items-center justify-between gap-3 mb-5">
+  <div class="flex items-center gap-3">
+    <h1 class="text-2xl font-bold text-ink font-mono tabular-nums">Envío #{{ envio.id }}</h1>
+    {% include "partials/_badge_estado_envio.html" with envio=envio %}
+  </div>
+  <div class="flex gap-2.5">
+    <a href="{% url 'envios:editar' envio.pk %}" class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Editar</a>
+    {% if user.perfil.rol == 'ADMIN' %}
+    <button hx-post="{% url 'envios:eliminar' envio.pk %}"
+            hx-confirm="¿Eliminar este envío de forma PERMANENTE? Los pedidos incluidos vuelven a quedar sin envío (Por despachar), no se puede deshacer."
+            class="text-sm font-semibold px-4 py-2 rounded-full border border-[#e0463a] bg-[#e0463a] text-white hover:bg-white hover:text-[#e0463a] shadow-sm">Eliminar</button>
+    {% endif %}
+  </div>
 </div>
 
 <div class="grid gap-4 items-start" style="grid-template-columns: 1.15fr .85fr;">

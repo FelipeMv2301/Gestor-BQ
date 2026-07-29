@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.template.loader import render_to_string
+from django.core.paginator import Paginator
 from pedidos.permisos import es_admin
 from .models import PerfilUsuario
 from .forms import PerfilUsuarioForm
@@ -36,6 +37,8 @@ def panel_perfiles(request):
     if not es_admin(request.user):
         return redirect("inicio")
     perfiles = PerfilUsuario.objects.select_related("usuario").order_by("usuario__email")
+    paginador = Paginator(perfiles, 20)
+    perfiles = paginador.get_page(request.GET.get("page"))
     return render(request, "cuentas/panel_perfiles.html",
                   {"perfiles": perfiles, "rol_choices": PerfilUsuario.Rol.choices})
 

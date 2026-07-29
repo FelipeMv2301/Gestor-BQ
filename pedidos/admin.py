@@ -1,9 +1,9 @@
 from django.contrib import admin, messages
 from .models import Pedido, SkuCourier
 from django.urls import path, reverse
-from .services import guardar_pedidos_woo, guardar_pedidos_sap, aprobar_pedido, rechazar_pedido, guardar_un_pedido_sap, guardar_un_pedido_woo, notificar_pedido
+from .services import guardar_pedidos_woo, guardar_pedidos_sap, rechazar_pedido, guardar_un_pedido_sap, guardar_un_pedido_woo, notificar_pedido
 from django.shortcuts import redirect
-from envios.services import despachar_pedidos
+from envios.services import despachar_pedidos, parsear_bultos
 from django.template.response import TemplateResponse
 from . import permisos
 import datetime
@@ -16,7 +16,7 @@ class SkuCourierAdmin(admin.ModelAdmin):
 #Campos que aparecerán en la pantalla de admin del proyecto
 @admin.register(Pedido)
 class PedidoAdmin(admin.ModelAdmin):
-    actions = ["aprobar_pedidos", "despachar_a_courier", "rechazar_pedidos", "notificar_pedidos"]
+    actions = ["despachar_a_courier", "rechazar_pedidos", "notificar_pedidos"]
     list_display = ("origen", "modificado_en", "num_pedido", "ejecutivo", "tipo_entrega", "retirar_en", "courier", "rut", "razon_social", "nombre_contacto", "telefono_contacto", "email_contacto", "direccion_calle", "direccion_comuna", "direccion_ciudad", "estado_comercial", "estado_notificacion", "envio")
 
     def get_urls(self):
@@ -121,40 +121,7 @@ class PedidoAdmin(admin.ModelAdmin):
         courier = pedidos[0].courier
 
         if request.method == "POST":
-            if request.POST.get("modo_bultos") == "simple":
-                cantidad_simple = int(request.POST.get("simple_cantidad") or 1)
-                peso_total = float(request.POST.get("simple_peso_total") or 0)
-                peso_por_bulto = round(peso_total / cantidad_simple, 2) if cantidad_simple else peso_total
-
-                bultos = [{
-                    "tipo": "CAJA",
-                    "cantidad": cantidad_simple,
-                    "alto": "",
-                    "ancho": "",
-                    "largo": "",
-                    "peso": peso_por_bulto,
-                    "tipo_contenido": request.POST.get("simple_tipo_contenido"),
-                }]
-            else:
-                tipos = request.POST.getlist("bulto_tipo")
-                cantidades = request.POST.getlist("bulto_cantidad")
-                altos = request.POST.getlist("bulto_alto")
-                anchos = request.POST.getlist("bulto_ancho")
-                largos = request.POST.getlist("bulto_largo")
-                pesos = request.POST.getlist("bulto_peso")
-                contenidos = request.POST.getlist("bulto_tipo_contenido")
-
-                bultos = []
-                for i in range(len(pesos)):
-                    bultos.append({
-                        "tipo": tipos[i],
-                        "cantidad": int(cantidades[i]),
-                        "alto": altos[i],
-                        "ancho": anchos[i],
-                        "largo": largos[i],
-                        "peso": float(pesos[i]),
-                        "tipo_contenido": contenidos[i],
-                    })
+            bultos = parsear_bultos(request)
 
             destinatario = {
                 "nombre": request.POST.get("destinatario_nombre"),
@@ -192,16 +159,6 @@ class PedidoAdmin(admin.ModelAdmin):
         }
         return TemplateResponse(request, "admin/pedidos/pedido/armar_despacho.html", contexto)
 
-    @admin.action(description="Aprobar pedido(s) seleccionado(s)")
-    def aprobar_pedidos(self, request, queryset):
-        for pedido in queryset:
-            try:
-                aprobar_pedido(pedido, request.user)
-            except (PermissionError, ValueError) as exc:
-                self.message_user(request, f"[!] Error: Pedido N° {pedido.origen}-{pedido.num_pedido}: {exc}", level=messages.ERROR)
-            else:
-                self.message_user(request, f"Pedido {pedido.origen}-{pedido.num_pedido} aprobado.", level=messages.SUCCESS)
-    
     #Filtra los datos de la tabla para cada rol.
     def get_queryset(self, request):
       query = super().get_queryset(request)

@@ -22,18 +22,15 @@ def responsable_del_pedido(usuario, pedido):
         return False
     return perfil.codigo_empleado_sap == pedido.ejecutivo.codigo_sap
 
-#Permiso necesario para cambiar el estado_comercial 
-def puede_aprobar(usuario, pedido):
+#Permiso específico para pasar un pedido a pedidosRechazados. Admin siempre; el ejecutivo dueño
+#solo hasta que se despache a courier (mismo corte que puede_editar).
+def puede_rechazar(usuario, pedido):
     rol = obtener_rol(usuario)
     if rol == PerfilUsuario.Rol.ADMIN:
         return True
-    if rol == PerfilUsuario.Rol.EJECUTIVO and responsable_del_pedido(usuario, pedido):
-        return True
+    if rol == PerfilUsuario.Rol.EJECUTIVO:
+        return responsable_del_pedido(usuario, pedido) and pedido.envio_id is None
     return False
-
-#Permiso específico para pasar un pedido a pedidosRechazados
-def puede_rechazar(usuario, pedido):
-    return obtener_rol(usuario) == PerfilUsuario.Rol.ADMIN
 
 #Permiso para reingresar un pedido anulado (solo Admin)
 def puede_reingresar(usuario, rechazado):
@@ -44,7 +41,8 @@ def puede_reingresar(usuario, rechazado):
         return rechazado.snapshot.get("ejecutivo") == _ejecutivo_pk(usuario)
     return False
 
-#Permiso específico para editar un pedido dependiendo del estado. Si es notificado, no se puede 
+#Permiso específico para editar un pedido. Ejecutivo: hasta que se despache a courier (envio_id).
+#Logística: hasta que se notifique al cliente. Si es notificado, nadie salvo Admin.
 def puede_editar(usuario, pedido):
     rol = obtener_rol(usuario)
     if rol == PerfilUsuario.Rol.ADMIN:
@@ -52,9 +50,9 @@ def puede_editar(usuario, pedido):
     if pedido.estado_notificacion == Pedido.EstadoNotificacion.NOTIFICADO:
         return False
     if rol == PerfilUsuario.Rol.EJECUTIVO:
-        return pedido.estado_comercial == Pedido.EstadoComercial.PENDIENTE
+        return pedido.envio_id is None
     if rol == PerfilUsuario.Rol.LOGISTICA:
-        return pedido.estado_comercial == Pedido.EstadoComercial.APROBADO
+        return True
     return False
 
 def queryset_visible(usuario, queryset):
@@ -64,13 +62,10 @@ def queryset_visible(usuario, queryset):
 
     if rol == PerfilUsuario.Rol.EJECUTIVO:
         perfil = getattr(usuario, "perfil", None)
-        return queryset.filter(
-            estado_comercial=Pedido.EstadoComercial.PENDIENTE,
-            ejecutivo__codigo_sap=perfil.codigo_empleado_sap,
-        )
+        return queryset.filter(ejecutivo__codigo_sap=perfil.codigo_empleado_sap)
 
     if rol == PerfilUsuario.Rol.LOGISTICA:
-        return queryset.filter(estado_comercial=Pedido.EstadoComercial.APROBADO)
+        return queryset
     return queryset.none()
 
 def queryset_pedidos_ejecutivo(usuario):
@@ -110,7 +105,7 @@ def queryset_para_ver(usuario):
         perfil = getattr(usuario, "perfil", None)
         return Pedido.objects.filter(ejecutivo__codigo_sap=getattr(perfil, "codigo_empleado_sap", None))
     if rol == PerfilUsuario.Rol.LOGISTICA:
-        return Pedido.objects.filter(estado_comercial=Pedido.EstadoComercial.APROBADO)
+        return Pedido.objects.all()
     return Pedido.objects.none()
 
 def es_logistica(usuario):

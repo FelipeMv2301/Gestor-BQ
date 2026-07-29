@@ -1,3 +1,4 @@
+{% load pedidos_extras %}
 <div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
   <div class="overflow-x-auto">
     <table class="w-full text-sm min-w-[900px]">
@@ -39,7 +40,8 @@
           <td class="px-4 py-3">{% include "partials/_badge_estado.html" with pedido=pedido %}</td>
           <td class="px-4 py-3 text-xs text-muted font-mono tabular-nums whitespace-nowrap">{{ pedido.modificado_en|date:"d/m/y H:i" }}</td>
           <td class="px-4 py-3 text-right whitespace-nowrap">
-            <a href="{% url 'pedidos:detalle' pedido.pk %}" class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-2.5 py-1.5 rounded-lg">Ver / Editar</a>
+            {% puede_editar_pedido user pedido as puede_editar_fila %}
+            <a href="{% url 'pedidos:detalle' pedido.pk %}" class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-2.5 py-1.5 rounded-lg">{% if puede_editar_fila %}Ver / Editar{% else %}Ver{% endif %}</a>
           </td>
         </tr>
         {% empty %}
@@ -52,4 +54,4 @@
     </table>
   </div>
 </div>
-<p class="text-xs text-muted mt-2">{{ pedidos|length }} pedido{{ pedidos|length|pluralize }}.</p>
+{% include "partials/_paginacion.html" with page_obj=pedidos hx_target="#tabla-pedidos" %}

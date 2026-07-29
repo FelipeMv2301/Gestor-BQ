@@ -4,6 +4,7 @@ from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.urls import reverse
 from django.http import HttpResponse
+from django.core.paginator import Paginator
 from pedidos.permisos import es_admin
 from .models import Ejecutivo
 from .forms import EjecutivoForm
@@ -14,6 +15,8 @@ def panel_ejecutivos(request):
     if not es_admin(request.user):
         return redirect("inicio")
     ejecutivos = Ejecutivo.objects.order_by("nombre")
+    paginador = Paginator(ejecutivos, 20)
+    ejecutivos = paginador.get_page(request.GET.get("page"))
     return render(request, "ejecutivos/panel_ejecutivos.html",
                 {"ejecutivos": ejecutivos, "form": EjecutivoForm()})
 

@@ -40,27 +40,26 @@ def eliminar_lote(request):
     resp["HX-Redirect"] = destino
     return resp
 
+#Anular por lote (Admin, o el ejecutivo dueño hasta que se despache a courier — permisos.puede_rechazar).
 @login_required
 @require_POST
-def aprobar_lote(request):
-    # Reusa aprobar_pedido en loop; junta ok/errores en un toast resumen.
+def rechazar_lote(request):
     ids = request.POST.getlist("ids")
     pedidos = permisos.queryset_para_ver(request.user).filter(pk__in=ids)
 
-    aprobados = 0
+    anulados = 0
     for pedido in pedidos:
         try:
-            services.aprobar_pedido(pedido, request.user)
-            aprobados += 1
+            services.rechazar_pedido(pedido, "", request.user)
+            anulados += 1
         except (PermissionError, ValueError) as exc:
             messages.error(request, f"{pedido.origen}-{pedido.num_pedido}: {str(exc).replace('[!] Error: ', '')}")
-    if aprobados:
-        messages.success(request, f"{aprobados} pedido(s) enviado(s) a Logística.")
+    if anulados:
+        messages.success(request, f"{anulados} pedido(s) anulado(s).")
 
     resp = HttpResponse(status=204)
     resp["HX-Redirect"] = reverse("pedidos:mis_pedidos")
     return resp
-
 
 @login_required
 @require_POST
@@ -74,7 +73,7 @@ def notificar_lote(request):
         try:
             services.notificar_pedido(pedido, request.user)
             notificados += 1
-        except (PermissionError, ValueError) as exc:
+        except Exception as exc:  # incluye errores de SMTP — que uno falle no bloquea al resto del lote
             messages.error(request, f"{pedido.origen}-{pedido.num_pedido}: {str(exc).replace('[!] Error: ', '')}")
     if notificados:
         messages.success(request, f"{notificados} cliente(s) notificado(s).")

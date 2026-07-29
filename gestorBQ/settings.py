@@ -72,7 +72,22 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 
 DEBUG = os.getenv('DEBUG', 'False').strip().lower() == 'true'
 
-ALLOWED_HOSTS = ['*']
+#Lista separada por comas (mismo criterio que EMAIL_BCC) — en prod: el hostname real (gestor.bioquimica.cl).
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '127.0.0.1,localhost').split(',') if h.strip()]
+
+#Django exige el origen completo (con esquema) para aceptar POSTs — vacío en dev (mismo origen,
+#sin proxy HTTPS de por medio); en prod: https://gestor.bioquimica.cl
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if o.strip()]
+
+#Solo tienen sentido con HTTPS real de por medio (Caddy/Cloudflare) — en dev (DEBUG=True, sin proxy)
+#romperían el login, por eso quedan atrás de este gate en vez de fijos.
+if not DEBUG:
+    #Caddy termina el TLS antes de llegar a Django (Caddy→gunicorn es HTTP plano) — sin esto Django
+    #cree que todo es HTTP y nunca manda las cookies Secure. Necesita que Caddy mande este header
+    #(header_up X-Forwarded-Proto {scheme}, ya en el Caddyfile del runbook).
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 
 
@@ -136,6 +151,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  #sirve estáticos sin depender de cómo esté armado Caddy
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -227,6 +243,19 @@ USE_I18N = True
 
 USE_TZ = True
 
+#Sin esto, los logger.info(...) de la app (ej. pedidos.scheduler) se pierden en silencio —
+#Django solo cablea handlers para sus propios loggers ("django.*"), no para los del proyecto.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "loggers": {
+        "pedidos": {"handlers": ["console"], "level": "INFO"},
+    },
+}
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -234,6 +263,18 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 STATICFILES_DIRS = [BASE_DIR / "static"]
+
+#Destino de "collectstatic" — distinto de STATICFILES_DIRS a propósito (Django lo exige).
+#En Docker: se genera al construir la imagen (ver Dockerfile), Whitenoise lo sirve directo.
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+if not DEBUG:
+    #El storage con manifest (hash en el nombre + cache larga) exige que collectstatic ya haya
+    #corrido — en dev nunca corre, por eso queda atrás de este gate (igual que SECURE_* arriba).
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    }
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

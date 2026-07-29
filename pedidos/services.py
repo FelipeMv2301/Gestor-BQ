@@ -138,6 +138,7 @@ def _mapear_orden_sap(orden, cache_bp, cookies, mapa_sku=None, mapa_ejecutivos=N
     nombre, telefono, email = obtener_datos_contacto_sap(orden, cache_bp, cookies)
     deteccion = detectar_courier_sap(orden, mapa_sku)
     return{
+        "estado_comercial": Pedido.EstadoComercial.APROBADO,  # mismo trato que Woo (_mapear_pedido_woo): pasa directo a Logística
         "tipo_entrega": definir_tipo_entrega_sap(orden),
         "nombre_contacto": nombre,
         "telefono_contacto": telefono,
@@ -199,7 +200,7 @@ def obtener_datos_contacto_sap(orden, cache_bp, cookies):
       contacto = next((c for c in contactos if c.get("InternalCode") == contact_code), None)
 
       if contacto:
-          nombre = contacto.get("Name") or f"{contacto.get('FirstName', '')} {contacto.get('LastName', '')}".strip()
+          nombre = f"{contacto.get('FirstName', '')} {contacto.get('LastName', '')}".strip()
           email = contacto.get("E_Mail") or bp.get("EmailAddress") or ""
           telefono = contacto.get("MobilePhone") or contacto.get("Phone1") or bp.get("Phone1") or ""
       else:
@@ -286,27 +287,6 @@ def guardar_un_pedido_sap(num_pedido, ignorar_rechazado=False):
 """
 Acciones del equipo
 """
-
-#Esta función pasa un pedido de estado PENDIENTE a APROBADO, para que logística pueda trabajarlo. Solo el ejecutivo o admin pueden aprobar.
-#Usa el archivo de permisos.py para evaluar que puede y que no puede hacer el usuario.
-def aprobar_pedido(pedido, usuario):
-      if not permisos.puede_aprobar(usuario, pedido):
-          raise PermissionError("[!] Error: Solo el ejecutivo a cargo del pedido, o ADMIN, pueden aprobarlo.")
-
-      if pedido.estado_comercial != Pedido.EstadoComercial.PENDIENTE:
-          raise ValueError(f"[!] Error: Solo se puede aprobar un pedido en PENDIENTE. (Actual: {pedido.estado_comercial}).")
-
-      if not pedido.courier:
-          raise ValueError("[!] Error: Debes seleccionar un courier antes de aprobar.")
-
-      contacto_valido = bool(pedido.telefono_contacto or pedido.email_contacto)
-      direccion_valida = bool(pedido.direccion_calle and pedido.direccion_comuna)
-      if not (contacto_valido and direccion_valida):
-          raise ValueError("[!] Error: Faltan datos de contacto o dirección válidos.")
-
-      pedido.estado_comercial = Pedido.EstadoComercial.APROBADO
-      pedido.save(update_fields=["estado_comercial", "modificado_en"])
-      return pedido
 
 #Arma un Snapshot del pedido rechazado
 def rechazar_pedido(pedido, motivo, usuario):

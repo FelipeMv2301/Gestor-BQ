@@ -19,10 +19,6 @@
             class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Notificar al cliente</button>
     {% endif %}
 
-    {% if pedido.estado_comercial == 'PENDIENTE' %}
-    <button hx-post="{% url 'pedidos:aprobar' pedido.pk %}"
-            class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Enviar a Logística →</button>
-    {% endif %}
     {% if puede_rechazar %}
     <button hx-get="{% url 'pedidos:rechazar' pedido.pk %}" hx-target="#modal"
             class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong text-rech-ink hover:bg-rech-bg">Anular</button>
@@ -59,7 +55,13 @@
       <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-3.5">Envío</h3>
       {% include "pedidos/_campo.html" with k="Tipo de entrega" v=pedido.get_tipo_entrega_display %}
       {% include "pedidos/_campo.html" with k="Courier" v=pedido.get_courier_display %}
+      {% if pedido.servicio_courier_nombre %}{% include "pedidos/_campo.html" with k="Servicio" v=pedido.servicio_courier_nombre %}{% endif %}
       {% include "pedidos/_campo.html" with k="Orden transporte" v=pedido.envio.orden_transporte mono=True %}
+      {% if pedido.envio_id and user.perfil.rol == 'LOGISTICA' or pedido.envio_id and user.perfil.rol == 'ADMIN' %}
+      <div class="flex justify-end py-1.5 text-sm">
+        <a href="{% url 'envios:detalle' pedido.envio_id %}" class="font-semibold text-brand hover:text-brand-ink">Ver envío #{{ pedido.envio_id }} →</a>
+      </div>
+      {% endif %}
     </div>
     <div class="p-5 border-t border-line">
       <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-3.5">Estado</h3>

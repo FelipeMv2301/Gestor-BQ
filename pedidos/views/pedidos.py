@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.http import HttpResponse
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+from django.core.paginator import Paginator
 import json
 
 from ..models import Pedido
@@ -16,54 +17,31 @@ from ..services import opciones_courier_servicio
 #Pantalla principal de la aplicación. Es aquí donde irán las funcionalidades de los filtros de búsqueda y el buscador
 @login_required
 def mis_pedidos(request):
-    vista = request.GET.get("vista", "pendientes")
-    estado = {
-        "pendientes": Pedido.EstadoComercial.PENDIENTE,
-        "cargados": Pedido.EstadoComercial.APROBADO,
-    }.get(vista)  # "todos" → None
-
     pedidos = (
         permisos.queryset_pedidos_ejecutivo(request.user)   # ← scope de seguridad (quién ve qué)
-        .con_estado_comercial(estado)
         .buscar(request.GET.get("q", "").strip())
         .con_notificacion(request.GET.getlist("notif"))
         .con_envio(request.GET.getlist("envio"))
         .con_origen(request.GET.getlist("origen"))
         .con_tipo_entrega(request.GET.getlist("tipo"))
         .con_courier(request.GET.getlist("courier"))
+        .con_estado_seguimiento(request.GET.getlist("estado"))
         .select_related("ejecutivo", "envio")
         .order_by("-modificado_en")
     )
+    paginador = Paginator(pedidos, 20)
+    pedidos = paginador.get_page(request.GET.get("page"))
 
     contexto = {
-        "pedidos": pedidos, "vista": vista, "q": request.GET.get("q", ""), "seleccionable": True,
+        "pedidos": pedidos, "q": request.GET.get("q", ""), "seleccionable": True,
         "sel_notif": request.GET.getlist("notif"), "sel_envio": request.GET.getlist("envio"),
         "sel_origen": request.GET.getlist("origen"), "sel_tipo": request.GET.getlist("tipo"),
-        "sel_courier": request.GET.getlist("courier"), "courier_servicio_opciones": opciones_courier_servicio(),
+        "sel_courier": request.GET.getlist("courier"), "sel_estado": request.GET.getlist("estado"),
+        "courier_servicio_opciones": opciones_courier_servicio(),
     }
 
     plantilla = "pedidos/_tabla_pedidos.html" if request.headers.get("HX-Request") else "pedidos/mis_pedidos.html"
     return render(request, plantilla, contexto)
-
-@login_required
-@require_POST
-def aprobar(request, pk):
-    pedido = get_object_or_404(permisos.queryset_para_ver(request.user), pk=pk)
-    try:
-        services.aprobar_pedido(pedido, request.user)
-    except (PermissionError, ValueError) as exc:
-        # Error accionable → toast rojo, se queda en la ficha
-        resp = HttpResponse(status=204)
-        resp["HX-Trigger"] = json.dumps({
-            "toast": {"level": "error", "body": str(exc).replace("[!] Error: ", "")}
-        })
-        return resp
-
-    # Éxito → mensaje + recarga la ficha (badge, botones, candados quedan consistentes)
-    messages.success(request, f"Pedido {pedido.origen}-{pedido.num_pedido} enviado a Logística.")
-    resp = HttpResponse(status=204)
-    resp["HX-Redirect"] = reverse("pedidos:detalle", args=[pk])
-    return resp
 
 @login_required
 def detalle_pedido(request, pk):
@@ -134,7 +112,7 @@ def rechazar(request, pk):
     if not permisos.puede_rechazar(request.user, pedido):
         resp = HttpResponse(status=204)
         resp["HX-Trigger"] = json.dumps({"toast": {"level": "error",
-            "body": "Solo un administrador puede anular pedidos."}})
+            "body": "No puedes anular este pedido."}})
         return resp
 
     if request.method == "POST":
@@ -151,6 +129,8 @@ def rechazar(request, pk):
 @login_required
 def anulados(request):
     rechazados = permisos.queryset_rechazados(request.user).select_related("rechazado_por").order_by("-rechazado_en")
+    paginador = Paginator(rechazados, 20)
+    rechazados = paginador.get_page(request.GET.get("page"))
     return render(request, "pedidos/anulados.html", {"rechazados": rechazados})
 
 @login_required
@@ -178,11 +158,36 @@ def reingresar(request, pk):
 
 @login_required
 @require_POST
+def editar_motivo_rechazado(request, pk):
+    if not permisos.es_admin(request.user):
+        return redirect("inicio")
+    rechazado = get_object_or_404(PedidoRechazado, pk=pk)
+    rechazado.motivo = request.POST.get("motivo", "").strip()
+    rechazado.save(update_fields=["motivo"])
+    resp = HttpResponse(status=204)
+    resp["HX-Redirect"] = reverse("pedidos:anulados")
+    return resp
+
+@login_required
+@require_POST
+def eliminar_rechazado(request, pk):
+    if not permisos.es_admin(request.user):
+        return redirect("inicio")
+    rechazado = get_object_or_404(PedidoRechazado, pk=pk)
+    origen, num = rechazado.origen, rechazado.num_pedido
+    rechazado.delete()
+    messages.success(request, f"Pedido {origen}-{num} eliminado del archivo permanentemente.")
+    resp = HttpResponse(status=204)
+    resp["HX-Redirect"] = reverse("pedidos:anulados")
+    return resp
+
+@login_required
+@require_POST
 def notificar(request, pk):
     pedido = get_object_or_404(permisos.queryset_para_ver(request.user), pk=pk)
     try:
         services.notificar_pedido(pedido, request.user)   # ← dispara el aviso al ejecutivo
-    except (PermissionError, ValueError) as exc:
+    except Exception as exc:  # incluye errores de SMTP — toast claro en vez de error 500 crudo
         resp = HttpResponse(status=204)
         resp["HX-Trigger"] = json.dumps({"toast": {"level": "error",
             "body": str(exc).replace("[!] Error: ", "")}})
@@ -205,15 +210,19 @@ def tablero_logistica(request):
         .con_envio(request.GET.getlist("envio"))
         .con_tipo_entrega(request.GET.getlist("tipo"))
         .con_origen(request.GET.getlist("origen"))
+        .con_estado_seguimiento(request.GET.getlist("estado"))
         .select_related("ejecutivo", "envio")
         .order_by("-modificado_en")
     )
+    paginador = Paginator(pedidos, 20)
+    pedidos = paginador.get_page(request.GET.get("page"))
 
     contexto = {
         "pedidos": pedidos, "q": request.GET.get("q", ""), "seleccionable": True,
         "sel_notif": request.GET.getlist("notif"), "sel_courier": request.GET.getlist("courier"),
         "sel_envio": request.GET.getlist("envio"), "sel_tipo": request.GET.getlist("tipo"),
-        "sel_origen": request.GET.getlist("origen"), "courier_servicio_opciones": opciones_courier_servicio(),
+        "sel_origen": request.GET.getlist("origen"), "sel_estado": request.GET.getlist("estado"),
+        "courier_servicio_opciones": opciones_courier_servicio(),
     }
     plantilla = "pedidos/_tabla_pedidos.html" if request.headers.get("HX-Request") else "pedidos/tablero_logistica.html"
     return render(request, plantilla, contexto)

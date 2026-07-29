@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.git/
+.gitignore
+db.sqlite3
+staticfiles/
+static/css/app.css
+tailwindcss.exe
+tailwindcss
+backlog_proyecto/

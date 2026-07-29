@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from ..models import Pedido
 from .. import permisos
-from envios.services import despachar_pedidos, validar_pedidos_para_despacho
+from envios.services import despachar_pedidos, validar_pedidos_para_despacho, parsear_bultos
 
 @login_required
 def armar_despacho(request):
@@ -30,25 +30,7 @@ def armar_despacho(request):
         return redirect("pedidos:despachos")
 
     if request.method == "POST":
-        if request.POST.get("modo_bultos") == "simple":
-            cantidad = int(request.POST.get("simple_cantidad") or 1)
-            peso_total = float(request.POST.get("simple_peso_total") or 0)
-            peso_unitario = round(peso_total / cantidad, 2) if cantidad else peso_total
-            bultos = [{"tipo": "CAJA", "cantidad": cantidad, "alto": "", "ancho": "", "largo": "",
-                       "peso": peso_unitario, "tipo_contenido": request.POST.get("simple_tipo_contenido")}]
-        else:
-            tipos = request.POST.getlist("bulto_tipo")
-            cantidades = request.POST.getlist("bulto_cantidad")
-            altos = request.POST.getlist("bulto_alto")
-            anchos = request.POST.getlist("bulto_ancho")
-            largos = request.POST.getlist("bulto_largo")
-            pesos = request.POST.getlist("bulto_peso")
-            contenidos = request.POST.getlist("bulto_tipo_contenido")
-            bultos = []
-            for i in range(len(pesos)):
-                bultos.append({"tipo": tipos[i], "cantidad": int(cantidades[i]), "alto": altos[i],
-                               "ancho": anchos[i], "largo": largos[i], "peso": float(pesos[i]),
-                               "tipo_contenido": contenidos[i]})
+        bultos = parsear_bultos(request)
 
         destinatario = {
             "nombre": request.POST.get("destinatario_nombre"),

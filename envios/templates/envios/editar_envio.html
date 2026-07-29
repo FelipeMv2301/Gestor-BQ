@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block titulo %}Editar envío #{{ envio.id }} — Portal Bioquímica{% endblock %}
+{% block ancho %}max-w-4xl{% endblock %}
+{% block content %}
+<a href="{% url 'envios:detalle' envio.pk %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-body mb-3">← Volver al envío</a>
+
+<div class="mb-5">
+  <h1 class="text-2xl font-bold text-ink">Editar envío #{{ envio.id }}</h1>
+  <p class="text-sm text-muted mt-1">Corrige lo que Chibra devolvió mal, o un dato mal cargado al despachar. No reenvía nada al courier.</p>
+</div>
+
+<form method="post" action="{% url 'envios:editar' envio.pk %}" class="flex flex-col gap-4">
+  {% csrf_token %}
+
+  <div class="bg-surface border border-line rounded-2xl p-6">
+    <h2 class="text-sm font-bold text-ink mb-4">Envío</h2>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Courier</span>
+        <select name="courier" required class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+          {% for valor, etiqueta in courier_choices %}
+          <option value="{{ valor }}" {% if envio.courier == valor %}selected{% endif %}>{{ etiqueta }}</option>
+          {% endfor %}
+        </select></label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Orden de transporte</span>
+        <input type="text" name="orden_transporte" value="{{ envio.orden_transporte }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none font-mono"></label>
+    </div>
+  </div>
+
+  <div class="bg-surface border border-line rounded-2xl p-6">
+    <h2 class="text-sm font-bold text-ink mb-4">Datos del courier</h2>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Centro remitente</span>
+        <select name="centro" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+          <option value="02" {% if envio.datos_courier.centro == "02" %}selected{% endif %}>02 - Biotecnología</option>
+          <option value="03" {% if envio.datos_courier.centro == "03" %}selected{% endif %}>03 - Educación</option>
+          <option value="04" {% if envio.datos_courier.centro == "04" %}selected{% endif %}>04 - Genérico</option>
+        </select></label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Servicio</span>
+        <select name="servicio" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+          <option value="10" {% if envio.datos_courier.servicio == "10" %}selected{% endif %}>10 - Express</option>
+          <option value="20" {% if envio.datos_courier.servicio == "20" %}selected{% endif %}>20 - Terrestre</option>
+        </select></label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Valor declarado</span>
+        <input type="number" name="valor_declarado" value="{{ envio.datos_courier.valor_declarado|default:0 }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Observaciones</span>
+        <textarea name="observaciones" maxlength="255" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">{{ envio.datos_courier.observaciones }}</textarea></label>
+    </div>
+    <p class="text-xs text-muted mt-3">Si cambias el courier a uno distinto de Chibra, centro/servicio dejan de aplicar — quedan guardados igual, pero sin efecto hasta que exista esa integración.</p>
+  </div>
+
+  <div class="bg-surface border border-line rounded-2xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-sm font-bold text-ink">Bultos</h2>
+      <div class="inline-flex bg-appbg border border-line p-1 rounded-xl gap-1 text-sm">
+        <label class="cursor-pointer"><input type="radio" name="modo_bultos" value="detallado" class="peer sr-only" checked onclick="mostrarModoBultos()">
+          <span class="block px-3 py-1 rounded-lg text-muted font-semibold peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Detallado</span></label>
+        <label class="cursor-pointer"><input type="radio" name="modo_bultos" value="simple" class="peer sr-only" onclick="mostrarModoBultos()">
+          <span class="block px-3 py-1 rounded-lg text-muted font-semibold peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Simple</span></label>
+      </div>
+    </div>
+
+    <div id="bultos-simple" class="hidden grid gap-4 sm:grid-cols-2">
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Cantidad de bultos</span>
+        <input type="number" name="simple_cantidad" value="1" min="1" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Peso total (kg)</span>
+        <input type="number" name="simple_peso_total" step="0.01" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Volumen total (opcional)</span>
+        <input type="text" name="volumen_total" value="{{ envio.datos_courier.volumen_total }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Contenido</span>
+        <select name="simple_tipo_contenido" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+          <option value="SECO">SECO</option><option value="REFRIGERADO">REFRIGERADO</option><option value="REFRIGERADO CON SENSOR">REFRIGERADO CON SENSOR</option>
+        </select></label>
+    </div>
+
+    <div id="bultos-detallado">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm min-w-[640px]">
+          <thead><tr class="text-xs uppercase tracking-wide text-muted text-left">
+            <th class="py-2 pr-2">Tipo</th><th class="py-2 px-2">Cant.</th><th class="py-2 px-2">Alto</th><th class="py-2 px-2">Ancho</th><th class="py-2 px-2">Largo</th><th class="py-2 px-2">Peso (kg)</th><th class="py-2 pl-2">Contenido</th>
+          </tr></thead>
+          <tbody id="filas-bultos">
+            {% for bulto in envio.datos_courier.bultos|default:'' %}
+            <tr>
+              <td class="py-1 pr-2"><select name="bulto_tipo" class="text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5">
+                <option value="CAJA" {% if bulto.tipo == "CAJA" %}selected{% endif %}>CAJA</option>
+                <option value="BULTO" {% if bulto.tipo == "BULTO" %}selected{% endif %}>BULTO</option>
+                <option value="NEVERA L" {% if bulto.tipo == "NEVERA L" %}selected{% endif %}>NEVERA L</option>
+                <option value="NEVERAS S" {% if bulto.tipo == "NEVERAS S" %}selected{% endif %}>NEVERAS S</option>
+                <option value="NEVERA M" {% if bulto.tipo == "NEVERA M" %}selected{% endif %}>NEVERA M</option>
+                <option value="SOBRE" {% if bulto.tipo == "SOBRE" %}selected{% endif %}>SOBRE</option>
+                <option value="VALIJA" {% if bulto.tipo == "VALIJA" %}selected{% endif %}>VALIJA</option>
+                <option value="PALLET" {% if bulto.tipo == "PALLET" %}selected{% endif %}>PALLET</option>
+                <option value="BOLSO/MALETA" {% if bulto.tipo == "BOLSO/MALETA" %}selected{% endif %}>BOLSO/MALETA</option>
+                <option value="CONTENEDOR" {% if bulto.tipo == "CONTENEDOR" %}selected{% endif %}>CONTENEDOR</option>
+                <option value="NEVERA XL" {% if bulto.tipo == "NEVERA XL" %}selected{% endif %}>NEVERA XL</option>
+              </select></td>
+              <td class="py-1 px-2"><input type="number" name="bulto_cantidad" value="{{ bulto.cantidad|default:1 }}" min="1" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+              <td class="py-1 px-2"><input type="text" name="bulto_alto" value="{{ bulto.alto }}" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+              <td class="py-1 px-2"><input type="text" name="bulto_ancho" value="{{ bulto.ancho }}" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+              <td class="py-1 px-2"><input type="text" name="bulto_largo" value="{{ bulto.largo }}" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+              <td class="py-1 px-2"><input type="number" name="bulto_peso" step="0.01" value="{{ bulto.peso|stringformat:"s" }}" required class="w-20 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+              <td class="py-1 pl-2"><select name="bulto_tipo_contenido" class="text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5">
+                <option value="SECO" {% if bulto.tipo_contenido == "SECO" %}selected{% endif %}>SECO</option>
+                <option value="REFRIGERADO" {% if bulto.tipo_contenido == "REFRIGERADO" %}selected{% endif %}>REFRIGERADO</option>
+                <option value="REFRIGERADO CON SENSOR" {% if bulto.tipo_contenido == "REFRIGERADO CON SENSOR" %}selected{% endif %}>REFRIGERADO CON SENSOR</option>
+              </select></td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td class="py-1 pr-2"><select name="bulto_tipo" class="text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5">
+                <option value="CAJA" selected>CAJA</option><option value="BULTO">BULTO</option><option value="NEVERA L">NEVERA L</option><option value="NEVERAS S">NEVERAS S</option><option value="NEVERA M">NEVERA M</option><option value="SOBRE">SOBRE</option><option value="VALIJA">VALIJA</option><option value="PALLET">PALLET</option><option value="BOLSO/MALETA">BOLSO/MALETA</option><option value="CONTENEDOR">CONTENEDOR</option><option value="NEVERA XL">NEVERA XL</option>
+              </select></td>
+              <td class="py-1 px-2"><input type="number" name="bulto_cantidad" value="1" min="1" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+              <td class="py-1 px-2"><input type="text" name="bulto_alto" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+              <td class="py-1 px-2"><input type="text" name="bulto_ancho" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+              <td class="py-1 px-2"><input type="text" name="bulto_largo" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+              <td class="py-1 px-2"><input type="number" name="bulto_peso" step="0.01" required class="w-20 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+              <td class="py-1 pl-2"><select name="bulto_tipo_contenido" class="text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5">
+                <option value="SECO">SECO</option><option value="REFRIGERADO">REFRIGERADO</option><option value="REFRIGERADO CON SENSOR">REFRIGERADO CON SENSOR</option>
+              </select></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <button type="button" onclick="agregarFilaBulto()" class="text-sm font-semibold text-brand-ink hover:underline mt-3">+ Agregar bulto</button>
+    </div>
+  </div>
+
+  <div class="flex justify-end gap-2.5">
+    <a href="{% url 'envios:detalle' envio.pk %}" class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:bg-appbg">Cancelar</a>
+    <button type="submit" class="text-sm font-semibold px-5 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Guardar cambios</button>
+  </div>
+</form>
+
+<script>
+  function agregarFilaBulto() {
+    var filaOriginal = document.querySelector("#filas-bultos tr");
+    var filaNueva = filaOriginal.cloneNode(true);
+    filaNueva.querySelectorAll("input").forEach(function (c) { if (c.type !== "number" || !c.value) c.value = c.type === "number" ? (c.name === "bulto_cantidad" ? 1 : "") : ""; });
+    document.getElementById("filas-bultos").appendChild(filaNueva);
+  }
+  function mostrarModoBultos() {
+    var esSimple = document.querySelector('input[name="modo_bultos"][value="simple"]').checked;
+    document.getElementById('bultos-simple').classList.toggle('hidden', !esSimple);
+    document.getElementById('bultos-detallado').classList.toggle('hidden', esSimple);
+    document.getElementsByName('bulto_peso').forEach(function (c) { c.required = !esSimple; });
+  }
+</script>
+{% endblock %}

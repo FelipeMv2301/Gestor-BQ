@@ -41,4 +41,4 @@
     </table>
   </div>
 </div>
-<p class="text-xs text-muted mt-2">{{ envios|length }} envío{{ envios|length|pluralize }}.</p>
+{% include "partials/_paginacion.html" with page_obj=envios hx_target="#tabla-envios" %}

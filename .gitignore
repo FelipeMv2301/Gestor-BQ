@@ -3,6 +3,17 @@ __pycache__/
 *.pyc
 .env
 .env.*
+!.env.example
 db.sqlite3
 .backlog_proyecto/
 backlog_proyecto/
+
+#Tailwind CLI: el binario no se versiona (112MB, específico de plataforma), y el CSS
+#compilado se genera en el build/deploy — nunca a mano. Fuente (tailwind.config.js,
+#static/css/tailwind-src.css) sí queda en git.
+tailwindcss.exe
+tailwindcss
+static/css/app.css
+
+#Salida de "collectstatic" — se genera en el build/deploy (Dockerfile), nunca a mano.
+staticfiles/

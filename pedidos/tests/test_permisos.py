@@ -29,18 +29,17 @@ class PermisosTest(TestCase):
         self.assertTrue(permisos.responsable_del_pedido(self.dueno, self.pedido))
         self.assertFalse(permisos.responsable_del_pedido(self.ajeno, self.pedido))
 
-    # --- aprobar ---
-    def test_puede_aprobar(self):
-        self.assertTrue(permisos.puede_aprobar(self.dueno, self.pedido))
-        self.assertTrue(permisos.puede_aprobar(self.admin, self.pedido))
-        self.assertFalse(permisos.puede_aprobar(self.ajeno, self.pedido))
-        self.assertFalse(permisos.puede_aprobar(self.logi, self.pedido))
-
-    # --- rechazar (solo Admin) ---
-    def test_solo_admin_rechaza(self):
+    # --- rechazar: Admin siempre; ejecutivo dueño hasta que se despache a courier ---
+    def test_rechazar_admin_y_dueno_sin_despachar(self):
         self.assertTrue(permisos.puede_rechazar(self.admin, self.pedido))
-        self.assertFalse(permisos.puede_rechazar(self.dueno, self.pedido))
+        self.assertTrue(permisos.puede_rechazar(self.dueno, self.pedido))
+        self.assertFalse(permisos.puede_rechazar(self.ajeno, self.pedido))
         self.assertFalse(permisos.puede_rechazar(self.logi, self.pedido))
+
+    def test_dueno_no_puede_rechazar_tras_despachar(self):
+        self.pedido.envio_id = 999  # simula ya despachado a courier
+        self.assertFalse(permisos.puede_rechazar(self.dueno, self.pedido))
+        self.assertTrue(permisos.puede_rechazar(self.admin, self.pedido))  # Admin sin restricción
 
     # --- reingresar: Admin siempre; Ejecutivo solo los suyos ---
     def test_puede_reingresar(self):
@@ -54,13 +53,13 @@ class PermisosTest(TestCase):
         self.assertFalse(permisos.puede_reingresar(self.ajeno, rech))   # otro ejecutivo
         self.assertFalse(permisos.puede_reingresar(self.logi, rech))    # logística no
 
-    # --- editar por estado/rol ---
+    # --- editar por rol: ejecutivo hasta despachar (envio_id), logística hasta notificar ---
     def test_editar_segun_estado(self):
-        self.assertTrue(permisos.puede_editar(self.dueno, self.pedido))   # PENDIENTE, dueño
-        self.assertFalse(permisos.puede_editar(self.logi, self.pedido))   # LOGISTICA no toca PENDIENTE
-        self.pedido.estado_comercial = EC.APROBADO
-        self.assertFalse(permisos.puede_editar(self.dueno, self.pedido))  # ya salió de Comercial
-        self.assertTrue(permisos.puede_editar(self.logi, self.pedido))    # ahora Logística
+        self.assertTrue(permisos.puede_editar(self.dueno, self.pedido))   # sin envío, dueño
+        self.assertTrue(permisos.puede_editar(self.logi, self.pedido))    # logística también, en paralelo
+        self.pedido.envio_id = 999  # simula ya despachado a courier
+        self.assertFalse(permisos.puede_editar(self.dueno, self.pedido))  # ejecutivo ya no puede
+        self.assertTrue(permisos.puede_editar(self.logi, self.pedido))    # logística sigue pudiendo
 
     def test_notificado_bloquea_edicion_salvo_admin(self):
         self.pedido.estado_comercial = EC.APROBADO
@@ -86,9 +85,9 @@ class PermisosTest(TestCase):
     def test_queryset_visible(self):
         todos = Pedido.objects.all()
         self.assertEqual(permisos.queryset_visible(self.admin, todos).count(), 1)
-        self.assertEqual(permisos.queryset_visible(self.dueno, todos).count(), 1)   # PENDIENTE + dueño
+        self.assertEqual(permisos.queryset_visible(self.dueno, todos).count(), 1)   # todos los suyos
         self.assertEqual(permisos.queryset_visible(self.ajeno, todos).count(), 0)
-        self.assertEqual(permisos.queryset_visible(self.logi, todos).count(), 0)    # no hay APROBADO
+        self.assertEqual(permisos.queryset_visible(self.logi, todos).count(), 1)    # logística ve todo
         self.assertEqual(permisos.queryset_visible(self.sin_rol, todos).count(), 0)
 
     def test_queryset_para_ver(self):

@@ -1,0 +1,9 @@
+services:
+  app:
+    build: .
+    env_file: .env
+    ports:
+      #APP_PORT: 8002 para producción, 8003 para el ambiente de prueba (gestor-test) — se define
+      #en el .env de cada clon, así conviven en el mismo servidor sin pisarse.
+      - "127.0.0.1:${APP_PORT:-8002}:8000"
+    restart: unless-stopped

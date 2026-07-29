@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.http import HttpResponse
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+from django.core.paginator import Paginator
 import datetime
 
 from ..models import Pedido, SkuCourier
@@ -71,6 +72,8 @@ def panel_skus(request):
     if not permisos.es_admin(request.user):
         return redirect("inicio")
     skus = SkuCourier.objects.order_by("sku")
+    paginador = Paginator(skus, 20)
+    skus = paginador.get_page(request.GET.get("page"))
     return render(request, "pedidos/panel_skus.html",
                   {"skus": skus, "form": SkuCourierForm(), "courier_choices": Courier.choices})
 

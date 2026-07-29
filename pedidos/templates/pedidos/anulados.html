@@ -22,13 +22,27 @@
         {% for r in rechazados %}
         <tr class="border-t border-line hover:bg-appbg">
           <td class="px-4 py-3 font-mono text-xs font-semibold text-ink whitespace-nowrap tabular-nums"><span class="text-muted">{{ r.origen }}-</span>{{ r.num_pedido }}</td>
-          <td class="px-4 py-3 text-muted">{{ r.motivo|default:"—" }}</td>
+          <td class="px-4 py-3 text-muted">
+            {% if user.perfil.rol == 'ADMIN' %}
+            <form hx-post="{% url 'pedidos:editar_motivo_rechazado' r.pk %}" hx-swap="none" class="flex items-center gap-1.5">
+              <input type="text" name="motivo" value="{{ r.motivo }}" class="text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1 w-full min-w-[10rem]">
+              <button type="submit" class="text-xs font-semibold text-brand-ink hover:underline shrink-0">Guardar</button>
+            </form>
+            {% else %}
+            {{ r.motivo|default:"—" }}
+            {% endif %}
+          </td>
           <td class="px-4 py-3">{{ r.rechazado_por.email|default:"—" }}</td>
           <td class="px-4 py-3 text-xs text-muted font-mono tabular-nums whitespace-nowrap">{{ r.rechazado_en|date:"d/m/y H:i" }}</td>
-          <td class="px-4 py-3 text-right">
+          <td class="px-4 py-3 text-right whitespace-nowrap">
             <button hx-post="{% url 'pedidos:reingresar' r.pk %}"
                     hx-confirm="¿Reingresar {{ r.origen }}-{{ r.num_pedido }} desde la fuente? Volverá a la lista con datos actualizados."
                     class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-2.5 py-1.5 rounded-lg">Reingresar</button>
+            {% if user.perfil.rol == 'ADMIN' %}
+            <button hx-post="{% url 'pedidos:eliminar_rechazado' r.pk %}"
+                    hx-confirm="¿Eliminar {{ r.origen }}-{{ r.num_pedido }} del archivo de forma PERMANENTE? No se puede deshacer ni reingresar después."
+                    class="text-sm font-semibold text-[#e0463a] hover:bg-rech-bg px-2.5 py-1.5 rounded-lg">Eliminar</button>
+            {% endif %}
           </td>
         </tr>
         {% empty %}
@@ -38,4 +52,5 @@
     </table>
   </div>
 </div>
+{% include "partials/_paginacion.html" with page_obj=rechazados %}
 {% endblock %}

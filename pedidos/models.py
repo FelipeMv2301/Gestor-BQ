@@ -37,6 +37,31 @@ class PedidoQuerySet(models.QuerySet):
     def con_courier(self, valores):
         return self.filter(courier__in=valores) if valores else self
 
+    #Filtra por los mismos estados que muestra el badge (Pedido.estado_seguimiento), para no tener que
+    #combinar mentalmente los filtros de Notificación + Envío para llegar al mismo resultado.
+    def con_estado_seguimiento(self, claves):
+        if not claves:
+            return self
+        mapa = {
+            "preparando_retiro": Q(tipo_entrega=Pedido.TipoEntrega.RETIRO_BIOQUIMICA,
+                                    estado_notificacion=Pedido.EstadoNotificacion.NO_NOTIFICADO),
+            "retiro_disponible": Q(tipo_entrega=Pedido.TipoEntrega.RETIRO_BIOQUIMICA,
+                                    estado_notificacion=Pedido.EstadoNotificacion.NOTIFICADO),
+            "cargado_courier": Q(tipo_entrega=Pedido.TipoEntrega.DESPACHO,
+                                  estado_notificacion=Pedido.EstadoNotificacion.NOTIFICADO),
+            "despachado_sin_notificar": Q(tipo_entrega=Pedido.TipoEntrega.DESPACHO,
+                                           estado_notificacion=Pedido.EstadoNotificacion.NO_NOTIFICADO,
+                                           envio__isnull=False),
+            "por_despachar": Q(tipo_entrega=Pedido.TipoEntrega.DESPACHO,
+                                estado_notificacion=Pedido.EstadoNotificacion.NO_NOTIFICADO,
+                                envio__isnull=True),
+        }
+        condiciones = Q(pk__in=[])
+        for clave in claves:
+            if clave in mapa:
+                condiciones |= mapa[clave]
+        return self.filter(condiciones)
+
 class Pedido(models.Model):
     objects = PedidoQuerySet.as_manager()
     class Meta:
@@ -232,19 +257,17 @@ class Pedido(models.Model):
             return f"{self.courier}|{self.servicio_courier_codigo}"
         return self.courier
 
-    #Estado de seguimiento unificado (comercial + logística + notificación + tipo de entrega).
-    #Única fuente de verdad para el badge. Devuelve (etiqueta, clave_color) con clave ∈ pend/apro/noti.
+    #Estado de seguimiento unificado (logística + notificación + tipo de entrega). Todo pedido activo
+    #es APROBADO desde que se ingresa (SAP y Woo) — única fuente de verdad para el badge.
+    #Devuelve (etiqueta, clave_color) con clave ∈ apro/noti.
     @property
     def estado_seguimiento(self):
-        if self.estado_comercial == self.EstadoComercial.PENDIENTE:
-            return ("Pendiente de carga", "pend")
-
         notificado = self.estado_notificacion == self.EstadoNotificacion.NOTIFICADO
 
         if self.tipo_entrega == self.TipoEntrega.RETIRO_BIOQUIMICA:
             if notificado:
                 return ("Retiro disponible", "noti")
-            return ("Preparando retiro", "apro")
+            return ("Notificación pendiente", "apro")
 
         # Despacho
         if notificado:

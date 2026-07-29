@@ -7,34 +7,8 @@
   <title>{% block titulo %}Portal Bioquímica{% endblock %}</title>
 
   <link rel="icon" type="image/svg+xml" href="{% static 'images/icono.svg' %}">
-  <link rel="icon" type="image/png" href="{% static 'images/icono.png' %}">
   <link rel="stylesheet" href="{% static 'vendor/tom-select/tom-select-2.3.1.min.css' %}">
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            appbg: 'var(--appbg)', surface: 'var(--surface)', field: 'var(--field)',
-            line: 'var(--line)', linestrong: 'var(--linestrong)',
-            body: 'var(--body)', muted: 'var(--muted)', ink: 'var(--ink)',
-            brand: { DEFAULT: 'var(--brand)', ink: 'var(--brand-ink)', soft: 'var(--brand-soft)' },
-            lime:  { DEFAULT: 'var(--lime)', ink: 'var(--lime-ink)', soft: 'var(--lime-soft)' },
-            pend: { bg: 'var(--pend-bg)', ink: 'var(--pend-ink)', dot: 'var(--pend-dot)' },
-            apro: { bg: 'var(--apro-bg)', ink: 'var(--apro-ink)', dot: 'var(--apro-dot)' },
-            noti: { bg: 'var(--noti-bg)', ink: 'var(--noti-ink)', dot: 'var(--noti-dot)' },
-            rech: { bg: 'var(--rech-bg)', ink: 'var(--rech-ink)', dot: 'var(--rech-dot)' },
-          },
-          fontFamily: {
-            sans: ['-apple-system','Segoe UI','system-ui','Roboto','sans-serif'],
-            mono: ['SF Mono','ui-monospace','Cascadia Mono','Roboto Mono','monospace'],
-          },
-        }
-      }
-    }
-  </script>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <style>
     :root {
       --appbg:#edf4f4; --surface:#ffffff; --field:#ffffff; --line:#dbe8e8; --linestrong:#c6d8d8;
@@ -122,10 +96,15 @@
       var lista = datos ? JSON.parse(datos.textContent) : [];
       (scope || document).querySelectorAll('input[data-comuna]').forEach(function (el) {
         if (el.tomselect) return;                       // no re-inicializar
-        new TomSelect(el, {
+        var valorPrecargado = el.value;                 // Tom Select no lo lee solo — hay que pasarlo a mano
+        var ts = new TomSelect(el, {
           options: lista.map(function (c) { return { value: c, text: c }; }),
-          create: true, maxItems: 1, persist: false,    // create:true preserva el valor precargado de SAP/Woo
+          create: true, maxItems: 1, persist: false,    // create:true permite escribir un valor nuevo, no precarga solo
         });
+        if (valorPrecargado) {
+          ts.addOption({value: valorPrecargado, text: valorPrecargado});  // por si no matchea la lista (SAP/Woo)
+          ts.addItem(valorPrecargado, true);  // silent=true: no dispara 'change' al precargar
+        }
       });
     }
     document.addEventListener('DOMContentLoaded', function () { initComunas(); });
