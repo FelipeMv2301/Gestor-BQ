@@ -7,25 +7,29 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
-    defaults:
-      run:
-        working-directory: /home/gestorbq/gestorBQ-test
+    env:
+      DEPLOY_DIR: /home/gestorbq/gestorBQ-test
     steps:
-      #Sin "path" absoluto, checkout clona en el workspace propio del runner (_work/...), NO en
-      #working-directory (eso solo cambia el cwd de los pasos "run", no de esta acción). "clean:
-      #false" es clave: evita que git limpie archivos sin versionar en cada deploy — el .env real
-      #de producción/test vive ahí y no está en git (nunca se versiona, ver .gitignore).
+      #actions/checkout rechaza cualquier "path" fuera del workspace propio del runner (protección
+      #de seguridad, no bypasseable) — por eso clona en el workspace default y después se
+      #sincroniza a mano al directorio real de despliegue.
       - uses: actions/checkout@v4
-        with:
-          path: /home/gestorbq/gestorBQ-test
-          clean: false
+
+      #rsync en vez de "cp -r": --delete refleja también los archivos borrados en el commit, y los
+      #--exclude protegen lo que no vive en git (el .env real, con secretos, nunca versionado) y el
+      #.git viejo de cuando este directorio se clonó a mano la primera vez.
+      - name: Sincronizar código al directorio de despliegue (sin tocar .env)
+        run: |
+          rsync -a --delete --exclude='.env' --exclude='.git' "$GITHUB_WORKSPACE"/ "$DEPLOY_DIR"/
 
       - name: Build y reinicio del contenedor
+        working-directory: ${{ env.DEPLOY_DIR }}
         run: |
           docker compose build
           docker compose up -d
 
       - name: Migraciones + estáticos
+        working-directory: ${{ env.DEPLOY_DIR }}
         run: |
           docker compose exec -T app python manage.py migrate --noinput
           docker compose exec -T app python manage.py collectstatic --noinput
