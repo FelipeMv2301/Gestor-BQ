@@ -11,7 +11,14 @@ jobs:
       run:
         working-directory: /home/gestorbq/gestorBQ-test
     steps:
+      #Sin "path" absoluto, checkout clona en el workspace propio del runner (_work/...), NO en
+      #working-directory (eso solo cambia el cwd de los pasos "run", no de esta acción). "clean:
+      #false" es clave: evita que git limpie archivos sin versionar en cada deploy — el .env real
+      #de producción/test vive ahí y no está en git (nunca se versiona, ver .gitignore).
       - uses: actions/checkout@v4
+        with:
+          path: /home/gestorbq/gestorBQ-test
+          clean: false
 
       - name: Build y reinicio del contenedor
         run: |
