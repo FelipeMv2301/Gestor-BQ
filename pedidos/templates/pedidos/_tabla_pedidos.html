@@ -13,15 +13,15 @@
           <th class="text-left font-semibold px-4 py-3">Observaciones</th>
           <th class="text-left font-semibold px-4 py-3">Estado</th>
           <th class="text-left font-semibold px-4 py-3">Actualizado</th>
-          <th class="px-4 py-3"></th>
         </tr>
       </thead>
       <tbody>
         {% for pedido in pedidos %}
         <tr class="border-t border-line hover:bg-appbg">
           {% if seleccionable %}<td class="px-4 py-3"><input type="checkbox" name="ids" value="{{ pedido.pk }}" onchange="event.stopPropagation(); avisarSeleccion()" class="accent-brand w-4 h-4"></td>{% endif %}
-          <td class="px-4 py-3 font-mono text-sm font-semibold text-ink whitespace-nowrap tabular-nums">
-            <span class="text-muted">{{ pedido.origen }}-</span>{{ pedido.num_pedido }}
+          <td class="px-4 py-3 font-mono whitespace-nowrap tabular-nums">
+            <a href="{% url 'pedidos:detalle' pedido.pk %}" class="text-sm font-semibold text-brand-ink hover:underline">{{ pedido.num_pedido }}</a>
+            <div class="text-xs text-muted">{{ pedido.origen }}</div>
           </td>
           <td class="px-4 py-3">
             <div class="font-semibold text-ink">{{ pedido.razon_social|default:pedido.nombre_contacto|default:"—" }}</div>
@@ -41,13 +41,9 @@
           <td class="px-4 py-3 text-muted max-w-[16rem] truncate" title="{{ pedido.observaciones }}">{{ pedido.observaciones|default:"—" }}</td>
           <td class="px-4 py-3">{% include "partials/_badge_estado.html" with pedido=pedido %}</td>
           <td class="px-4 py-3 text-xs text-muted font-mono tabular-nums whitespace-nowrap">{{ pedido.modificado_en|date:"d/m/y H:i" }}</td>
-          <td class="px-4 py-3 text-right whitespace-nowrap">
-            {% puede_editar_pedido user pedido as puede_editar_fila %}
-            <a href="{% url 'pedidos:detalle' pedido.pk %}" class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-2.5 py-1.5 rounded-lg">{% if puede_editar_fila %}Ver / Editar{% else %}Ver{% endif %}</a>
-          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="{% if seleccionable %}10{% else %}9{% endif %}" class="px-4 py-10 text-center text-muted">
+        <tr><td colspan="{% if seleccionable %}9{% else %}8{% endif %}" class="px-4 py-10 text-center text-muted">
           <div class="text-sm">No hay pedidos que coincidan.</div>
           <div class="text-xs mt-1">Prueba a quitar filtros o cambiar la búsqueda.</div>
         </td></tr>

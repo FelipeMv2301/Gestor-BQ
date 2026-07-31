@@ -5,6 +5,7 @@ from django.template.loader import render_to_string
 from django.core.paginator import Paginator
 from pedidos.permisos import es_admin
 from .models import PerfilUsuario
+from ejecutivos.models import Ejecutivo
 from .forms import PerfilUsuarioForm
 import json
 
@@ -39,8 +40,11 @@ def panel_perfiles(request):
     perfiles = PerfilUsuario.objects.select_related("usuario").order_by("usuario__email")
     paginador = Paginator(perfiles, 20)
     perfiles = paginador.get_page(request.GET.get("page"))
+    #Tabla de referencia (izquierda): qué código SAP es cada ejecutivo y si sigue activo en SAP
+    ejecutivos = Ejecutivo.objects.order_by("nombre")
     return render(request, "cuentas/panel_perfiles.html",
-                  {"perfiles": perfiles, "rol_choices": PerfilUsuario.Rol.choices})
+                  {"perfiles": perfiles, "ejecutivos": ejecutivos,
+                   "rol_choices": PerfilUsuario.Rol.choices})
 
 
 #Trae el form (GET, al clickear "Editar" en una fila) y lo procesa (POST). Al guardar, devuelve

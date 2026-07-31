@@ -13,8 +13,13 @@ def crear_perfil_usuario(sender, instance, created, **kwargs):
     #Compara el email de la tabla ejecutivo (data de sap) con el del usuario que inicia sesión, para luego asignarle su codigo_sap
     ejecutivo = Ejecutivo.objects.filter(email=instance.email, activo=True).first()
 
-    codigo_sugerido = None
-    if ejecutivo and not PerfilUsuario.objects.filter(codigo_empleado_sap=ejecutivo.codigo_sap).exists():
-        codigo_sugerido = ejecutivo.codigo_sap
-    
-    PerfilUsuario.objects.create(usuario=instance, codigo_empleado_sap=codigo_sugerido)
+    #Solo autoasigna si ese código SAP no lo tiene ya otro perfil (ni en el escalar ni en la M2M) — un código = un dueño
+    codigo_ocupado = ejecutivo and (
+        PerfilUsuario.objects.filter(codigo_empleado_sap=ejecutivo.codigo_sap).exists()
+        or PerfilUsuario.objects.filter(ejecutivos=ejecutivo).exists()
+    )
+    codigo_sugerido = ejecutivo.codigo_sap if ejecutivo and not codigo_ocupado else None
+
+    perfil = PerfilUsuario.objects.create(usuario=instance, codigo_empleado_sap=codigo_sugerido)
+    if codigo_sugerido is not None:
+        perfil.ejecutivos.add(ejecutivo)   # M2M es la fuente de verdad; el escalar queda como fallback

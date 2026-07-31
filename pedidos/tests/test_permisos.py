@@ -106,3 +106,27 @@ class PermisosTest(TestCase):
         self.assertIn("retirar_en", logi)           # logística SÍ
         self.assertNotIn("estado_comercial", ejec)  # estado nunca por edición directa
         self.assertEqual(permisos.campos_editables(self.sin_rol, self.pedido), [])
+
+
+class PermisosMultiCodigoTest(TestCase):
+    """Un perfil que gestiona DOS canales SAP ve los pedidos de ambos códigos (M2M `ejecutivos`)."""
+    def setUp(self):
+        self.ejec_a = crear_ejecutivo(codigo_sap=10, email="a@bioquimica.cl")
+        self.ejec_b = crear_ejecutivo(codigo_sap=20, nombre="Canal B", email="b@bioquimica.cl")
+        self.pa = crear_pedido(num="100", ejecutivo=self.ejec_a, estado_comercial=EC.PENDIENTE)
+        self.pb = crear_pedido(num="200", ejecutivo=self.ejec_b, estado_comercial=EC.PENDIENTE)
+
+        # ejecutivo con dos canales: código 10 (vía factory) + 20 (agregado a la M2M)
+        self.multi = crear_usuario("multi@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=10)
+        self.multi.perfil.ejecutivos.add(self.ejec_b)
+
+    def test_codigos_sap_lista_ambos(self):
+        self.assertEqual(sorted(self.multi.perfil.codigos_sap), [10, 20])
+
+    def test_responsable_de_ambos_canales(self):
+        self.assertTrue(permisos.responsable_del_pedido(self.multi, self.pa))
+        self.assertTrue(permisos.responsable_del_pedido(self.multi, self.pb))
+
+    def test_queryset_ve_pedidos_de_ambos(self):
+        self.assertEqual(permisos.queryset_para_ver(self.multi).count(), 2)
+        self.assertEqual(permisos.queryset_pedidos_ejecutivo(self.multi).count(), 2)

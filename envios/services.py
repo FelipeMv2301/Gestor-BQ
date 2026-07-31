@@ -17,6 +17,14 @@ def _despachar_chibra(pedidos, destinatario, datos_courier):
     return {"orden_transporte": resultado["numero_envio"]}
 
 def _despachar_moveup(pedidos, destinatario, datos_courier):
+    # MoveUP no tiene campo de referencia externa → las referencias de pedido (num_pedido / DocNum SAP)
+    # van en observations, como hace MoveUP mismo ("OrderNumber: ...").
+    refs = ", ".join(f"{p.origen}-{p.num_pedido}" for p in pedidos)
+    obs_operador = datos_courier.get("observaciones") or ""
+    observations = f"Pedidos: {refs}"
+    if obs_operador:
+        observations += f" | {obs_operador}"
+
     paquete = {
         "recipientName": destinatario.get("nombre") or "",
         "recipientAddress": destinatario.get("direccion") or "",
@@ -28,7 +36,7 @@ def _despachar_moveup(pedidos, destinatario, datos_courier):
         "packagePrice": int(datos_courier.get("valor_declarado") or 0),
         "packageSize": int(datos_courier.get("package_size") or moveup_client.PACKAGE_SIZE_CAJA),
         "packageQuantity": int(datos_courier.get("cantidad") or 1),
-        "observations": datos_courier.get("observaciones") or "",
+        "observations": observations,
     }
 
     creados = moveup_client.crear_paquetes(paquete)

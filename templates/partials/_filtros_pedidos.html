@@ -1,25 +1,14 @@
 <div class="flex flex-col gap-1.5">
   <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Estado</span>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="estado" value="por_despachar" data-filtro class="accent-brand w-4 h-4" {% if 'por_despachar' in sel_estado %}checked{% endif %}> Por despachar</label>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="estado" value="despachado_sin_notificar" data-filtro class="accent-brand w-4 h-4" {% if 'despachado_sin_notificar' in sel_estado %}checked{% endif %}> Despachado</label>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="estado" value="cargado_courier" data-filtro class="accent-brand w-4 h-4" {% if 'cargado_courier' in sel_estado %}checked{% endif %}> Cargado a Courier</label>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="estado" value="preparando_retiro" data-filtro class="accent-brand w-4 h-4" {% if 'preparando_retiro' in sel_estado %}checked{% endif %}> Notificación Pendiente</label>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="estado" value="retiro_disponible" data-filtro class="accent-brand w-4 h-4" {% if 'retiro_disponible' in sel_estado %}checked{% endif %}> Retiro Disponible</label>
-</div>
-<div class="flex flex-col gap-1.5 border-t border-line pt-3">
-  <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Notificación</span>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="notif" value="NOTIFICADO" data-filtro class="accent-brand w-4 h-4" {% if 'NOTIFICADO' in sel_notif %}checked{% endif %}> Notificado</label>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="notif" value="NO_NOTIFICADO" data-filtro class="accent-brand w-4 h-4" {% if 'NO_NOTIFICADO' in sel_notif %}checked{% endif %}> No notificado</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="estado" value="recien_ingresado" data-filtro class="accent-brand w-4 h-4" {% if 'recien_ingresado' in sel_estado %}checked{% endif %}> Recién Ingresado</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="estado" value="cargado_sin_notificar" data-filtro class="accent-brand w-4 h-4" {% if 'cargado_sin_notificar' in sel_estado %}checked{% endif %}> Cargado (sin notificar)</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="estado" value="cargado_notificado" data-filtro class="accent-brand w-4 h-4" {% if 'cargado_notificado' in sel_estado %}checked{% endif %}> Cargado y Notificado</label>
+  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="estado" value="notificado_retiro" data-filtro class="accent-brand w-4 h-4" {% if 'notificado_retiro' in sel_estado %}checked{% endif %}> Notificado (Retiro BQ)</label>
 </div>
 <div class="flex flex-col gap-1.5 border-t border-line pt-3">
   <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Courier</span>
   <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="courier" value="CHIBRA" data-filtro class="accent-brand w-4 h-4" {% if 'CHIBRA' in sel_courier %}checked{% endif %}> Chibra</label>
   <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="courier" value="MOVEUP" data-filtro class="accent-brand w-4 h-4" {% if 'MOVEUP' in sel_courier %}checked{% endif %}> MoveUP</label>
-</div>
-<div class="flex flex-col gap-1.5 border-t border-line pt-3">
-  <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Envío</span>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="enviado" data-filtro class="accent-brand w-4 h-4" {% if 'enviado' in sel_envio %}checked{% endif %}> Enviado a courier</label>
-  <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="envio" value="sin" data-filtro class="accent-brand w-4 h-4" {% if 'sin' in sel_envio %}checked{% endif %}> Sin enviar</label>
 </div>
 <div class="flex flex-col gap-1.5 border-t border-line pt-3">
   <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Entrega</span>

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block titulo %}Envíos Realizados — Portal Bioquímica{% endblock %}
+{% block titulo %}Mis Envíos — Portal Bioquímica{% endblock %}
 {% block content %}
 <div class="mb-5">
-  <h1 class="text-2xl font-bold text-ink">Envíos Realizados</h1>
-  <p class="text-sm text-muted mt-1">Despachos ya documentados con el courier, agrupados por envío.</p>
+  <h1 class="text-2xl font-bold text-ink">Mis Envíos</h1>
+  <p class="text-sm text-muted mt-1">Despachos de tus pedidos, ya documentados con el courier.</p>
 </div>
 
-<form hx-get="{% url 'envios:lista' %}" hx-target="#tabla-envios" hx-push-url="true"
+<form hx-get="{% url 'envios:mis_envios' %}" hx-target="#tabla-envios" hx-push-url="true"
       hx-trigger="change from:[data-filtro], keyup delay:400ms from:input[type=search]">
   <div class="grid gap-5 md:grid-cols-[15rem_minmax(0,1fr)]">
     <aside class="bg-surface border border-line rounded-2xl p-4 h-max md:sticky md:top-20 flex flex-col gap-4">
@@ -25,7 +25,7 @@
         <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="origen" value="WEB" data-filtro class="accent-brand w-4 h-4" {% if 'WEB' in sel_origen %}checked{% endif %}> WEB (tienda)</label>
       </div>
 
-      <a href="{% url 'envios:lista' %}" class="text-xs font-semibold text-brand-ink hover:underline mt-1">Limpiar filtros</a>
+      <a href="{% url 'envios:mis_envios' %}" class="text-xs font-semibold text-brand-ink hover:underline mt-1">Limpiar filtros</a>
     </aside>
 
     <div class="flex flex-col gap-4 min-w-0">
@@ -34,11 +34,6 @@
           <input type="search" name="q" value="{{ q }}" placeholder="Buscar OT / N° pedido / RUT…"
                  class="w-full text-sm rounded-lg border border-linestrong bg-field text-body pl-9 pr-3 py-2 focus:border-brand focus:outline-none">
           <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">🔍</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span id="spin-estados" class="htmx-indicator text-sm text-muted">Consultando…</span>
-          <button type="button" hx-post="{% url 'envios:refrescar_estados' %}" hx-indicator="#spin-estados"
-                  class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink shadow-sm">Actualizar estados</button>
         </div>
       </div>
       <div id="tabla-envios">

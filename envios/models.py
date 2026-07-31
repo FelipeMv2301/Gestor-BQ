@@ -23,6 +23,11 @@ class EnvioCourierQuerySet(models.QuerySet):
     def con_origen(self, valores):
         return self.filter(pedidos__origen__in=valores).distinct() if valores else self
 
+    #Scope del ejecutivo: solo envíos que agrupan al menos un pedido suyo. Recibe la lista de códigos
+    #SAP del perfil (permisos.codigos_sap_usuario). Sin códigos → nada.
+    def de_ejecutivo(self, codigos_sap):
+        return self.filter(pedidos__ejecutivo__codigo_sap__in=codigos_sap).distinct() if codigos_sap else self.none()
+
 
 class EnvioCourier(models.Model):
     objects = EnvioCourierQuerySet.as_manager()
@@ -40,9 +45,17 @@ class EnvioCourier(models.Model):
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
     datos_courier = models.JSONField(blank=True, default=dict)
+    estado_courier = models.CharField(max_length=60, blank=True)          # lo que reporta el courier (ej. "Programado")
+    estado_courier_actualizado = models.DateTimeField(null=True, blank=True)  # cuándo se consultó por última vez
 
     def __str__(self):
         detalle_envio = f"#{self.id} - {self.courier} - {self.estado}"
         if self.orden_transporte:
           detalle_envio += f" - {self.orden_transporte}"
         return detalle_envio
+
+    #URL de tracking del courier (o None si no tiene). Import local para no acoplar el modelo.
+    @property
+    def url_seguimiento(self):
+        from integraciones.seguimiento import url_seguimiento
+        return url_seguimiento(self)

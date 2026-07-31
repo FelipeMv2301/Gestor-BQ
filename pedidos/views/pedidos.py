@@ -20,8 +20,6 @@ def mis_pedidos(request):
     pedidos = (
         permisos.queryset_pedidos_ejecutivo(request.user)   # ← scope de seguridad (quién ve qué)
         .buscar(request.GET.get("q", "").strip())
-        .con_notificacion(request.GET.getlist("notif"))
-        .con_envio(request.GET.getlist("envio"))
         .con_origen(request.GET.getlist("origen"))
         .con_tipo_entrega(request.GET.getlist("tipo"))
         .con_courier(request.GET.getlist("courier"))
@@ -34,7 +32,6 @@ def mis_pedidos(request):
 
     contexto = {
         "pedidos": pedidos, "q": request.GET.get("q", ""), "seleccionable": True,
-        "sel_notif": request.GET.getlist("notif"), "sel_envio": request.GET.getlist("envio"),
         "sel_origen": request.GET.getlist("origen"), "sel_tipo": request.GET.getlist("tipo"),
         "sel_courier": request.GET.getlist("courier"), "sel_estado": request.GET.getlist("estado"),
         "courier_servicio_opciones": opciones_courier_servicio(),
@@ -205,9 +202,7 @@ def tablero_logistica(request):
     pedidos = (
         Pedido.objects.con_estado_comercial(Pedido.EstadoComercial.APROBADO)
         .buscar(request.GET.get("q", "").strip())
-        .con_notificacion(request.GET.getlist("notif"))
         .con_courier(request.GET.getlist("courier"))
-        .con_envio(request.GET.getlist("envio"))
         .con_tipo_entrega(request.GET.getlist("tipo"))
         .con_origen(request.GET.getlist("origen"))
         .con_estado_seguimiento(request.GET.getlist("estado"))
@@ -219,8 +214,7 @@ def tablero_logistica(request):
 
     contexto = {
         "pedidos": pedidos, "q": request.GET.get("q", ""), "seleccionable": True,
-        "sel_notif": request.GET.getlist("notif"), "sel_courier": request.GET.getlist("courier"),
-        "sel_envio": request.GET.getlist("envio"), "sel_tipo": request.GET.getlist("tipo"),
+        "sel_courier": request.GET.getlist("courier"), "sel_tipo": request.GET.getlist("tipo"),
         "sel_origen": request.GET.getlist("origen"), "sel_estado": request.GET.getlist("estado"),
         "courier_servicio_opciones": opciones_courier_servicio(),
     }

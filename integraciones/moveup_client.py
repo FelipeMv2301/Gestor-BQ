@@ -47,7 +47,7 @@ def consultar_envios(id_paquete=None, estado=None, desde=None, hasta=None):
         params["endDate"] = hasta
 
     respuesta = requests.get(
-        f"{settings.MOVEUP_BASE_URL}/integrations/packages",
+        f"{settings.MOVEUP_BASE_URL}/integrations/packages/search",   # /search para consultar (doc)
         headers=_headers(),
         params=params,
         timeout=60
@@ -75,3 +75,9 @@ def obtener_etiqueta(id_paquete):
         raise ValueError(f"[!] Error de MoveUP: {datos.get('message', 'sin detalle')}")
 
     return base64.b64decode(datos["pdfBase64"])
+
+
+def estado_paquete(id_paquete):
+    # Devuelve el packageStatus del paquete (o "" si no se encuentra).
+    resultados = consultar_envios(id_paquete=id_paquete)
+    return (resultados[0].get("packageStatus") or "") if resultados else ""

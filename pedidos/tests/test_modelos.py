@@ -12,16 +12,16 @@ TE = Pedido.TipoEntrega
 class EstadoSeguimientoTest(TestCase):
     def test_retiro_sin_notificar(self):
         p = crear_pedido(estado_comercial=EC.APROBADO, tipo_entrega=TE.RETIRO_BIOQUIMICA)
-        self.assertEqual(p.estado_seguimiento, ("Notificación pendiente", "apro"))
+        self.assertEqual(p.estado_seguimiento, ("Recién Ingresado", "pend"))
 
     def test_retiro_notificado(self):
         p = crear_pedido(estado_comercial=EC.APROBADO, tipo_entrega=TE.RETIRO_BIOQUIMICA,
                          estado_notificacion=EN.NOTIFICADO)
         self.assertEqual(p.estado_seguimiento[1], "noti")
 
-    def test_despacho_por_despachar(self):
+    def test_despacho_recien_ingresado(self):
         p = crear_pedido(estado_comercial=EC.APROBADO, tipo_entrega=TE.DESPACHO)
-        self.assertEqual(p.estado_seguimiento, ("Por despachar", "apro"))
+        self.assertEqual(p.estado_seguimiento, ("Recién Ingresado", "pend"))
 
     def test_despacho_con_envio(self):
         envio = EnvioCourier.objects.create(courier=Courier.CHIBRA,
@@ -76,14 +76,14 @@ class PedidoQuerySetTest(TestCase):
         self.assertEqual(Pedido.objects.con_envio(["sin", "enviado"]).count(), 2)  # ambos = sin filtro
 
     def test_con_estado_seguimiento(self):
-        # self.sap: DESPACHO, sin envío, sin notificar -> "por_despachar"
-        # self.web: RETIRO_BIOQUIMICA, notificado -> "retiro_disponible"
-        self.assertEqual(Pedido.objects.con_estado_seguimiento(["por_despachar"]).get(), self.sap)
-        self.assertEqual(Pedido.objects.con_estado_seguimiento(["retiro_disponible"]).get(), self.web)
-        self.assertEqual(Pedido.objects.con_estado_seguimiento(["cargado_courier"]).count(), 0)
+        # self.sap: DESPACHO, sin envío, sin notificar -> "recien_ingresado"
+        # self.web: RETIRO_BIOQUIMICA, notificado -> "notificado_retiro"
+        self.assertEqual(Pedido.objects.con_estado_seguimiento(["recien_ingresado"]).get(), self.sap)
+        self.assertEqual(Pedido.objects.con_estado_seguimiento(["notificado_retiro"]).get(), self.web)
+        self.assertEqual(Pedido.objects.con_estado_seguimiento(["cargado_notificado"]).count(), 0)
         self.assertEqual(Pedido.objects.con_estado_seguimiento([]).count(), 2)  # sin filtro
         self.assertEqual(
-            Pedido.objects.con_estado_seguimiento(["por_despachar", "retiro_disponible"]).count(), 2)
+            Pedido.objects.con_estado_seguimiento(["recien_ingresado", "notificado_retiro"]).count(), 2)
 
     def test_encadenado(self):
         # WEB + APROBADO + notificado → solo el web

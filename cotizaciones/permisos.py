@@ -1,4 +1,4 @@
-from pedidos.permisos import obtener_rol
+from pedidos.permisos import obtener_rol, codigos_sap_usuario
 from cuentas.models import PerfilUsuario
 from .models import Cotizacion
 
@@ -11,10 +11,10 @@ def queryset_cotizaciones_visible(usuario):
           return Cotizacion.objects.all()
 
       if rol == PerfilUsuario.Rol.EJECUTIVO:
-          codigo = getattr(perfil, "codigo_empleado_sap", None)
-          if codigo is None:
+          codigos = codigos_sap_usuario(usuario)
+          if not codigos:
               return Cotizacion.objects.none()
-          return Cotizacion.objects.filter(ejecutivo__codigo_sap=codigo)
+          return Cotizacion.objects.filter(ejecutivo__codigo_sap__in=codigos)
 
       # LOGISTICA y cualquier otro rol: no ven cotizaciones
       return Cotizacion.objects.none()

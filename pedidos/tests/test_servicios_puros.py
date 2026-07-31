@@ -13,7 +13,7 @@ class OpcionesCourierServicioTest(TestCase):
     def test_sin_sku_courier_solo_trae_placeholder_y_couriers_sin_servicio(self):
         opciones = services.opciones_courier_servicio()
         self.assertEqual(opciones[0], ("", "— Sin courier —"))
-        self.assertIn(("CHIBRA", "Chibra (elegir servicio)"), opciones)
+        self.assertIn(("CHIBRA", "Chibra"), opciones)
 
     def test_con_servicio_configurado_agrega_opcion_combinada(self):
         SkuCourier.objects.create(sku="ABC123", courier=Courier.CHIBRA, servicio_codigo="10", servicio_nombre="Express")

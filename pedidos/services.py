@@ -7,6 +7,7 @@ from pedidosRechazados.models import PedidoRechazado
 from . import permisos
 import datetime
 from django.db import transaction
+from django.db.models import Q
 from cuentas.models import PerfilUsuario
 from utils import Courier
 
@@ -26,7 +27,7 @@ def opciones_courier_servicio():
         etiqueta_courier = etiquetas_courier.get(courier_valor, courier_valor)
         opciones.append((f"{courier_valor}|{codigo}", f"{etiqueta_courier} — {nombre}"))
     for courier_valor, etiqueta_courier in Courier.choices:
-        opciones.append((courier_valor, f"{etiqueta_courier} (elegir servicio)"))
+        opciones.append((courier_valor, f"{etiqueta_courier}"))
     return opciones
 
 """
@@ -347,13 +348,15 @@ def pedido_fue_rechazado(origen, num_pedido):
 def pedido_ya_existe(origen, num_pedido):
     return Pedido.objects.filter(origen=origen, num_pedido=num_pedido).exists()
 
-#Crea un aviso para el/los usuario(s) dueños del pedido (fan-out por codigo_sap del ejecutivo)
+#Crea un aviso para el/los usuario(s) dueños del pedido (fan-out por codigo_sap del ejecutivo).
+#Matchea por la M2M `ejecutivos` o por el escalar legacy — un perfil puede tener el código en cualquiera.
 def _avisar_ejecutivo(pedido, tipo, mensaje):
     if pedido.ejecutivo_id is None:
         return
+    codigo = pedido.ejecutivo.codigo_sap
     perfiles = PerfilUsuario.objects.filter(
-        codigo_empleado_sap=pedido.ejecutivo.codigo_sap
-    ).select_related("usuario")
+        Q(ejecutivos__codigo_sap=codigo) | Q(codigo_empleado_sap=codigo)
+    ).select_related("usuario").distinct()
     Aviso.objects.bulk_create([
         Aviso(destinatario=p.usuario, tipo=tipo, mensaje=mensaje,
               origen=pedido.origen, num_pedido=pedido.num_pedido, pedido=pedido)

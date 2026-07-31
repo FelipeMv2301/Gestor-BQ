@@ -7,12 +7,18 @@ from pedidos.models import Pedido
 
 def crear_usuario(email, rol=None, codigo_sap=None):
     """Crea un User; el signal ya le crea el PerfilUsuario, acá le fijamos rol/código.
-    Se modifica el objeto perfil (no un .update de queryset) para no dejar cache viejo en user.perfil."""
+    Se modifica el objeto perfil (no un .update de queryset) para no dejar cache viejo en user.perfil.
+    Mantiene escalar y M2M `ejecutivos` consistentes (el signal pudo poblar la M2M al crear el user)."""
     user = User.objects.create(username=email, email=email)
     perfil = user.perfil
     perfil.rol = rol
     perfil.codigo_empleado_sap = codigo_sap
     perfil.save()
+    perfil.ejecutivos.clear()
+    if codigo_sap is not None:
+        ejecutivo = Ejecutivo.objects.filter(codigo_sap=codigo_sap).first()
+        if ejecutivo:
+            perfil.ejecutivos.add(ejecutivo)
     return user
 
 
