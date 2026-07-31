@@ -11,6 +11,8 @@
     {% if user.perfil.rol == 'EJECUTIVO' or user.perfil.rol == 'ADMIN' %}
       <a href="{% url 'pedidos:mis_pedidos' %}"
          class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Mis pedidos</a>
+      <a href="{% url 'cotizaciones:lista' %}"
+         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Cotizaciones</a>
     {% endif %}
     {% if user.perfil.rol == 'LOGISTICA' or user.perfil.rol == 'ADMIN' %}
        <a href="{% url 'pedidos:despachos' %}"

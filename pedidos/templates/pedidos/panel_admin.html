@@ -80,5 +80,38 @@
     <span class="text-brand-ink font-bold text-lg">→</span>
   </a>
 
+  <!-- Cotizaciones: sincronizar por rango -->
+  <div class="bg-surface border border-line rounded-2xl p-6">
+    <h2 class="text-sm font-bold text-ink mb-1">Sincronizar cotizaciones</h2>
+    <p class="text-xs text-muted mb-4">Trae cotizaciones de SAP modificadas en el rango (por fecha de actualización).</p>
+    <form hx-post="{% url 'cotizaciones:panel_sincronizar' %}" hx-indicator="#spinner-cot" class="flex flex-wrap items-end gap-3">
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Desde</span>
+        <input type="date" name="after" required class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Hasta</span>
+        <input type="date" name="before" class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Sincronizar</button>
+      <span id="spinner-cot" class="htmx-indicator text-sm text-muted">Sincronizando…</span>
+    </form>
+  </div>
+
+  <!-- Cotizaciones: actualizar facturación -->
+  <div class="bg-surface border border-line rounded-2xl p-6">
+    <h2 class="text-sm font-bold text-ink mb-1">Actualizar facturación de cotizaciones</h2>
+    <p class="text-xs text-muted mb-4">Recalcula el total facturado y el estado (Abierto/Parcial/Completado) de las cotizaciones abiertas y parciales. Puede tardar (consulta la cadena en SAP).</p>
+    <form hx-post="{% url 'cotizaciones:panel_facturacion' %}" hx-indicator="#spinner-fact">
+      <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Actualizar facturación</button>
+      <span id="spinner-fact" class="htmx-indicator text-sm text-muted ml-2">Calculando…</span>
+    </form>
+  </div>
+
+  <!-- Cotizaciones: limpiar (borrar todas) -->
+  <div class="bg-surface border border-[#e0463a] rounded-2xl p-6">
+    <h2 class="text-sm font-bold text-rech-ink mb-1">Limpiar cotizaciones</h2>
+    <p class="text-xs text-muted mb-4">Borra TODAS las cotizaciones de la base. Se pueden volver a traer con "Sincronizar cotizaciones".</p>
+    <form hx-post="{% url 'cotizaciones:eliminar_todas' %}" hx-confirm="¿Eliminar TODAS las cotizaciones? Se pueden re-sincronizar de SAP.">
+      <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full border border-[#e0463a] bg-[#e0463a] text-white hover:bg-white hover:text-[#e0463a] shadow-sm">Limpiar todas las cotizaciones</button>
+    </form>
+  </div>
+
 </div>
 {% endblock %}

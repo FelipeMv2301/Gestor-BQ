@@ -145,6 +145,7 @@ INSTALLED_APPS = [
     'pedidos',
     'pedidosRechazados',
     'envios',
+    'cotizaciones',
     'django.contrib.sites',
     'allauth',
     'allauth.account',
@@ -202,8 +203,14 @@ if DATABASE_VERSION == "SQLITE":
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
+            'OPTIONS': {
+                  'timeout': 60,                                    # espera 30s el lock, no 5
+                  'init_command': 'PRAGMA journal_mode=WAL;',       # lectores concurrentes durante escritura
+                  'transaction_mode': 'IMMEDIATE',
+              },
         }
     }
+    
 else:
     DATABASES = {
         'default': {
@@ -256,6 +263,10 @@ LOGGING = {
     },
     "loggers": {
         "pedidos": {"handlers": ["console"], "level": "INFO"},
+        #Sin esto, un 500 real (excepción no manejada) no deja ningún rastro en "docker compose
+        #logs" — Django por defecto solo lo manda a mail_admins (necesita ADMINS + email
+        #configurados, que no tenemos), nunca a consola.
+        "django": {"handlers": ["console"], "level": "ERROR"},
         #TEMPORAL: diagnóstico del login Google en gestor-test (2026-07-29) — allauth atrapa el
         #OAuth2Error/RequestException del intercambio de token y muestra su propia pantalla de
         #error sin loguear nada, así que sin esto el traceback real queda invisible. Sacar cuando

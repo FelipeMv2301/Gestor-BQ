@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% load cotizaciones_extras %}
+{% block titulo %}Cotización {{ cotizacion.docnum }} — Portal Bioquímica{% endblock %}
+{% block content %}
+<a href="{% url 'cotizaciones:lista' %}" class="text-sm font-semibold text-brand-ink hover:underline">← Volver a cotizaciones</a>
+
+<div class="flex flex-wrap items-center gap-3 mt-3 mb-5">
+  <h1 class="text-2xl font-bold text-ink font-mono">Cotización {{ cotizacion.docnum }}</h1>
+  {% include "cotizaciones/_badge_estado.html" with estado=cotizacion.estado %}
+</div>
+
+<div class="grid gap-5 sm:grid-cols-2">
+  <!-- Cliente + contacto -->
+  <section class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="bg-appbg border-b border-line">
+          <th colspan="2" class="text-left text-sm font-bold text-ink px-4 py-3">Cliente</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-b border-line">
+          <td class="px-4 py-2.5 text-body font-semibold whitespace-nowrap w-32">Nombre:</td>
+          <td class="px-4 py-2.5 text-ink">{{ cotizacion.card_name|default:"—" }}</td>
+        </tr>
+        <tr class="border-b border-line">
+          <td class="px-4 py-2.5 text-body font-semibold whitespace-nowrap w-32">RUT:</td>
+          <td class="px-4 py-2.5 text-ink font-mono">{{ cotizacion.rut|default:"—" }}</td>
+        </tr>
+        <tr class="border-b border-line">
+          <td class="px-4 py-2.5 text-body font-semibold whitespace-nowrap w-32">Contacto:</td>
+          <td class="px-4 py-2.5 text-ink">{{ cotizacion.nombre_contacto|default:"—" }}</td>
+        </tr>
+        <tr class="border-b border-line">
+          <td class="px-4 py-2.5 text-body font-semibold whitespace-nowrap w-32">Teléfono:</td>
+          <td class="px-4 py-2.5 text-ink">{{ cotizacion.telefono|default:"—" }}</td>
+        </tr>
+        <tr class="border-b border-line">
+          <td class="px-4 py-2.5 text-body font-semibold whitespace-nowrap w-32">Email:</td>
+          <td class="px-4 py-2.5 text-ink break-all">{{ cotizacion.email|default:"—" }}</td>
+        </tr>
+        <tr><td class="px-4 py-2.5" colspan="2">&nbsp;</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Comercial -->
+  <section class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="bg-appbg border-b border-line">
+          <th colspan="2" class="text-left text-sm font-bold text-ink px-4 py-3">Comercial</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-b border-line">
+          <td class="px-4 py-2.5 text-body font-semibold whitespace-nowrap w-32">Ejecutivo:</td>
+          <td class="px-4 py-2.5 text-ink">{{ cotizacion.ejecutivo.nombre|default:"—" }}</td>
+        </tr>
+        <tr class="border-b border-line">
+          <td class="px-4 py-2.5 text-body font-semibold whitespace-nowrap w-32">Tipo de venta:</td>
+          <td class="px-4 py-2.5 text-ink">{{ cotizacion.tipo_venta_legible|default:"—" }}</td>
+        </tr>
+        <tr class="border-b border-line">
+          <td class="px-4 py-2.5 text-body font-semibold whitespace-nowrap w-32">Área:</td>
+          <td class="px-4 py-2.5 text-ink">{{ cotizacion.area_legible|default:"—" }}</td>
+        </tr>
+        <tr class="border-b border-line">
+          <td class="px-4 py-2.5 text-body font-semibold whitespace-nowrap w-32">Contabilización:</td>
+          <td class="px-4 py-2.5 text-ink tabular-nums">{{ cotizacion.fecha_contabilizacion|date:"d/m/Y"|default:"—" }}</td>
+        </tr>
+        <tr class="border-b border-line">
+          <td class="px-4 py-2.5 text-body font-semibold whitespace-nowrap w-32">Válido hasta:</td>
+          <td class="px-4 py-2.5 text-ink tabular-nums">{{ cotizacion.fecha_caducidad|date:"d/m/Y"|default:"—" }}</td>
+        </tr>
+        <tr class="border-b border-line">
+          <td class="px-4 py-2.5 text-body font-semibold whitespace-nowrap w-32">Actualizado:</td>
+          <td class="px-4 py-2.5 text-ink tabular-nums">{{ cotizacion.actualizado_sap|date:"d/m/Y"|default:"—" }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<!-- Detalle de la cotización (líneas de producto + totales) -->
+<h2 class="text-sm font-bold text-ink mt-6 mb-3">Detalle cotización</h2>
+<div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[720px]">
+      <thead>
+        <tr class="bg-appbg text-xs uppercase tracking-wide">
+          <th class="text-left font-semibold px-4 py-3">Ítem</th>
+          <th class="text-left font-semibold px-4 py-3">Descripción</th>
+          <th class="text-right font-semibold px-4 py-3">Cantidad</th>
+          <th class="text-right font-semibold px-4 py-3">Precio unit.</th>
+          <th class="text-right font-semibold px-4 py-3">Total línea</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for linea in cotizacion.lineas %}
+        <tr class="border-t border-line">
+          <td class="px-4 py-3 font-mono text-ink whitespace-nowrap">{{ linea.ItemCode }}</td>
+          <td class="px-4 py-3 text-body">{{ linea.ItemDescription }}</td>
+          <td class="px-4 py-3 text-right tabular-nums whitespace-nowrap">{{ linea.Quantity|floatformat:"-2" }}</td>
+          <td class="px-4 py-3 text-right tabular-nums whitespace-nowrap">{{ linea.UnitPrice|clp }}</td>
+          <td class="px-4 py-3 text-right tabular-nums whitespace-nowrap font-semibold text-ink">{{ linea.LineTotal|clp }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="px-4 py-8 text-center text-muted text-sm">Sin líneas de producto.</td></tr>
+        {% endfor %}
+      </tbody>
+
+      <tfoot>
+        <tr class="border-t border-line">
+          <td colspan="4" class="px-4 py-2 text-right bg-appbg"><strong>Total neto</strong></td>
+          <td class="px-4 py-2 text-right tabular-nums font-semibold text-ink whitespace-nowrap bg-appbg">{{ cotizacion.neto|clp }}</td>
+        </tr>
+        <tr class="border-t border-line">
+          <td colspan="4" class="px-4 py-2 text-right bg-appbg"><strong>Total IVA</strong></td>
+          <td class="px-4 py-2 text-right tabular-nums text-ink whitespace-nowrap bg-appbg">{{ cotizacion.iva|clp }}</td>
+        </tr>
+        <tr class="border-t border-line">
+          <td colspan="4" class="px-4 py-2 text-right font-bold text-ink">Total</td>
+          <td class="px-4 py-2 text-right tabular-nums font-bold text-brand-ink whitespace-nowrap">{{ cotizacion.total|clp }}</td>
+        </tr>
+        <tr class="border-t border-line">
+          <td colspan="4" class="px-4 py-2 text-right text-muted">Facturado (neto)</td>
+          <td class="px-4 py-2 text-right tabular-nums text-ink whitespace-nowrap">{{ cotizacion.total_facturado|clp }}</td>
+        </tr>
+        <tr class="border-t border-line">
+          <td colspan="4" class="px-4 py-2 text-right text-muted">Diferencia</td>
+          <td class="px-4 py-2 text-right tabular-nums whitespace-nowrap {% if cotizacion.diferencia %}text-ink{% else %}text-muted{% endif %}">{{ cotizacion.diferencia|clp }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<!-- Documentos asociados (trazado en vivo de la cadena SAP) -->
+<h2 class="text-sm font-bold text-ink mt-6 mb-3">Documentos asociados</h2>
+{% if docs.ordenes or docs.facturas or docs.notas %}
+<div class="grid gap-5 sm:grid-cols-3">
+  {% include "cotizaciones/_docs_tabla.html" with titulo="Notas de venta" docs=docs.ordenes %}
+  {% include "cotizaciones/_docs_tabla.html" with titulo="Facturas" docs=docs.facturas %}
+  {% include "cotizaciones/_docs_tabla.html" with titulo="Notas de crédito" docs=docs.notas %}
+</div>
+{% else %}
+<div class="bg-surface border border-line rounded-2xl p-5 text-sm text-muted">
+  Sin documentos asociados todavía (la cotización aún no se convirtió a nota de venta ni factura).
+</div>
+{% endif %}
+{% endblock %}

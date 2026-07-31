@@ -1,0 +1,50 @@
+{% load cotizaciones_extras %}
+<div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[900px]">
+      <thead>
+        <tr class="bg-appbg text-xs uppercase tracking-wide text-muted">
+          {% if seleccionable %}<th class="px-4 py-3 w-10"><input type="checkbox" onchange="event.stopPropagation(); seleccionarTodo(this)" class="accent-brand w-4 h-4" aria-label="Seleccionar todo"></th>{% endif %}
+          <th class="text-left font-semibold px-4 py-3">N° cotización</th>
+          <th class="text-left font-semibold px-4 py-3">Cliente</th>
+          <th class="text-left font-semibold px-4 py-3">Ejecutivo</th>
+          <th class="text-right font-semibold px-4 py-3">Neto</th>
+          <th class="text-right font-semibold px-4 py-3">Total</th>
+          <th class="text-right font-semibold px-4 py-3">Facturado</th>
+          <th class="text-right font-semibold px-4 py-3">Diferencia</th>
+          <th class="text-left font-semibold px-4 py-3">Contabilización</th>
+          <th class="text-left font-semibold px-4 py-3">Válido hasta</th>
+          <th class="text-left font-semibold px-4 py-3">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cotizacion in cotizaciones %}
+        <tr class="border-t border-line hover:bg-appbg">
+          {% if seleccionable %}<td class="px-4 py-3"><input type="checkbox" name="ids" value="{{ cotizacion.pk }}" onchange="avisarSeleccion()" class="accent-brand w-4 h-4"></td>{% endif %}
+          <td class="px-4 py-3 font-mono text-sm font-semibold whitespace-nowrap tabular-nums">
+            <a href="{% url 'cotizaciones:detalle' cotizacion.pk %}" class="text-brand-ink hover:underline">{{ cotizacion.docnum }}</a>
+          </td>
+          <td class="px-4 py-3">
+            <div class="font-semibold text-ink">{{ cotizacion.card_name|default:"—" }}</div>
+            <div class="text-sm text-muted font-mono">{{ cotizacion.rut }}</div>
+          </td>
+          <td class="px-4 py-3 text-body">{{ cotizacion.ejecutivo.nombre|default:"—" }}</td>
+          <td class="px-4 py-3 text-right tabular-nums whitespace-nowrap">{{ cotizacion.neto|clp }}</td>
+          <td class="px-4 py-3 text-right tabular-nums whitespace-nowrap font-semibold text-ink">{{ cotizacion.total|clp }}</td>
+          <td class="px-4 py-3 text-right tabular-nums whitespace-nowrap">{{ cotizacion.total_facturado|clp }}</td>
+          <td class="px-4 py-3 text-right tabular-nums whitespace-nowrap {% if cotizacion.diferencia %}text-body{% else %}text-muted{% endif %}">{{ cotizacion.diferencia|clp }}</td>
+          <td class="px-4 py-3 text-body whitespace-nowrap tabular-nums">{{ cotizacion.fecha_contabilizacion|date:"d/m/Y"|default:"—" }}</td>
+          <td class="px-4 py-3 text-body whitespace-nowrap tabular-nums">{{ cotizacion.fecha_caducidad|date:"d/m/Y"|default:"—" }}</td>
+          <td class="px-4 py-3">{% include "cotizaciones/_badge_estado.html" with estado=cotizacion.estado %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="{% if seleccionable %}11{% else %}10{% endif %}" class="px-4 py-10 text-center text-muted">
+          <div class="text-sm">No hay cotizaciones que coincidan.</div>
+          <div class="text-xs mt-1">Prueba a quitar filtros o cambiar la búsqueda.</div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/_paginacion.html" with page_obj=cotizaciones hx_target="#tabla-cotizaciones" %}

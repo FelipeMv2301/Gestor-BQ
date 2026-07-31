@@ -31,5 +31,10 @@ class PerfilUsuario(models.Model):
         default=True
     )
 
+    ve_todas_cotizaciones = models.BooleanField(
+        default=False,
+        help_text="Supervisor comercial: ve las cotizaciones de todos los ejecutivos.",
+    )
+
     def __str__(self):
         return self.usuario.email

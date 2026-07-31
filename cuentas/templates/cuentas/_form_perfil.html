@@ -13,6 +13,11 @@
       {{ form.codigo_empleado_sap }}
       {% if form.codigo_empleado_sap.errors %}<p class="text-xs text-rech-ink mt-1">{{ form.codigo_empleado_sap.errors|striptags }}</p>{% endif %}
     </label>
+    <label class="flex items-center gap-2 cursor-pointer">
+      {{ form.ve_todas_cotizaciones }}
+      <span class="text-sm text-body">{{ form.ve_todas_cotizaciones.label }}</span>
+      {% if form.ve_todas_cotizaciones.errors %}<p class="text-xs text-rech-ink mt-1">{{ form.ve_todas_cotizaciones.errors|striptags }}</p>{% endif %}
+    </label>
     <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Guardar</button>
   </form>
 </div>

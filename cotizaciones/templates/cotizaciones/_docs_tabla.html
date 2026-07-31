@@ -1,0 +1,23 @@
+{% load cotizaciones_extras %}
+<section class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="bg-appbg border-b border-line">
+        <th colspan="2" class="text-left text-sm font-bold text-ink px-4 py-3">{{ titulo }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in docs %}
+      <tr class="border-b border-line last:border-0">
+        <td class="px-4 py-2.5 font-mono text-ink whitespace-nowrap">{{ d.docnum }}{% if d.cancelado %} <span class="text-xs text-rech-ink">(anulada)</span>{% endif %}</td>
+        <td class="px-4 py-2.5 text-right whitespace-nowrap">
+          <div class="tabular-nums text-body">{{ d.total|clp }}</div>
+          <div class="text-xs text-muted tabular-nums">{{ d.fecha|slice:":10" }}</div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="2" class="px-4 py-3 text-muted text-sm">—</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>

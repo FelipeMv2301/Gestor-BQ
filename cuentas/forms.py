@@ -7,11 +7,15 @@ INPUT = "w-full text-sm rounded-lg border border-linestrong bg-field text-body p
 class PerfilUsuarioForm(forms.ModelForm):
     class Meta:
         model = PerfilUsuario
-        fields = ["rol", "codigo_empleado_sap"]
-        labels = {"rol": "Rol", "codigo_empleado_sap": "Código SAP"}
+        fields = ["rol", "codigo_empleado_sap", "ve_todas_cotizaciones"]
+        labels = {"rol": "Rol", "codigo_empleado_sap": "Código SAP",
+                  "ve_todas_cotizaciones": "Ve todas las cotizaciones"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["rol"].required = False
-        for f in self.fields.values():
-            f.widget.attrs["class"] = INPUT
+        for name, f in self.fields.items():
+            if name == "ve_todas_cotizaciones":
+                f.widget.attrs["class"] = "accent-brand w-4 h-4"   # checkbox, no el INPUT de texto
+            else:
+                f.widget.attrs["class"] = INPUT
