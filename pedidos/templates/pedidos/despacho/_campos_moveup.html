@@ -1,13 +1,15 @@
 <div class="bg-surface border border-line rounded-2xl p-6">
   <h2 class="text-sm font-bold text-ink mb-4">Dirección</h2>
   <p class="text-xs text-muted mb-3">MoveUP pide calle y número separados. Revisa y ajusta antes de despachar.</p>
-  <div class="grid gap-4 sm:grid-cols-3">
+  <div class="grid gap-4 sm:grid-cols-2">
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Calle</span>
       <input type="text" name="moveup_calle" value="{{ pedidos.0.direccion_calle }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Número</span>
       <input type="text" name="moveup_numero" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Depto / Casa</span>
       <input type="text" name="moveup_depto" value="{{ pedidos.0.direccion_depto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Comuna</span>
+      <input type="text" name="destinatario_comuna" data-comuna value="{{ pedidos.0.direccion_comuna }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
   </div>
 </div>
 

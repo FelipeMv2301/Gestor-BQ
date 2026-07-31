@@ -51,12 +51,18 @@ def _parsear_despacho_chibra(request):
         "email": request.POST.get("destinatario_email"),
     }
 
+    tipos_doc = request.POST.getlist("doc_tipo")
+    refs_doc = request.POST.getlist("doc_referencia")
+    documentos = [{"tipo": t.strip(), "referencia": r.strip()}
+                  for t, r in zip(tipos_doc, refs_doc) if t.strip() and r.strip()]
+
     datos_courier = {
         "centro": request.POST.get("centro"),
         "servicio": request.POST.get("servicio"),
         "valor_declarado": request.POST.get("valor_declarado") or 0,
         "volumen_total": request.POST.get("volumen_total"),
         "observaciones": request.POST.get("observaciones"),
+        "documentos": documentos,   # cedibles → chibra_client los pone en TIPOS_DOCUMENTO
     }
 
     return bultos, destinatario, datos_courier

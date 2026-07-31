@@ -1,7 +1,11 @@
 <div class="bg-surface border border-line rounded-2xl p-6">
   <h2 class="text-sm font-bold text-ink mb-4">Dirección</h2>
-  <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Dirección</span>
-    <input type="text" name="destinatario_direccion" value="{{ pedidos.0.direccion_calle }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Dirección</span>
+      <input type="text" name="destinatario_direccion" value="{{ pedidos.0.direccion_calle }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Comuna</span>
+      <input type="text" name="destinatario_comuna" data-comuna value="{{ pedidos.0.direccion_comuna }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+  </div>
 </div>
 
 <div class="bg-surface border border-line rounded-2xl p-6">
@@ -78,7 +82,41 @@
   </div>
 </div>
 
+<div class="bg-surface border border-line rounded-2xl p-6">
+  <div class="flex items-center justify-between mb-1">
+    <h2 class="text-sm font-bold text-ink">Documentos (cedibles)</h2>
+    <button type="button" onclick="agregarFilaDocumento()" class="text-sm font-semibold text-brand-ink hover:underline">+ Agregar documento</button>
+  </div>
+  <p class="text-xs text-muted mb-4">Opcional. Deja el tipo o el N° en blanco si no aplica.</p>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="text-xs uppercase tracking-wide text-muted text-left">
+        <th class="py-2 pr-2 w-1/2">Tipo documento</th><th class="py-2 px-2">N° documento</th><th class="py-2 pl-2 w-8"></th>
+      </tr></thead>
+      <tbody id="filas-documentos">
+        <tr>
+          <td class="py-1 pr-2"><select name="doc_tipo" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5">
+            <option value="">Seleccione tipo</option>
+            <option value="CED">CEDIBLE CON DEVOLUCIÓN</option>
+          </select></td>
+          <td class="py-1 px-2"><input type="text" name="doc_referencia" maxlength="40" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 pl-2 text-center"><button type="button" onclick="quitarFilaDocumento(this)" class="text-muted hover:text-rech-ink" title="Quitar">✕</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <script>
+  function agregarFilaDocumento() {
+    var fila = document.querySelector('#filas-documentos tr');
+    var nueva = fila.cloneNode(true);
+    nueva.querySelectorAll('select, input').forEach(function (c) { c.value = ''; });
+    document.getElementById('filas-documentos').appendChild(nueva);
+  }
+  function quitarFilaDocumento(boton) {
+    if (document.querySelectorAll('#filas-documentos tr').length > 1) boton.closest('tr').remove();
+  }
   function agregarFilaBulto() {
     var filaOriginal = document.querySelector("#filas-bultos tr");
     var filaNueva = filaOriginal.cloneNode(true);
