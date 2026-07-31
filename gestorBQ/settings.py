@@ -51,6 +51,7 @@ CHIBRA_CLIENTE_REMITENTE = os.getenv("CHIBRA_CLIENTE_REMITENTE")
 
 #Llamar parametros de MoveUP
 MOVEUP_BASE_URL = os.getenv("MOVEUP_BASE_URL")
+MOVEUP_ACCESS_TOKEN = os.getenv("MOVEUP_ACCESS_TOKEN")
 
 #Parámetros de cuenta no-reply
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
