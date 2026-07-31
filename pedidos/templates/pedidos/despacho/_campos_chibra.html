@@ -59,7 +59,7 @@
     <div class="overflow-x-auto">
       <table class="w-full text-sm min-w-[640px]">
         <thead><tr class="text-xs uppercase tracking-wide text-muted text-left">
-          <th class="py-2 pr-2">Tipo</th><th class="py-2 px-2">Cant.</th><th class="py-2 px-2">Alto</th><th class="py-2 px-2">Ancho</th><th class="py-2 px-2">Largo</th><th class="py-2 px-2">Peso (kg)</th><th class="py-2 pl-2">Contenido</th>
+          <th class="py-2 pr-2">Tipo</th><th class="py-2 px-2">Cant.</th><th class="py-2 px-2">Alto</th><th class="py-2 px-2">Ancho</th><th class="py-2 px-2">Largo</th><th class="py-2 px-2">Peso (kg)</th><th class="py-2 pl-2">Contenido</th><th class="py-2 pl-2 w-8"></th>
         </tr></thead>
         <tbody id="filas-bultos">
           <tr>
@@ -74,6 +74,7 @@
             <td class="py-1 pl-2"><select name="bulto_tipo_contenido" class="text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5">
               <option value="SECO">SECO</option><option value="REFRIGERADO">REFRIGERADO</option><option value="REFRIGERADO CON SENSOR">REFRIGERADO CON SENSOR</option>
             </select></td>
+            <td class="py-1 pl-2 text-center"><button type="button" onclick="quitarFilaBulto(this)" class="text-muted hover:text-rech-ink" title="Quitar">✕</button></td>
           </tr>
         </tbody>
       </table>
@@ -121,6 +122,9 @@
     var filaOriginal = document.querySelector("#filas-bultos tr");
     var filaNueva = filaOriginal.cloneNode(true);
     document.getElementById("filas-bultos").appendChild(filaNueva);
+  }
+  function quitarFilaBulto(boton) {
+    if (document.querySelectorAll('#filas-bultos tr').length > 1) boton.closest('tr').remove();
   }
   function mostrarModoBultos() {
     var esSimple = document.querySelector('input[name="modo_bultos"][value="simple"]').checked;
