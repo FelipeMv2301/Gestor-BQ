@@ -1,5 +1,6 @@
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.core.exceptions import ImmediateHttpResponse
+from django.contrib.auth import get_user_model
 from django.http import HttpResponseForbidden
 from dotenv import load_dotenv
 import logging
@@ -21,6 +22,16 @@ class BioquimicaSocialAccountAdapter(DefaultSocialAccountAdapter):
             raise ImmediateHttpResponse(
                 HttpResponseForbidden("Acceso disponible solo a cuentas @bioquimica.cl")
             )
+
+        #Reconciliación por email: si este login Google todavía no está enlazado a un
+        #SocialAccount pero ya existe un User con el mismo correo, conectarlos aquí para
+        #evitar el formulario de signup (que pediría username). Complementa a
+        #SOCIALACCOUNT_EMAIL_AUTHENTICATION como cinturón y tirantes.
+        if sociallogin.is_existing:
+            return
+        existing_user = get_user_model().objects.filter(email__iexact=email).first()
+        if existing_user:
+            sociallogin.connect(request, existing_user)
 
     #TEMPORAL: diagnóstico del login Google en gestor-test (2026-07-29) — allauth atrapa la
     #excepción del intercambio OAuth2 y muestra su propia pantalla de error sin loguear nada.

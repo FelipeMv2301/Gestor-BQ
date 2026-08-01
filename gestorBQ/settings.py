@@ -126,6 +126,20 @@ SOCIALACCOUNT_ADAPTER = "cuentas.adapters.BioquimicaSocialAccountAdapter"
 
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 
+#Login solo por email — el modelo User de Django trae un campo `username` obligatorio que
+#allauth, por defecto, sigue pidiendo en el signup social. Lo desactivamos para que la
+#identidad sea el correo @bioquimica.cl y nada más (sin pantalla "elige nombre de usuario").
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*']
+ACCOUNT_EMAIL_REQUIRED = True
+
+#Conecta automáticamente un login Google a un User existente que tenga el mismo email
+#(verificado por Google). Sin esto, si falta la fila SocialAccount enlazada, allauth trata
+#el login como registro nuevo y cae al formulario de signup.
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+
 #El link "Salir" del header es un <a> con GET; sin esto, allauth muestra antes una
 #pantalla de confirmación ("¿Seguro que quieres salir?") en vez de cerrar sesión directo.
 ACCOUNT_LOGOUT_ON_GET = True
