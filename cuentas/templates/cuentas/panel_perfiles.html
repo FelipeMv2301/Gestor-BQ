@@ -18,14 +18,15 @@
       <h2 class="text-sm font-bold text-ink">Ejecutivos (SAP)</h2>
       <p class="text-xs text-muted mt-0.5">Referencia de código y estado.</p>
     </div>
-    <!-- dir=rtl mueve la barra vertical a la izquierda; dir=ltr en la tabla mantiene el orden normal de columnas -->
-    <div class="overflow-y-auto overflow-x-hidden max-h-[65vh]" dir="rtl">
-      <table class="w-full text-sm" dir="ltr">
-        <thead class="sticky top-0 z-10">
-          <tr class="bg-appbg text-xs uppercase tracking-wide text-muted">
-            <th class="text-left font-semibold px-4 py-2.5">Nombre</th>
-            <th class="text-left font-semibold px-4 py-2.5">Código</th>
-            <th class="text-left font-semibold px-4 py-2.5">Estado</th>
+    <div class="scroll-fino overflow-y-auto overflow-x-hidden max-h-[65vh]">
+      <table class="w-full text-sm">
+        <!-- sticky + fondo van en cada <th>, no en el <thead>/<tr>: al hacer scroll, el fondo
+             del <tr> no siempre pinta sobre las filas que pasan por debajo y se transparenta. -->
+        <thead>
+          <tr class="text-xs uppercase tracking-wide text-muted">
+            <th class="sticky top-0 z-10 bg-appbg border-b border-line text-left font-semibold px-4 py-2.5">Nombre</th>
+            <th class="sticky top-0 z-10 bg-appbg border-b border-line text-left font-semibold px-4 py-2.5">Código</th>
+            <th class="sticky top-0 z-10 bg-appbg border-b border-line text-left font-semibold px-4 py-2.5">Estado</th>
           </tr>
         </thead>
         <tbody>
@@ -80,7 +81,8 @@
 
   <!-- Form de edición, fijo -->
   <div class="bg-surface border border-line rounded-2xl shadow-sm p-6 h-max lg:sticky lg:top-20" id="panel-editar-perfil">
-    <p class="text-sm text-muted">Selecciona un usuario de la lista para editar su rol o sus códigos SAP.</p>
+    <p class="text-xs font-semibold uppercase tracking-wide text-muted">Editar perfil</p>
+    <p class="text-sm text-muted mt-2">Selecciona un usuario de la lista para editar su rol o sus códigos SAP.</p>
   </div>
 
 </div>

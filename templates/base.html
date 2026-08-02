@@ -30,6 +30,20 @@
       --noti-bg:#1f2c12; --noti-ink:#a9d167; --noti-dot:#7ab648;
       --rech-bg:#351512; --rech-ink:#ef8579; --rech-dot:#e0463a;
     }
+
+    /* Barra de scroll fina, en los colores de la paleta (hereda claro/oscuro por las CSS vars).
+       Aplicar en cualquier caja con overflow propio; el navegador si no dibuja la barra nativa
+       del sistema, que corta el look del resto de las tarjetas. */
+    .scroll-fino { scrollbar-width: thin; scrollbar-color: var(--linestrong) transparent; }
+    .scroll-fino::-webkit-scrollbar { width: 0.625rem; height: 0.625rem; }
+    .scroll-fino::-webkit-scrollbar-track { background: transparent; }
+    /* El borde transparente + background-clip deja aire entre el pulgar y el borde de la caja,
+       para que no quede pegado al filo redondeado de la tarjeta. */
+    .scroll-fino::-webkit-scrollbar-thumb {
+      background: var(--linestrong); border-radius: 999px;
+      border: 0.1875rem solid transparent; background-clip: content-box;
+    }
+    .scroll-fino::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: content-box; }
   </style>
   <script>
     (function () {
@@ -56,6 +70,47 @@
     var oscuro = document.documentElement.classList.toggle('dark');
     localStorage.setItem('tema', oscuro ? 'dark' : 'claro');
   };
+
+  // --- Menú hamburguesa del header (solo bajo el breakpoint xl) ---
+  (function () {
+    function panel()  { return document.getElementById('menu-movil'); }
+    function boton()  { return document.getElementById('boton-menu'); }
+
+    function pintar(abierto) {
+      var p = panel(), b = boton();
+      if (!p || !b) return;
+      p.classList.toggle('hidden', !abierto);
+      b.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+      b.setAttribute('aria-label', abierto ? 'Cerrar menú de navegación' : 'Abrir menú de navegación');
+      b.querySelector('[data-icono="abrir"]').classList.toggle('hidden', abierto);
+      b.querySelector('[data-icono="cerrar"]').classList.toggle('hidden', !abierto);
+    }
+
+    window.alternarMenu = function () {
+      var p = panel();
+      if (p) pintar(p.classList.contains('hidden'));
+    };
+    window.cerrarMenu = function () { pintar(false); };
+
+    // Click fuera del header: cierra. Un click en un link del panel navega igual, pero el
+    // cierre deja el estado limpio si la navegación no ocurre (ancla, target nuevo, etc).
+    document.addEventListener('click', function (e) {
+      var p = panel();
+      if (!p || p.classList.contains('hidden')) return;
+      if (!e.target.closest('header')) cerrarMenu();
+      else if (e.target.closest('#menu-movil a')) cerrarMenu();
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') cerrarMenu();
+    });
+
+    // Al pasar a pantalla ancha el CSS ya esconde el panel (xl:hidden); esto sincroniza el
+    // aria-expanded y el ícono para que no queden mostrando el estado "abierto".
+    window.addEventListener('resize', function () {
+      if (window.matchMedia('(min-width: 1280px)').matches) cerrarMenu();
+    });
+  })();
 </script>
 
 <body class="min-h-screen bg-appbg text-body font-sans antialiased" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>

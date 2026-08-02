@@ -1,4 +1,6 @@
 {% load static %}
+<!-- `sticky` ya es un elemento posicionado: sirve de ancla para el panel `absolute` del menú
+     hamburguesa sin necesidad de agregar `relative` (que además pisaría al sticky). -->
 <header class="sticky top-0 z-40 flex items-center gap-5 px-6 py-2.5 bg-surface border-b border-line">
   <a href="{% url 'inicio' %}" class="flex items-center shrink-0">
     <img src="{% static 'images/logo.png' %}"        alt="bioquimica.cl" class="h-10 block dark:hidden"> 
@@ -7,31 +9,19 @@
   </a>
 
   {% if user.is_authenticated and user.perfil.rol %}
-  <nav class="flex gap-1">
-    {% if user.perfil.rol == 'EJECUTIVO' or user.perfil.rol == 'ADMIN' %}
-      <a href="{% url 'pedidos:mis_pedidos' %}"
-         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Mis pedidos</a>
-      <a href="{% url 'cotizaciones:lista' %}"
-         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Cotizaciones</a>
-    {% endif %}
-    {% if user.perfil.rol == 'EJECUTIVO' %}
-      <a href="{% url 'envios:mis_envios' %}"
-         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Mis envíos</a>
-    {% endif %}
-    {% if user.perfil.rol == 'LOGISTICA' or user.perfil.rol == 'ADMIN' %}
-       <a href="{% url 'pedidos:despachos' %}"
-         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Pedidos a Despachar</a>
-       <a href="{% url 'envios:lista' %}"
-         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Envíos Realizados</a>
-    {% endif %}
-    {% if user.perfil.rol == 'EJECUTIVO' or user.perfil.rol == 'ADMIN' %}
-      <a href="{% url 'pedidos:anulados' %}"
-         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Anulados</a>
-    {% endif %}
-    {% if user.perfil.rol == 'ADMIN' %}
-      <a href="{% url 'pedidos:panel_admin' %}"
-         class="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg">Admin</a>
-    {% endif %}
+  <!-- Botón hamburguesa: solo bajo el breakpoint xl, donde los links ya no entran en una línea.
+       Cambiar `xl` por `lg` aquí y en las tres clases de abajo mueve el corte a 64rem. -->
+  <button id="boton-menu" type="button" onclick="alternarMenu()"
+          aria-label="Abrir menú de navegación" aria-expanded="false" aria-controls="menu-movil"
+          class="xl:hidden shrink-0 w-9 h-9 rounded-lg border border-line grid place-items-center text-muted hover:text-body hover:bg-appbg">
+    <svg data-icono="abrir" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    <svg data-icono="cerrar" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
+
+  <nav class="hidden xl:flex gap-1">
+    {% include "partials/_nav_links.html" with clase="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2 rounded-lg" %}
   </nav>
   {% endif %}
 
@@ -61,6 +51,17 @@
     <span class="w-9 h-9 rounded-full bg-brand text-white grid place-items-center font-bold text-xs">{{ user.email|first|upper }}</span>
     <a href="{% url 'account_logout' %}"
        class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-3 py-2 rounded-lg">Salir</a>
+  </div>
+  {% endif %}
+
+  {% if user.is_authenticated and user.perfil.rol %}
+  <!-- Panel del hamburguesa. Cuelga del borde inferior del header (`top-full`) porque el header es
+       sticky. Lleva `hidden` (estado cerrado, lo saca el JS) y además `xl:hidden`: así, si alguien
+       agranda la ventana con el menú abierto, el CSS lo esconde solo sin depender del listener. -->
+  <div id="menu-movil" class="hidden xl:hidden absolute top-full left-0 right-0 bg-surface border-b border-line shadow-lg">
+    <nav class="scroll-fino flex flex-col gap-0.5 p-3 max-h-[70vh] overflow-y-auto">
+      {% include "partials/_nav_links.html" with clase="text-sm font-semibold text-muted hover:text-body hover:bg-appbg px-3 py-2.5 rounded-lg" %}
+    </nav>
   </div>
   {% endif %}
 </header>
