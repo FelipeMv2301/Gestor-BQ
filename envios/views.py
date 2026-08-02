@@ -3,8 +3,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from pedidos.permisos import es_logistica
+from cuentas.models import PerfilUsuario
 from .models import EnvioCourier
 from .services import parsear_bultos
+from integraciones.seguimiento import refrescar_estados_courier, actualizar_estado_courier
 from utils import Courier
 from pedidos import permisos
 from django.urls import reverse
@@ -36,12 +38,73 @@ def lista_envios(request):
     return render(request, plantilla, contexto)
 
 
+#Igual que lista_envios pero acotado a los envíos del ejecutivo (los que agrupan un pedido suyo).
+#Read-only: sin botón "Actualizar estados" (eso es de logística). ADMIN usa la lista completa.
+@login_required
+def mis_envios(request):
+    if permisos.obtener_rol(request.user) != PerfilUsuario.Rol.EJECUTIVO:
+        return redirect("inicio")
+
+    codigos = permisos.codigos_sap_usuario(request.user)
+    envios = (
+        EnvioCourier.objects.de_ejecutivo(codigos)
+        .buscar(request.GET.get("q", "").strip())
+        .con_courier(request.GET.getlist("courier"))
+        .con_origen(request.GET.getlist("origen"))
+        .prefetch_related("pedidos")
+        .order_by("-creado_en")
+    )
+    paginador = Paginator(envios, 20)
+    envios = paginador.get_page(request.GET.get("page"))
+
+    contexto = {
+        "envios": envios, "q": request.GET.get("q", ""),
+        "sel_courier": request.GET.getlist("courier"), "sel_origen": request.GET.getlist("origen"),
+        "courier_choices": Courier.choices,
+    }
+    plantilla = "envios/_tabla_envios.html" if request.headers.get("HX-Request") else "envios/mis_envios.html"
+    return render(request, plantilla, contexto)
+
+
 @login_required
 def detalle_envio(request, pk):
+    envio = get_object_or_404(EnvioCourier.objects.prefetch_related("pedidos"), pk=pk)
+    if not permisos.puede_ver_envio(request.user, envio):
+        return redirect("inicio")
+    # Ejecutivo: read-only (sin botones de acción). Logística/Admin: gestiona.
+    return render(request, "envios/detalle_envio.html",
+                  {"envio": envio, "puede_gestionar": es_logistica(request.user)})
+
+
+#Batch: refresca el estado-courier de todos los MoveUP en 1 sola llamada a la API (ver seguimiento.py).
+@login_required
+@require_POST
+def refrescar_estados(request):
     if not es_logistica(request.user):
         return redirect("inicio")
-    envio = get_object_or_404(EnvioCourier.objects.prefetch_related("pedidos"), pk=pk)
-    return render(request, "envios/detalle_envio.html", {"envio": envio})
+    envios = EnvioCourier.objects.filter(courier=Courier.MOVEUP)
+    total = refrescar_estados_courier(envios)
+    messages.success(request, f"Estados de courier actualizados ({total} envío/s).")
+    resp = HttpResponse(status=204)
+    resp["HX-Redirect"] = reverse("envios:lista")
+    return resp
+
+
+#Individual: refresca el estado-courier de UN envío (1 llamada). Para el botón del detalle.
+@login_required
+@require_POST
+def refrescar_estado_envio(request, pk):
+    if not es_logistica(request.user):
+        return redirect("inicio")
+    envio = get_object_or_404(EnvioCourier, pk=pk)
+    try:
+        if actualizar_estado_courier(envio):
+            messages.success(request, f"Estado actualizado: {envio.estado_courier or '—'}.")
+        else:
+            messages.info(request, "Este courier no tiene consulta de estado por API.")
+    except Exception as exc:
+        messages.error(request, f"No se pudo consultar el estado: {exc}")
+    return redirect("envios:detalle", pk=pk)
 
 
 #Solo ENTREGADO/ERROR: nada del flujo automático los setea hoy (despachar_pedidos deja DESPACHADO).

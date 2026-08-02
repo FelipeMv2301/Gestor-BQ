@@ -26,4 +26,5 @@ urlpatterns = [
     path("pedidos/", include("pedidos.urls")), #Trae las urls que definimos en Pedidos
     path("ejecutivos/", include("ejecutivos.urls")), #Trae las urls que definimos en Ejecutivos (para gestión del admin)
     path("envios/", include("envios.urls")), #Trae las urls que definimos en Envíos
+    path("cotizaciones/", include("cotizaciones.urls")), #Trae las urls que definimos en Cotizaciones
 ]

@@ -1,0 +1,9 @@
+{% if estado == 'COMPLETADO' %}
+  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-noti-bg text-noti-ink"><span class="w-1.5 h-1.5 rounded-full bg-noti-dot"></span>Completado</span>
+{% elif estado == 'PARCIAL' %}
+  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-pend-bg text-pend-ink"><span class="w-1.5 h-1.5 rounded-full bg-pend-dot"></span>Parcial</span>
+{% elif estado == 'ANULADO' %}
+  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-rech-bg text-rech-ink"><span class="w-1.5 h-1.5 rounded-full bg-rech-dot"></span>Anulado</span>
+{% else %}
+  <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap bg-apro-bg text-apro-ink"><span class="w-1.5 h-1.5 rounded-full bg-apro-dot"></span>Abierto</span>
+{% endif %}

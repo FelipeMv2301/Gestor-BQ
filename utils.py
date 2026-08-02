@@ -37,3 +37,6 @@ COMUNAS_CL = ['Algarrobo', 'Alhué', 'Alto Biobío', 'Alto Hospicio', 'Alto del 
 class Courier(models.TextChoices):
     CHIBRA = "CHIBRA", "Chibra"
     MOVEUP = "MOVEUP", "MoveUP"
+    #Contemplados a futuro (anotado 2026-07-29, sin integración construida todavía):
+    #STARKEN = "STARKEN", "Starken"
+    #ALAS = "ALAS", "Alas"

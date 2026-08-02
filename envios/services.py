@@ -1,5 +1,6 @@
 from .models import EnvioCourier
 from integraciones import chibra_client
+from integraciones import moveup_client
 from pedidos.models import Pedido
 from pedidos.services  import notificar_pedido
 from django.db import transaction
@@ -15,9 +16,94 @@ def _despachar_chibra(pedidos, destinatario, datos_courier):
     )
     return {"orden_transporte": resultado["numero_envio"]}
 
+def _despachar_moveup(pedidos, destinatario, datos_courier):
+    # MoveUP no tiene campo de referencia externa → las referencias de pedido (num_pedido / DocNum SAP)
+    # van en observations, como hace MoveUP mismo ("OrderNumber: ...").
+    refs = ", ".join(f"{p.origen}-{p.num_pedido}" for p in pedidos)
+    obs_operador = datos_courier.get("observaciones") or ""
+    observations = f"Pedidos: {refs}"
+    if obs_operador:
+        observations += f" | {obs_operador}"
+
+    paquete = {
+        "recipientName": destinatario.get("nombre") or "",
+        "recipientAddress": destinatario.get("direccion") or "",
+        "recipientAddressNumber": destinatario.get("numero") or "",
+        "recipientHouseNumber": destinatario.get("depto") or "",
+        "recipientCommune": destinatario.get("comuna") or "",
+        "recipientPhone": destinatario.get("telefono") or "",
+        "recipientEmail": destinatario.get("email") or "",
+        "packagePrice": int(datos_courier.get("valor_declarado") or 0),
+        "packageSize": int(datos_courier.get("package_size") or moveup_client.PACKAGE_SIZE_CAJA),
+        "packageQuantity": int(datos_courier.get("cantidad") or 1),
+        "observations": observations,
+    }
+
+    creados = moveup_client.crear_paquetes(paquete)
+    primero = creados[0] if creados else {}
+    return {"orden_transporte": str(primero.get("id") or "")}
+
 SELECCIONAR_COURIER = {
     Courier.CHIBRA: _despachar_chibra,
-    #Courier.MOVEUP: _despachar_moveup,
+    Courier.MOVEUP: _despachar_moveup,
+}
+
+def _parsear_despacho_chibra(request):
+    bultos = parsear_bultos(request)
+    destinatario = {
+        "nombre": request.POST.get("destinatario_nombre"),
+        "rut": request.POST.get("destinatario_rut"),
+        "direccion": request.POST.get("destinatario_direccion"),
+        "comuna": request.POST.get("destinatario_comuna"),
+        "telefono": request.POST.get("destinatario_telefono"),
+        "email": request.POST.get("destinatario_email"),
+    }
+
+    tipos_doc = request.POST.getlist("doc_tipo")
+    refs_doc = request.POST.getlist("doc_referencia")
+    documentos = [{"tipo": t.strip(), "referencia": r.strip()}
+                  for t, r in zip(tipos_doc, refs_doc) if t.strip() and r.strip()]
+
+    datos_courier = {
+        "centro": request.POST.get("centro"),
+        "servicio": request.POST.get("servicio"),
+        "valor_declarado": request.POST.get("valor_declarado") or 0,
+        "volumen_total": request.POST.get("volumen_total"),
+        "observaciones": request.POST.get("observaciones"),
+        "documentos": documentos,   # cedibles → chibra_client los pone en TIPOS_DOCUMENTO
+    }
+
+    return bultos, destinatario, datos_courier
+
+def _parsear_despacho_moveup(request):
+    destinatario = {
+        "nombre": request.POST.get("destinatario_nombre"),
+        "rut": request.POST.get("destinatario_rut"),
+        "comuna": request.POST.get("destinatario_comuna"),
+        "telefono": request.POST.get("destinatario_telefono"),
+        "email": request.POST.get("destinatario_email"),
+        "direccion": request.POST.get("moveup_calle"),
+        "numero": request.POST.get("moveup_numero"),
+        "depto": request.POST.get("moveup_depto"),
+    }
+
+    datos_courier = {
+        "package_size": request.POST.get("package_size"),
+        "cantidad": request.POST.get("cantidad") or 1,
+        "valor_declarado": request.POST.get("valor_declarado") or 0,
+        "observaciones": request.POST.get("observaciones"),
+    }
+
+    faltantes = [etiqueta for campo, etiqueta in
+                [("nombre", "Nombre"), ("direccion", "Calle"), ("numero", "Número"), ("comuna", "Comuna")]
+                if not (destinatario.get(campo) or "").strip()]
+    if faltantes:
+          raise ValueError(f"Faltan datos para MoveUP: {', '.join(faltantes)}.")
+    return [], destinatario, datos_courier
+
+PARSEAR_DESPACHO = {
+    Courier.CHIBRA: _parsear_despacho_chibra,
+    Courier.MOVEUP: _parsear_despacho_moveup,
 }
 
 #Valida que un grupo de pedidos pueda agruparse en un solo despacho. Se usa apenas se selecciona

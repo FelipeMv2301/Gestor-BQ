@@ -55,10 +55,13 @@ def sincronizar_ejecutivos_desde_sap():
         ejecutivo = Ejecutivo.objects.filter(email=perfil.usuario.email, activo=True).first()
         if not ejecutivo:
             continue
-        if PerfilUsuario.objects.filter(codigo_empleado_sap=ejecutivo.codigo_sap).exists():
+        #Un código = un dueño: no reasignar si ya lo tiene otro perfil (escalar o M2M)
+        if (PerfilUsuario.objects.filter(codigo_empleado_sap=ejecutivo.codigo_sap).exists()
+                or PerfilUsuario.objects.filter(ejecutivos=ejecutivo).exists()):
             continue
         perfil.codigo_empleado_sap = ejecutivo.codigo_sap
         perfil.save(update_fields=["codigo_empleado_sap"])
+        perfil.ejecutivos.add(ejecutivo)   # M2M es la fuente de verdad; el escalar queda como fallback
         perfiles_actualizados += 1
 
     return {

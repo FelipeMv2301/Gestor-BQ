@@ -12,11 +12,11 @@
     <option value="{{ valor }}" {% if valor == pedido.valor_courier_servicio %}selected{% endif %}>{{ etiqueta }}</option>
     {% endfor %}
   </select>
-  {% if pedido.envio %}<div class="text-xs text-muted font-mono mt-1">{{ pedido.envio.orden_transporte }}</div>{% endif %}
+  {% if pedido.envio %}<div class="text-xs font-mono mt-1"><a href="{% url 'envios:detalle' pedido.envio.pk %}" class="text-brand-ink hover:underline">{{ pedido.envio.orden_transporte }}</a></div>{% endif %}
   {% else %}
     {% if pedido.courier %}
       {{ pedido.get_courier_display }}{% if pedido.servicio_courier_nombre %} ({{ pedido.servicio_courier_nombre }}){% endif %}{% if pedido.envio %}
-      <span class="text-xs text-muted font-mono">· {{ pedido.envio.orden_transporte }}</span>{% endif %}
+      <span class="text-xs text-muted font-mono">· <a href="{% url 'envios:detalle' pedido.envio.pk %}" class="text-brand-ink hover:underline">{{ pedido.envio.orden_transporte }}</a></span>{% endif %}
     {% else %}
       <span class="text-xs text-pend-ink bg-pend-bg px-2 py-0.5 rounded font-semibold whitespace-nowrap">⚠ Falta courier</span>
     {% endif %}

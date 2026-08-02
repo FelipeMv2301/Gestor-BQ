@@ -152,10 +152,28 @@ class EditarPerfilTest(TestCase):
         self.assertIsNone(self.usuario.perfil.rol)  # no cambió nada
 
     def test_admin_asigna_rol_y_codigo(self):
+        Ejecutivo.objects.create(codigo_sap=30, nombre="Canal 30", email="c30@bioquimica.cl", activo=True)
         self.client.force_login(self.admin)
         resp = self.client.post(f"/cuentas/panel/perfiles/{self.usuario.perfil.pk}/editar/",
-                                 {"rol": Rol.EJECUTIVO, "codigo_empleado_sap": 30})
+                                 {"rol": Rol.EJECUTIVO, "codigos_sap": "30"})
         self.assertEqual(resp.status_code, 200)
         self.usuario.perfil.refresh_from_db()
         self.assertEqual(self.usuario.perfil.rol, Rol.EJECUTIVO)
-        self.assertEqual(self.usuario.perfil.codigo_empleado_sap, 30)
+        self.assertEqual(self.usuario.perfil.codigos_sap, [30])
+
+    def test_admin_asigna_dos_codigos_a_mano(self):
+        Ejecutivo.objects.create(codigo_sap=30, nombre="Canal 30", email="c30@bioquimica.cl", activo=True)
+        Ejecutivo.objects.create(codigo_sap=40, nombre="Canal 40", email="c40@bioquimica.cl", activo=True)
+        self.client.force_login(self.admin)
+        resp = self.client.post(f"/cuentas/panel/perfiles/{self.usuario.perfil.pk}/editar/",
+                                 {"rol": Rol.EJECUTIVO, "codigos_sap": "30, 40"})
+        self.assertEqual(resp.status_code, 200)
+        self.usuario.perfil.refresh_from_db()
+        self.assertEqual(sorted(self.usuario.perfil.codigos_sap), [30, 40])
+
+    def test_admin_codigo_inexistente_da_error(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(f"/cuentas/panel/perfiles/{self.usuario.perfil.pk}/editar/",
+                                 {"rol": Rol.EJECUTIVO, "codigos_sap": "999"})
+        self.usuario.perfil.refresh_from_db()
+        self.assertEqual(self.usuario.perfil.codigos_sap, [])   # no se guardó nada

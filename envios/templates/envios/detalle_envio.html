@@ -2,13 +2,14 @@
 {% block titulo %}Envío #{{ envio.id }} — Portal Bioquímica{% endblock %}
 {% block ancho %}max-w-4xl{% endblock %}
 {% block content %}
-<a href="{% url 'envios:lista' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-body bg-surface border border-linestrong rounded-full px-4 py-2 hover:border-brand hover:text-brand-ink shadow-sm mb-4">← Volver a Envíos</a>
+<a href="{% if puede_gestionar %}{% url 'envios:lista' %}{% else %}{% url 'pedidos:mis_pedidos' %}{% endif %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-body bg-surface border border-linestrong rounded-full px-4 py-2 hover:border-brand hover:text-brand-ink shadow-sm mb-4">← Volver</a>
 
 <div class="flex items-center justify-between gap-3 mb-5">
   <div class="flex items-center gap-3">
     <h1 class="text-2xl font-bold text-ink font-mono tabular-nums">Envío #{{ envio.id }}</h1>
     {% include "partials/_badge_estado_envio.html" with envio=envio %}
   </div>
+  {% if puede_gestionar %}
   <div class="flex gap-2.5">
     <a href="{% url 'envios:editar' envio.pk %}" class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Editar</a>
     {% if user.perfil.rol == 'ADMIN' %}
@@ -17,6 +18,7 @@
             class="text-sm font-semibold px-4 py-2 rounded-full border border-[#e0463a] bg-[#e0463a] text-white hover:bg-white hover:text-[#e0463a] shadow-sm">Eliminar</button>
     {% endif %}
   </div>
+  {% endif %}
 </div>
 
 <div class="grid gap-4 items-start" style="grid-template-columns: 1.15fr .85fr;">
@@ -67,6 +69,25 @@
       {% include "pedidos/_campo.html" with k="Creado" v=envio.creado_en|date:"d/m/Y H:i" %}
       {% include "pedidos/_campo.html" with k="Actualizado" v=envio.actualizado_en|date:"d/m/Y H:i" %}
     </div>
+    <div class="p-5 border-t border-line">
+      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-3.5">Seguimiento</h3>
+      {% include "pedidos/_campo.html" with k="Estado courier" v=envio.estado_courier|default:"—" %}
+      {% if envio.estado_courier_actualizado %}
+      {% include "pedidos/_campo.html" with k="Actualizado" v=envio.estado_courier_actualizado|date:"d/m/Y H:i" %}
+      {% endif %}
+      {% if envio.url_seguimiento %}
+      <a href="{{ envio.url_seguimiento }}" target="_blank" rel="noopener" class="inline-flex text-sm font-semibold text-brand-ink hover:underline mt-2">Ver en el courier ↗</a>
+      <p class="text-xs text-muted mt-1">URL de tracking definitiva: próximamente.</p>
+      {% endif %}
+      {% if puede_gestionar %}
+      <form method="post" action="{% url 'envios:refrescar_estado' envio.pk %}" class="mt-3">
+        {% csrf_token %}
+        <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Refrescar estado</button>
+      </form>
+      {% endif %}
+    </div>
+
+    {% if puede_gestionar %}
     <div class="p-5 border-t border-line flex flex-col gap-2.5">
       <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-1">Marcar estado</h3>
       <p class="text-xs text-muted mb-1">Nada del flujo automático marca Entregado ni Error — es manual, según lo que confirme el courier.</p>
@@ -85,6 +106,7 @@
       </form>
       {% endif %}
     </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

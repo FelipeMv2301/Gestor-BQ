@@ -15,12 +15,17 @@ def obtener_rol(usuario):
     rol = getattr  (perfil, "rol", None)
     return rol
 
-#Compara el código de empleado que tiene la cuenta de usuario con el que está asociado el pedido como tal
-def responsable_del_pedido(usuario, pedido):
+#Códigos SAP del usuario (lista) — único punto de verdad de visibilidad. Un perfil puede gestionar
+#varios canales SAP, así que siempre es una lista (ver PerfilUsuario.codigos_sap).
+def codigos_sap_usuario(usuario):
     perfil = getattr(usuario, "perfil", None)
-    if perfil is None or pedido.ejecutivo_id is None:
+    return perfil.codigos_sap if perfil is not None else []
+
+#El pedido es del usuario si su ejecutivo cae en alguno de los códigos SAP del perfil
+def responsable_del_pedido(usuario, pedido):
+    if pedido.ejecutivo_id is None:
         return False
-    return perfil.codigo_empleado_sap == pedido.ejecutivo.codigo_sap
+    return pedido.ejecutivo.codigo_sap in codigos_sap_usuario(usuario)
 
 #Permiso específico para pasar un pedido a pedidosRechazados. Admin siempre; el ejecutivo dueño
 #solo hasta que se despache a courier (mismo corte que puede_editar).
@@ -38,7 +43,7 @@ def puede_reingresar(usuario, rechazado):
     if rol == PerfilUsuario.Rol.ADMIN:
         return True
     if rol == PerfilUsuario.Rol.EJECUTIVO:
-        return rechazado.snapshot.get("ejecutivo") == _ejecutivo_pk(usuario)
+        return rechazado.snapshot.get("ejecutivo") in _ejecutivo_pks(usuario)
     return False
 
 #Permiso específico para editar un pedido. Ejecutivo: hasta que se despache a courier (envio_id).
@@ -61,16 +66,14 @@ def queryset_visible(usuario, queryset):
           return queryset
 
     if rol == PerfilUsuario.Rol.EJECUTIVO:
-        perfil = getattr(usuario, "perfil", None)
-        return queryset.filter(ejecutivo__codigo_sap=perfil.codigo_empleado_sap)
+        return queryset.filter(ejecutivo__codigo_sap__in=codigos_sap_usuario(usuario))
 
     if rol == PerfilUsuario.Rol.LOGISTICA:
         return queryset
     return queryset.none()
 
 def queryset_pedidos_ejecutivo(usuario):
-    perfil = getattr(usuario, "perfil", None)
-    return Pedido.objects.filter(ejecutivo__codigo_sap=perfil.codigo_empleado_sap)
+    return Pedido.objects.filter(ejecutivo__codigo_sap__in=codigos_sap_usuario(usuario))
 
 #Permiso para editar el courier inline desde la tabla (mismo criterio que la edición completa,
 #más el chequeo de que "courier" esté en los campos que el rol puede tocar)
@@ -102,8 +105,7 @@ def queryset_para_ver(usuario):
     if rol == PerfilUsuario.Rol.ADMIN:
         return Pedido.objects.all()
     if rol == PerfilUsuario.Rol.EJECUTIVO:
-        perfil = getattr(usuario, "perfil", None)
-        return Pedido.objects.filter(ejecutivo__codigo_sap=getattr(perfil, "codigo_empleado_sap", None))
+        return Pedido.objects.filter(ejecutivo__codigo_sap__in=codigos_sap_usuario(usuario))
     if rol == PerfilUsuario.Rol.LOGISTICA:
         return Pedido.objects.all()
     return Pedido.objects.none()
@@ -114,15 +116,24 @@ def es_logistica(usuario):
 def es_admin(usuario):
     return obtener_rol(usuario) == PerfilUsuario.Rol.ADMIN
 
-# pk del Ejecutivo del usuario (para acotar rechazados a "los suyos")
+#Quién puede VER el detalle de un envío: Logística/Admin todos; el ejecutivo solo los que incluyen
+#un pedido suyo (read-only — no gestiona nada, eso queda tras es_logistica en las vistas de acción).
+def puede_ver_envio(usuario, envio):
+    if es_logistica(usuario):
+        return True
+    if obtener_rol(usuario) == PerfilUsuario.Rol.EJECUTIVO:
+        codigos = codigos_sap_usuario(usuario)
+        return bool(codigos) and envio.pedidos.filter(ejecutivo__codigo_sap__in=codigos).exists()
+    return False
+
+# pks de los Ejecutivo del usuario (para acotar rechazados a "los suyos"). Lista: puede gestionar varios canales.
 #Básicamente ayuda a que las funciones como rechazar pedido, sigan vinculadas al ejecutivo comercial del pedido y así los cambios sean visibles para él
-def _ejecutivo_pk(usuario):
+def _ejecutivo_pks(usuario):
     from ejecutivos.models import Ejecutivo
-    codigo = getattr(getattr(usuario, "perfil", None), "codigo_empleado_sap", None)
-    if codigo is None:
-        return None
-    ejec = Ejecutivo.objects.filter(codigo_sap=codigo).first()
-    return ejec.pk if ejec else None
+    codigos = codigos_sap_usuario(usuario)
+    if not codigos:
+        return []
+    return list(Ejecutivo.objects.filter(codigo_sap__in=codigos).values_list("pk", flat=True))
 
 def queryset_rechazados(usuario):
     from pedidosRechazados.models import PedidoRechazado
@@ -130,8 +141,8 @@ def queryset_rechazados(usuario):
     if rol == PerfilUsuario.Rol.ADMIN:
         return PedidoRechazado.objects.all()
     if rol == PerfilUsuario.Rol.EJECUTIVO:
-        pk = _ejecutivo_pk(usuario)
-        return PedidoRechazado.objects.filter(snapshot__ejecutivo=pk) if pk else PedidoRechazado.objects.none()
+        pks = _ejecutivo_pks(usuario)
+        return PedidoRechazado.objects.filter(snapshot__ejecutivo__in=pks) if pks else PedidoRechazado.objects.none()
     return PedidoRechazado.objects.none()
 
 """

@@ -51,6 +51,7 @@ CHIBRA_CLIENTE_REMITENTE = os.getenv("CHIBRA_CLIENTE_REMITENTE")
 
 #Llamar parametros de MoveUP
 MOVEUP_BASE_URL = os.getenv("MOVEUP_BASE_URL")
+MOVEUP_ACCESS_TOKEN = os.getenv("MOVEUP_ACCESS_TOKEN")
 
 #Parámetros de cuenta no-reply
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
@@ -125,6 +126,20 @@ SOCIALACCOUNT_ADAPTER = "cuentas.adapters.BioquimicaSocialAccountAdapter"
 
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 
+#Login solo por email — el modelo User de Django trae un campo `username` obligatorio que
+#allauth, por defecto, sigue pidiendo en el signup social. Lo desactivamos para que la
+#identidad sea el correo @bioquimica.cl y nada más (sin pantalla "elige nombre de usuario").
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*']
+ACCOUNT_EMAIL_REQUIRED = True
+
+#Conecta automáticamente un login Google a un User existente que tenga el mismo email
+#(verificado por Google). Sin esto, si falta la fila SocialAccount enlazada, allauth trata
+#el login como registro nuevo y cae al formulario de signup.
+SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
+
 #El link "Salir" del header es un <a> con GET; sin esto, allauth muestra antes una
 #pantalla de confirmación ("¿Seguro que quieres salir?") en vez de cerrar sesión directo.
 ACCOUNT_LOGOUT_ON_GET = True
@@ -145,6 +160,7 @@ INSTALLED_APPS = [
     'pedidos',
     'pedidosRechazados',
     'envios',
+    'cotizaciones',
     'django.contrib.sites',
     'allauth',
     'allauth.account',
@@ -202,8 +218,14 @@ if DATABASE_VERSION == "SQLITE":
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
+            'OPTIONS': {
+                  'timeout': 60,                                    # espera 30s el lock, no 5
+                  'init_command': 'PRAGMA journal_mode=WAL;',       # lectores concurrentes durante escritura
+                  'transaction_mode': 'IMMEDIATE',
+              },
         }
     }
+    
 else:
     DATABASES = {
         'default': {
@@ -256,6 +278,10 @@ LOGGING = {
     },
     "loggers": {
         "pedidos": {"handlers": ["console"], "level": "INFO"},
+        #Sin esto, un 500 real (excepción no manejada) no deja ningún rastro en "docker compose
+        #logs" — Django por defecto solo lo manda a mail_admins (necesita ADMINS + email
+        #configurados, que no tenemos), nunca a consola.
+        "django": {"handlers": ["console"], "level": "ERROR"},
         #TEMPORAL: diagnóstico del login Google en gestor-test (2026-07-29) — allauth atrapa el
         #OAuth2Error/RequestException del intercambio de token y muestra su propia pantalla de
         #error sin loguear nada, así que sin esto el traceback real queda invisible. Sacar cuando

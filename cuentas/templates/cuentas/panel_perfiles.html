@@ -1,26 +1,65 @@
 {% extends "base.html" %}
 {% block titulo %}Perfiles — Portal Bioquímica{% endblock %}
-{% block ancho %}max-w-6xl{% endblock %}
+{% block ancho %}max-w-[96rem]{% endblock %}
 {% block content %}
 <a href="{% url 'pedidos:panel_admin' %}"
    class="inline-flex items-center gap-1.5 text-sm font-semibold text-body bg-surface border border-linestrong rounded-full px-4 py-2 hover:border-brand hover:text-brand-ink shadow-sm mb-4">← Volver a Administración</a>
 
 <div class="mb-5">
   <h1 class="text-2xl font-bold text-ink">Perfiles de usuario</h1>
-  <p class="text-sm text-muted mt-1">Asigna el rol (Ejecutivo / Logística / Administrador) y el código SAP de cada cuenta. Las cuentas se crean solas al iniciar sesión por primera vez.</p>
+  <p class="text-sm text-muted mt-1">Asigna el rol y los códigos SAP de cada cuenta. La tabla de la izquierda es la referencia de qué código es cada ejecutivo. Las cuentas se crean solas al iniciar sesión por primera vez.</p>
 </div>
 
-<div class="grid gap-5 md:grid-cols-[minmax(0,1fr)_20rem]">
+<div class="grid gap-5 lg:grid-cols-[18rem_minmax(0,1fr)_20rem]">
 
-  <!-- Listado, scrolleable -->
+  <!-- Referencia: ejecutivos (código SAP + estado) -->
+  <div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden h-max lg:sticky lg:top-20">
+    <div class="px-4 py-3 border-b border-line">
+      <h2 class="text-sm font-bold text-ink">Ejecutivos (SAP)</h2>
+      <p class="text-xs text-muted mt-0.5">Referencia de código y estado.</p>
+    </div>
+    <!-- dir=rtl mueve la barra vertical a la izquierda; dir=ltr en la tabla mantiene el orden normal de columnas -->
+    <div class="overflow-y-auto overflow-x-hidden max-h-[65vh]" dir="rtl">
+      <table class="w-full text-sm" dir="ltr">
+        <thead class="sticky top-0 z-10">
+          <tr class="bg-appbg text-xs uppercase tracking-wide text-muted">
+            <th class="text-left font-semibold px-4 py-2.5">Nombre</th>
+            <th class="text-left font-semibold px-4 py-2.5">Código</th>
+            <th class="text-left font-semibold px-4 py-2.5">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ejecutivo in ejecutivos %}
+          <tr class="border-t border-line hover:bg-appbg">
+            <td class="px-4 py-2.5 text-body">{{ ejecutivo.nombre|default:"—" }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono tabular-nums text-ink">{{ ejecutivo.codigo_sap }}</td>
+            <td class="px-4 py-2.5">
+              {% if ejecutivo.activo %}
+                <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-apro-bg text-apro-ink">
+                  <span class="w-1.5 h-1.5 rounded-full bg-apro-dot"></span>Activo</span>
+              {% else %}
+                <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-pend-bg text-pend-ink">
+                  <span class="w-1.5 h-1.5 rounded-full bg-pend-dot"></span>Inactivo</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="px-4 py-8 text-center text-muted text-sm">No hay ejecutivos cargados. Sincroniza desde SAP.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Perfiles -->
   <div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
-    <div class="overflow-auto max-h-[70vh]">
-      <table class="w-full text-sm min-w-[560px]">
+    <div>
+      <table class="w-full text-sm">
         <thead class="sticky top-0 z-10">
           <tr class="bg-appbg text-xs uppercase tracking-wide text-muted">
             <th class="text-left font-semibold px-4 py-3">Nombre</th>
             <th class="text-left font-semibold px-4 py-3">Email</th>
-            <th class="text-left font-semibold px-4 py-3">Código SAP</th>
+            <th class="text-left font-semibold px-4 py-3">Códigos SAP</th>
             <th class="text-left font-semibold px-4 py-3">Rol</th>
             <th class="px-4 py-3"></th>
           </tr>
@@ -40,8 +79,8 @@
   </div>
 
   <!-- Form de edición, fijo -->
-  <div class="bg-surface border border-line rounded-2xl shadow-sm p-6 h-max md:sticky md:top-20" id="panel-editar-perfil">
-    <p class="text-sm text-muted">Selecciona un usuario de la lista para editar su rol o código SAP.</p>
+  <div class="bg-surface border border-line rounded-2xl shadow-sm p-6 h-max lg:sticky lg:top-20" id="panel-editar-perfil">
+    <p class="text-sm text-muted">Selecciona un usuario de la lista para editar su rol o sus códigos SAP.</p>
   </div>
 
 </div>

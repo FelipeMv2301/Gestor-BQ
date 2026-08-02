@@ -43,18 +43,20 @@ class PedidoQuerySet(models.QuerySet):
         if not claves:
             return self
         mapa = {
-            "preparando_retiro": Q(tipo_entrega=Pedido.TipoEntrega.RETIRO_BIOQUIMICA,
-                                    estado_notificacion=Pedido.EstadoNotificacion.NO_NOTIFICADO),
-            "retiro_disponible": Q(tipo_entrega=Pedido.TipoEntrega.RETIRO_BIOQUIMICA,
+            "recien_ingresado": (
+                Q(tipo_entrega=Pedido.TipoEntrega.RETIRO_BIOQUIMICA,
+                  estado_notificacion=Pedido.EstadoNotificacion.NO_NOTIFICADO)
+                | Q(tipo_entrega=Pedido.TipoEntrega.DESPACHO,
+                    estado_notificacion=Pedido.EstadoNotificacion.NO_NOTIFICADO,
+                    envio__isnull=True)
+            ),
+            "cargado_sin_notificar": Q(tipo_entrega=Pedido.TipoEntrega.DESPACHO,
+                                       estado_notificacion=Pedido.EstadoNotificacion.NO_NOTIFICADO,
+                                       envio__isnull=False),
+            "cargado_notificado": Q(tipo_entrega=Pedido.TipoEntrega.DESPACHO,
                                     estado_notificacion=Pedido.EstadoNotificacion.NOTIFICADO),
-            "cargado_courier": Q(tipo_entrega=Pedido.TipoEntrega.DESPACHO,
-                                  estado_notificacion=Pedido.EstadoNotificacion.NOTIFICADO),
-            "despachado_sin_notificar": Q(tipo_entrega=Pedido.TipoEntrega.DESPACHO,
-                                           estado_notificacion=Pedido.EstadoNotificacion.NO_NOTIFICADO,
-                                           envio__isnull=False),
-            "por_despachar": Q(tipo_entrega=Pedido.TipoEntrega.DESPACHO,
-                                estado_notificacion=Pedido.EstadoNotificacion.NO_NOTIFICADO,
-                                envio__isnull=True),
+            "notificado_retiro": Q(tipo_entrega=Pedido.TipoEntrega.RETIRO_BIOQUIMICA,
+                                   estado_notificacion=Pedido.EstadoNotificacion.NOTIFICADO),
         }
         condiciones = Q(pk__in=[])
         for clave in claves:
@@ -259,22 +261,22 @@ class Pedido(models.Model):
 
     #Estado de seguimiento unificado (logística + notificación + tipo de entrega). Todo pedido activo
     #es APROBADO desde que se ingresa (SAP y Woo) — única fuente de verdad para el badge.
-    #Devuelve (etiqueta, clave_color) con clave ∈ apro/noti.
+    #Devuelve (etiqueta, clave_color) con clave ∈ pend/apro/noti.
     @property
     def estado_seguimiento(self):
         notificado = self.estado_notificacion == self.EstadoNotificacion.NOTIFICADO
 
         if self.tipo_entrega == self.TipoEntrega.RETIRO_BIOQUIMICA:
             if notificado:
-                return ("Retiro disponible", "noti")
-            return ("Notificación pendiente", "apro")
+                return ("Notificado (Retiro BQ)", "noti")
+            return ("Recién Ingresado", "pend")
 
         # Despacho
         if notificado:
-            return ("Cargado a courier", "noti")
+            return ("Cargado y Notificado", "noti")
         if self.envio_id:
-            return ("Despachado (sin notificar)", "apro")
-        return ("Por despachar", "apro")
+            return ("Cargado (sin notificar)", "apro")
+        return ("Recién Ingresado", "pend")
 
 #Mapear los couriers por el SKU asignado en SAP
 class SkuCourier(models.Model):

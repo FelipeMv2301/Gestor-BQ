@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from ..models import Pedido
 from .. import permisos
-from envios.services import despachar_pedidos, validar_pedidos_para_despacho, parsear_bultos
+from envios.services import despachar_pedidos, validar_pedidos_para_despacho, PARSEAR_DESPACHO
 
 @login_required
 def armar_despacho(request):
@@ -30,28 +30,17 @@ def armar_despacho(request):
         return redirect("pedidos:despachos")
 
     if request.method == "POST":
-        bultos = parsear_bultos(request)
-
-        destinatario = {
-            "nombre": request.POST.get("destinatario_nombre"),
-            "rut": request.POST.get("destinatario_rut"),
-            "direccion": request.POST.get("destinatario_direccion"),
-            "comuna": request.POST.get("destinatario_comuna"),
-            "telefono": request.POST.get("destinatario_telefono"),
-            "email": request.POST.get("destinatario_email"),
-        }
-        datos_courier = {
-            "centro": request.POST.get("centro"),
-            "servicio": request.POST.get("servicio"),
-            "valor_declarado": request.POST.get("valor_declarado") or 0,
-            "volumen_total": request.POST.get("volumen_total"),
-            "observaciones": request.POST.get("observaciones"),
-        }
+        parsear = PARSEAR_DESPACHO.get(courier)
+        if not parsear:
+            messages.error(request, f"No hay integración de despacho para {courier}.")
+            return redirect(f"{reverse('pedidos:armar_despacho')}?ids={ids_texto}")
 
         try:
+            # Cada parser lee del POST lo suyo y valida (lanza ValueError si falta algo).
+            bultos, destinatario, datos_courier = parsear(request)
             envio, notificaciones_fallidas = despachar_pedidos(
                 pedidos, courier, bultos, destinatario, datos_courier, request.user)
-        except ValueError as exc:
+        except Exception as exc:  # validación del parser, o error HTTP/API del courier → mostrarlo en pantalla, no 500
             messages.error(request, str(exc).replace("[!] Error: ", ""))
             return redirect(f"{reverse('pedidos:armar_despacho')}?ids={ids_texto}")
 
