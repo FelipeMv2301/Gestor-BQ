@@ -1,0 +1,23 @@
+{% comment %}
+Links de navegación filtrados por rol. Se incluye dos veces desde _header.html: en la barra
+horizontal (pantalla ancha) y dentro del panel del botón hamburguesa (pantalla angosta).
+La variable `clase` la pasa cada include y define el estilo de los <a>, para que la lista de
+links y sus permisos vivan en un solo lugar.
+{% endcomment %}
+{% if user.perfil.rol == 'EJECUTIVO' or user.perfil.rol == 'ADMIN' %}
+  <a href="{% url 'pedidos:mis_pedidos' %}" class="{{ clase }}">Mis pedidos</a>
+  <a href="{% url 'cotizaciones:lista' %}" class="{{ clase }}">Cotizaciones</a>
+{% endif %}
+{% if user.perfil.rol == 'EJECUTIVO' %}
+  <a href="{% url 'envios:mis_envios' %}" class="{{ clase }}">Mis envíos</a>
+{% endif %}
+{% if user.perfil.rol == 'LOGISTICA' or user.perfil.rol == 'ADMIN' %}
+  <a href="{% url 'pedidos:despachos' %}" class="{{ clase }}">Pedidos a Despachar</a>
+  <a href="{% url 'envios:lista' %}" class="{{ clase }}">Envíos Realizados</a>
+{% endif %}
+{% if user.perfil.rol == 'EJECUTIVO' or user.perfil.rol == 'ADMIN' %}
+  <a href="{% url 'pedidos:anulados' %}" class="{{ clase }}">Anulados</a>
+{% endif %}
+{% if user.perfil.rol == 'ADMIN' %}
+  <a href="{% url 'pedidos:panel_admin' %}" class="{{ clase }}">Admin</a>
+{% endif %}
