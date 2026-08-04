@@ -4,14 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado del repo
 
-Skeleton Django recién creado (`django-admin startproject gestorBQ .`), sin apps propias todavía.
-`gestorBQ/settings.py` está en su forma vanilla generada por Django: SQLite, `INSTALLED_APPS` solo
-con los apps de `django.contrib.*`, sin `django-allauth` ni ningún modelo de dominio. No existe
-`requirements.txt` — el único paquete instalado en `.venv` es `Django==5.2.16` (+ deps transitivas:
-`asgiref`, `sqlparse`). No hay tests, lint config ni CI.
+**En producción** (branch `produccion`; `desarrollo` despliega al ambiente `gestor-test`). Ya NO es un
+skeleton: el proyecto está construido, corriendo y sincronizando pedidos reales de SAP y WooCommerce.
 
-La documentación de planificación en `backlog_proyecto/` es la fuente de verdad de *qué construir* y
-*en qué orden* — léela antes de asumir estructura de apps, modelos o nombres de campos.
+- **7 apps de dominio**: `cuentas`, `ejecutivos`, `pedidos`, `pedidosRechazados`, `envios`,
+  `cotizaciones`, más `integraciones/` (paquete de clientes de sistemas externos, sin modelos).
+- **Base de datos**: Postgres en prod, SQLite en dev — se elige por la variable `DATABASE_VERSION`
+  (`SQLITE` → SQLite con WAL; cualquier otro valor → Postgres). Ver `gestorBQ/settings.py`.
+- **Auth**: Google OAuth (`django-allauth`) restringido a `@bioquimica.cl`, validado server-side en
+  `cuentas/adapters.py::BioquimicaSocialAccountAdapter`.
+- **Cron**: sincronización SAP/Woo cada `INTERVALO_SYNC_PEDIDOS` minutos vía APScheduler
+  (`pedidos/scheduler.py`), con lock en DB (`LockTarea`) para no duplicarse entre workers gunicorn.
+- **Tests**: 172 tests (`pedidos/tests/` como paquete + `cuentas/tests.py`, `envios/tests.py`).
+- **Deploy**: `Dockerfile` + `docker-compose.yml` + GitHub Actions (`.github/workflows/`) a un runner
+  self-hosted; Caddy termina el TLS delante de gunicorn; Whitenoise sirve estáticos.
+- **requirements.txt** existe y está pineado (Django 5.2.16, allauth, APScheduler, psutil, psycopg2,
+  gunicorn, whitenoise, requests, python-dotenv).
+
+La documentación de planificación en `backlog_proyecto/` sigue siendo la fuente de verdad de *qué falta*
+y *en qué orden*, pero el código ya es la fuente de verdad de *qué está construido*. Ante conflicto entre
+lo que dice un doc de `backlog_proyecto/` y lo que hace el código: **el código manda para el estado
+actual**; los docs mandan para el diseño/backlog pendiente.
 
 ## Comandos
 
@@ -20,129 +33,157 @@ Activar venv (PowerShell, desde la raíz del repo):
 .venv\Scripts\Activate.ps1
 ```
 
-Comandos Django estándar (con venv activo):
+Django (con venv activo):
 ```powershell
 python manage.py runserver
 python manage.py makemigrations
 python manage.py migrate
+python manage.py test              # suite completa
+python manage.py test pedidos      # solo un app
 python manage.py createsuperuser
 ```
 
-No hay `requirements.txt` aún — al instalar dependencias nuevas (`django-allauth`, driver de
-Postgres, etc.) generarlo con `pip freeze > requirements.txt`.
+Al instalar dependencias nuevas, regenerar el pin: `pip freeze > requirements.txt`.
+
+Frontend (Tailwind, CLI standalone — **no** hay Node/npm, ver `Dockerfile`):
+```powershell
+tailwindcss -i static/css/tailwind-src.css -o static/css/app.css --minify
+```
+`app.css` es un build purgado: una clase Tailwind que no aparezca en algún `.html` escaneado **no existe
+en el CSS compilado**. Reusar clases ya presentes o recompilar tras agregar clases nuevas.
+
+Docker / deploy (en el servidor):
+```powershell
+docker compose build
+docker compose up -d
+docker compose exec -T app python manage.py migrate --noinput
+docker compose exec -T app python manage.py collectstatic --noinput
+```
+El CI (`.github/workflows/`) hace esto automáticamente en cada push a `desarrollo` (→ `gestor-test`) y
+a `produccion` (→ prod). El `.env` real nunca se versiona; el runner lo preserva con `rsync --exclude`.
+
+Management commands propios (app `cotizaciones`): `sondear_cotizacion`, `sondear_cadena`,
+`recalcular_facturacion`.
 
 ## Documentos clave
 
-- `backlog_proyecto/plan-portal-logistica-comercial.md` — diseño/arquitectura narrativo del
-  proyecto a construir (Portal Logística + Comercial). Estado: propuesta en diseño, ajustada con
-  Felipe (2026-07-09), **no implementado**. Incluye los modelos de dominio propuestos (`PerfilUsuario`,
-  `Ejecutivo`, `Pedido`, `PedidoRechazado`) con sus campos.
-- `backlog_proyecto/backlog_historias_portal_logistica_comercial.md` — volcado en Markdown del
-  backlog (mismo contenido que el xlsx), útil para leer/grep sin abrir Excel.
-- `backlog_proyecto/backlog-historias-portal-logistica-comercial (1).xlsx` — fuente de verdad para
-  historias de usuario (HU), spikes, prioridad y estado de avance. El `.md` de diseño describe el
-  *por qué* y el *cómo*; el xlsx/backlog describe el *qué* y en qué orden.
+- `backlog_proyecto/plan-portal-logistica-comercial.md` — diseño/arquitectura narrativo original.
+  Útil como historia del *por qué*, pero varias decisiones ya están implementadas (ver más abajo).
+- `backlog_proyecto/backlog_historias_portal_logistica_comercial.md` — backlog de HU en Markdown
+  (grep-eable). Fuente de verdad del *qué* y el orden pendiente.
+- `backlog_proyecto/backlog-frontend-portal.md` — estado real y deuda técnica del frontend
+  (sección "Corte de estado real").
+- `backlog_proyecto/backlog-historias-portal-logistica-comercial (1).xlsx` — mismo backlog en Excel.
 
-El plan reemplaza el alcance de negocio de un documento anterior (`docs/plan-portal-despachos-django.md`,
-de otro repo), pero mantiene su parte técnica: stack Django y reutilización de servicios ya
-existentes en el sistema actual de despachos (`ChibraService`, `SapServiceGestor`, `WooServiceGestor`,
-`MAP_EMPLEADOS`, `ServicioCorreoGestor`). Esos módulos **no viven en este repo** — pertenecen al
-sistema FastAPI actual de `gestor_despachos_retiros` que este proyecto va a reemplazar/extender.
+El sistema reimplementó, **dentro de este repo**, la lógica que antes vivía en el proyecto FastAPI
+`gestor_despachos_retiros` (`ChibraService`, `SapServiceGestor`, `WooServiceGestor`, `MAP_EMPLEADOS`,
+`ServicioCorreoGestor`). Sus equivalentes aquí:
+- `integraciones/sap_client.py`, `integraciones/woo_client.py`, `integraciones/chibra_client.py`,
+  `integraciones/moveup_client.py`, `integraciones/email_client.py`, `integraciones/seguimiento.py`.
+- `MAP_EMPLEADOS`/`EMAIL_EJECUTIVOS` hardcodeados → modelo `ejecutivos.Ejecutivo` (datos en DB).
 
-## Resumen de la arquitectura planeada
+## Arquitectura (implementada)
 
-**Objetivo del proyecto**: reemplazar la planilla Google Sheets que hoy sincroniza NV de SAP
-(cron `fetch_orders_by_date`) por una app Django donde:
-- **Comercial** revisa/edita cada NV entrante (contacto, dirección, courier, observaciones) antes de
-  pasarla a Logística.
-- **Logística** ve la tabla maestra de pedidos ya confirmados, gestiona courier, dispara
-  notificación al cliente y documenta el envío en Chibra.
+**Objetivo cumplido**: reemplazó la planilla Google Sheets que sincronizaba NV de SAP por una app
+Django donde Comercial revisa/edita cada pedido y Logística gestiona courier, notifica al cliente y
+documenta el envío en el courier (Chibra/MoveUP).
 
-**Stack decidido**: Django + Postgres (hoy el settings sigue en SQLite — migrar antes de HU-0.4).
-Auth vía Google OAuth institucional (`django-allauth`), con validación server-side de dominio
-`@bioquimica.cl` (el hint `hd=` de Google no basta, se valida en `pre_social_login`/`save_user` de
-un adapter custom).
+**Capas** (respetar al tocar código — ver "Convenciones de colaboración"):
+- `models.py` — datos + `PedidoQuerySet` (filtros componibles: `buscar`, `con_estado_*`, etc.).
+- `pedidos/services.py` — reglas de negocio de ingesta y acciones (guardar SAP/Woo, rechazar,
+  reingresar, notificar).
+- `pedidos/permisos.py` — **toda** la autorización, un solo punto de verdad.
+- `envios/services.py` — validación y despacho a courier (dict-dispatch por courier).
+- `integraciones/*` — un cliente por sistema externo. Las vistas nunca pegan directo a una API.
+- `pedidos/views/` — solo orquestan + presentan.
 
-**Apps de dominio previstas** (sección 5 del plan), ninguna creada aún:
-- `cuentas` — `PerfilUsuario` (rol, `sap_employee_code`, activo).
-- `ejecutivos` — `Ejecutivo` (reemplaza `MAP_EMPLEADOS`/`EMAIL_EJECUTIVOS` hardcodeados).
-- `pedidos` — `Pedido` y `PedidoRechazado`.
-- `notificaciones` — `NotificacionEnvio`.
-- `chibra` — `EnvioChibra`.
+**Ingesta (cron)**: `guardar_pedidos_sap` / `guardar_pedidos_woo` traen NV recientes, deduplican contra
+`Pedido` existente y contra `PedidoRechazado`, y crean el `Pedido`. El filtro SAP es
+`U_BQ_CrearEnvio eq 'Y'` combinado con `TransportationCode`/`U_BQ_TipoEntrega`.
 
-**Roles** (`PerfilUsuario.rol`: `LOGISTICA` / `EJECUTIVO` / `ADMIN`) se asignan a mano por un Admin
-en `/admin/` — no se infieren de Google Groups/Workspace. Primer login crea `PerfilUsuario` con
-`rol=None` → pantalla de espera de activación.
+**Estados de un pedido** — OJO, esto cambió respecto del plan original:
+- `estado_comercial`: `PENDIENTE` / `APROBADO`. **La ingesta (SAP y Woo) entra directo como
+  `APROBADO`** — no hay flujo `PENDIENTE→APROBADO` por botón. `PENDIENTE` prácticamente no se usa hoy.
+- `estado_notificacion`: `NO_NOTIFICADO` / `NOTIFICADO` (lo dispara Logística al notificar al cliente).
+- **Rechazo**: `pedidos/services.py::rechazar_pedido` mueve el registro a `pedidosRechazados.PedidoRechazado`
+  (snapshot) y borra el `Pedido`. No hay estado `RECHAZADO` en el propio `Pedido`.
+- `Pedido.estado_seguimiento` (property) combina `tipo_entrega` + `estado_notificacion` + `envio_id`
+  en un único badge — es la fuente de verdad para la UI, no combinar filtros a mano.
 
-**Máquina de estados de un pedido** (`Pedido.estado_comercial`):
-`PENDIENTE` (ingesta automática o carga manual) → `APROBADO` (acción manual del ejecutivo, botón
-"Aprobar"; Logística ya no permite edición a Comercial) → `RECHAZADO` (acción explícita, sin
-equivalente en SAP, mueve el registro a `PedidoRechazado` archivado). `estado_notificacion` es un
-campo aparte que Logística dispara al notificar al cliente.
+**Roles** (`cuentas.PerfilUsuario.rol`: `EJECUTIVO` / `LOGISTICA` / `ADMIN`) se asignan a mano en
+`/admin/`. El rol `ADMIN` del portal **no** equivale a `is_staff` de Django (las cuentas de Google
+login nunca entran a `/admin/`).
 
-**Gestor de sesión SAP compartido (HU-0.5) — RESUELTO (2026-07-10)**: no se construye instancia
-propia ni Redis in-house. Se usa **Token-SAP-BQ**, servicio externo ya desplegado en Railway
-(`token-sap-bq-production.up.railway.app`, `numReplicas: 1` — no tocar esa config, es singleton en
-memoria) que centraliza login/sesión SAP compartida (`b1session`+`routeid`+`sap_db`) vía
-`POST /session` y `POST /session/invalidate`. `service_name` de este proyecto: `gestor-bq` (password
-va en variable de entorno / `.env`, nunca versionada). Desde `gestorBQ` se pega directo al Service
-Layer de SAP con las cookies recibidas — no se vuelve a llamar `/Login` desde este repo.
+**Multi-código SAP por perfil**: `PerfilUsuario.ejecutivos` es un M2M a `Ejecutivo`; la visibilidad se
+lee **siempre** vía la property `PerfilUsuario.codigos_sap` (prefiere la M2M, cae al escalar legacy
+`codigo_empleado_sap` si la M2M está vacía). Nunca filtrar por el escalar directo.
 
-**Exposición de red de Postgres (HU-0.4) — RESUELTO (2026-07-20)**: el servidor Postgres
-(`192.168.0.165`) es hardware propio en la LAN de la oficina, elegido para ahorrar costo de nube —
-no hay requisito de compliance que lo ate a esa red. Decisión de despliegue: **Django corre en el
-mismo servidor/LAN que Postgres**, no en Railway. Postgres nunca escucha fuera de `localhost`/LAN,
-sin excepción — no se abre 5432 a Internet ni se monta VPN para llegar a la base de datos.
+**Couriers**: `envios/services.py` despacha por dict-dispatch (`SELECCIONAR_COURIER`,
+`PARSEAR_DESPACHO`). Hoy: Chibra y MoveUP. Agregar un courier = agregar entrada al dict + su parser +
+su cliente en `integraciones/`, sin tocar el flujo.
 
-Se descartó Django-en-Railway + Postgres on-prem por fricción real, no solo teórica: Railway sin
-plan Pro no ofrece IP de salida fija, y el plan Pro la da **compartida** con otros clientes
-(`docs.railway.com/networking/static-outbound-ips`). Tailscale desde un contenedor de Railway solo
-corre en modo *userspace* (sin `/dev/net/tun`), lo que expone un proxy SOCKS5 local — pero
-`psycopg2`/libpq no soporta SOCKS5, así que no sirve para llegar a Postgres sin un forwarder TCP
-adicional y frágil.
+**Cotizaciones** (`cotizaciones/`): módulo aparte que consulta Quotations de SAP (sondeo vía
+`sondear_cotizacion`/`sondear_cadena`) y calcula facturación. `PerfilUsuario.ve_todas_cotizaciones`
+marca al supervisor comercial que ve las de todos los ejecutivos.
 
-Acceso remoto (teletrabajo) para Comercial/Logística: **no** vía VPN por persona (Tailscale free
-=3 usuarios; con "muchas personas" pasaría a plan pago, contra el objetivo de ahorro). En vez de
-eso, el servidor expone solo el puerto **443** (HTTPS) hacia Django; la barrera de acceso real es el
-login Google OAuth restringido a `@bioquimica.cl` ya planeado (sección de arquitectura arriba), no
-la red. Postgres sigue sin tocar Internet en ningún escenario.
+## Infraestructura — decisiones resueltas (conservar el porqué)
 
-Excepción: Tailscale (plan free) sí se usa para acceso de **administrador** directo a Postgres
-(`psql`/pgAdmin desde fuera de la oficina) — pocas personas, encaja en el límite gratuito.
+**Sesión SAP compartida (HU-0.5) — RESUELTO, implementado en `integraciones/sap_client.py`**: no se
+construye instancia propia ni Redis in-house. Se usa **Token-SAP-BQ**, servicio externo (desplegado en
+Railway, `numReplicas: 1` — singleton en memoria, no tocar esa config) que centraliza login/sesión SAP
+compartida (`b1session`+`routeid`) vía `POST /session` y `POST /session/invalidate`. `service_name` del
+proyecto: `gestor-bq` (credenciales en `.env`, nunca versionadas). Desde `gestorBQ` se pega directo al
+Service Layer de SAP con las cookies recibidas; en 401 se invalida y se re-pide sesión — no se llama
+`/Login` desde este repo.
 
-**Puntos todavía abiertos** (ver sección "Spikes" del plan antes de implementar):
-- Si el botón "Aprobar" además escribe `U_BQ_CrearEnvio='Y'` de vuelta a SAP (write-back) o el
-  estado se maneja solo internamente (HU-3.3).
-- Si el valor `HOME` de `U_BQ_TipoEntrega` reemplaza o coexiste con `BRANCH`/`1`/`3` (HU-3.4).
-- Si "Rechazar" es exclusivo de Comercial en `PENDIENTE` o también disponible para Logística sobre
-  `APROBADO` (HU-4.4).
+**Red de Postgres (HU-0.4) — RESUELTO, en producción**: el server Postgres (`192.168.0.165`) es hardware
+propio en la LAN de la oficina (ahorro de nube, sin requisito de compliance). **Django corre en el mismo
+servidor/LAN que Postgres** (Docker + gunicorn + Caddy), no en Railway. Postgres nunca escucha fuera de
+`localhost`/LAN — no se abre 5432 a Internet ni se monta VPN para llegar a la DB. El contenedor llega al
+Postgres nativo del host vía `host.docker.internal` (alias `host-gateway` en `docker-compose.yml`).
+
+Se descartó Django-en-Railway + Postgres on-prem por fricción real: Railway sin Pro no da IP de salida
+fija, y el Pro la da **compartida**; Tailscale en contenedor Railway solo corre en modo *userspace* (solo
+proxy SOCKS5, que `psycopg2`/libpq no soporta). Acceso remoto (teletrabajo) de Comercial/Logística:
+**no** por VPN por persona — el server expone solo el **443** (HTTPS) hacia Django y la barrera real es
+el login Google OAuth `@bioquimica.cl`. Excepción: Tailscale (plan free) sí para acceso de
+**administrador** directo a Postgres (`psql`/pgAdmin), pocas personas.
+
+## Puntos abiertos / spikes (revisar antes de tocar lo relacionado)
+
+- **HU-3.3 write-back a SAP**: hoy el estado se maneja **solo internamente** — no se escribe
+  `U_BQ_CrearEnvio` de vuelta a SAP. Confirmar con Felipe si eso debe cambiar.
+- **HU-3.4 `U_BQ_TipoEntrega`**: el filtro de ingesta ya trata `HOME` y `BRANCH` como coexistentes
+  (`TransportationCode eq 1 and (U_BQ_TipoEntrega eq 'HOME' or 'BRANCH')`), y `TransportationCode eq 3`
+  como retiro. Resuelto en código.
+- **HU-4.4 rechazo**: hoy `puede_rechazar` = Admin siempre, Ejecutivo dueño solo hasta que hay envío
+  (`envio_id is None`). Logística no rechaza explícitamente. Confirmar si Logística debe poder.
+- Deuda anotada en el propio código: `envios/services.py::validar_pedidos_para_despacho` agrupa por RUT
+  único ("puede causar errores innecesarios", ver comentario ahí).
 
 ## Convenciones de trabajo
 
-- El plan y el backlog (xlsx/md) pueden divergir en el tiempo — si hay conflicto sobre prioridad o
-  alcance de una historia, el backlog manda; si es sobre diseño técnico, el `.md` de diseño manda.
-- Los "Spikes" listados al final del plan deben resolverse (confirmar con Felipe) antes de
-  codear la historia que dependa de ellos.
-- HU-0.4 (Postgres) y HU-1.4 (modelos/migraciones) son la base de la Fase 0-1 — no crear apps de
-  dominio ni escribir modelos sin antes resolver el cambio de settings a Postgres.
-- No asumas nada que no sepas con certeza. Es mejor investigarlo y llegar a una respuesta coherente.
+- Si un doc de `backlog_proyecto/` y el código difieren sobre el **estado actual**, manda el código.
+  Sobre **prioridad/alcance pendiente**, manda el backlog; sobre **diseño técnico pendiente**, el `.md`.
+- Los spikes deben confirmarse con Felipe antes de codear la historia que dependa de ellos.
+- No asumas nada que no sepas con certeza. Investígalo (codegraph, código, tests) y llega a una
+  respuesta coherente antes de afirmar.
 
-## Convenciones de colaboración con Claude (2026-07-27)
+## Convenciones de colaboración con Claude
 
 - **Solo asesoría / control de Felipe:** no codear sin indicación explícita de "hazlo tú". Ante una
   tarea, proponer + explicar; codear solo cuando Felipe lo pide.
-- **Reparto del front actual:** el **frontend (templates)** lo puede hacer Claude; cualquier función
+- **Reparto:** el **frontend (templates)** lo puede hacer Claude; cualquier función
   **Python/Django/backend** (views, urls, permisos, servicios, modelos) Felipe prefiere escribirla él —
   Claude indica **qué y dónde**.
 - **Reusar, nunca reescribir lógica:** las reglas de negocio viven en `pedidos/services.py`,
   `pedidos/permisos.py`, `pedidos/models.py::PedidoQuerySet`, `integraciones/*`, `envios/services.py`.
   Las vistas solo orquestan + presentan. Antes de escribir algo nuevo, buscar si ya existe y reusarlo.
-- **Front:** Tailwind (CDN en dev) + HTMX. Diseño **"Design B" teal** con tokens CSS-var en `base.html`
-  (soportan claro/oscuro). Usar unidades **rem**, nunca px fijo, para que el control de tamaño A−/A+ escale.
-  Libs de terceros **vendorizadas** en `static/vendor/` (no CDN), con la versión en el nombre del archivo.
+- **Front:** Tailwind (CLI standalone, `app.css` compilado y purgado — **no CDN**) + HTMX. Diseño
+  **"Design B" teal** con tokens CSS-var en `base.html` (claro/oscuro). Usar **rem**, nunca px fijo,
+  para que el control A−/A+ escale. Libs de terceros **vendorizadas** en `static/vendor/` (no CDN),
+  con la versión en el nombre del archivo.
 - **Nombres de variables legibles**, no placeholders compactos.
 - **codegraph** está indexado (`.codegraph/`) — usarlo para mapear la lógica existente antes de tocar código.
-- **Estado real y deuda técnica** del frontend: `backlog_proyecto/backlog-frontend-portal.md`
-  (sección "Corte de estado real"). El dominio: `backlog_historias_...md`.
-- **Tests** en `pedidos/tests/` (paquete): `permisos`, `estado_seguimiento`, `PedidoQuerySet`, servicios.
-  Correr `python manage.py test pedidos` antes de refactorizar.
+- **Tests** en `pedidos/tests/` (paquete): permisos, modelos, scheduler, servicios, vistas, integraciones
+  mockeadas. Correr `python manage.py test` antes de refactorizar.

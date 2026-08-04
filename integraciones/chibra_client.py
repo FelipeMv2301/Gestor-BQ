@@ -109,3 +109,4 @@ def documentar_envio(pedidos, bultos, destinatario, datos_courier):
         raise ValueError(f"[!] Error de Chibra: {resultado.get('mensaje', 'sin detalle')}")
 
     return {"numero_envio": str(resultado.get("numero_envio", ""))}
+
