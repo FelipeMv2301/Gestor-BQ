@@ -8,8 +8,8 @@ PACKAGE_SIZE_SOBRE = 1
 PACKAGE_SIZE_CAJA = 2
 
 
-#Arma los headers comunes a toda llamada a MoveUP — placeholder hasta resolver cómo se obtiene
-#el Access Token (fijo en .env, o vía un endpoint de login que haya que renovar como en sap_client.py)
+#Arma los headers comunes a toda llamada a MoveUP. El Access Token es fijo en .env y NO expira
+#(confirmado con MoveUP, 2026-08) — no hay endpoint de login ni renovación como en sap_client.py.
 def _headers():
     return {
         "Accept": "application/json, text/plain, */*",
@@ -24,12 +24,16 @@ def crear_paquetes(paquetes):
         json=paquetes,
         timeout=60,
     )
-    respuesta.raise_for_status()
+    #MoveUP devuelve el motivo del rechazo en el body — no dejar que raise_for_status() lo tape con
+    #un "400 Client Error" pelado. Surfaceamos el texto crudo para que el toast diga qué campo falla.
+    if respuesta.status_code >= 400:
+        raise ValueError(f"[!] Error de MoveUP {respuesta.status_code}: {respuesta.text}")
+
     datos = respuesta.json()
 
     if datos.get("status") != 200:
         raise ValueError(f"[!] Error de MoveUP: {datos.get('message', 'sin detalle')}")
-    
+
     return datos["createdPackages"]
 
 def consultar_envios(id_paquete=None, estado=None, desde=None, hasta=None):

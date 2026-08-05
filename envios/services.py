@@ -4,7 +4,7 @@ from integraciones import moveup_client
 from pedidos.models import Pedido
 from pedidos.services  import notificar_pedido
 from django.db import transaction
-from utils import Courier
+from utils import Courier, normalizar_telefono_cl, es_movil_cl, normalizar_telefono_cl
 
 
 """
@@ -31,7 +31,7 @@ def _despachar_moveup(pedidos, destinatario, datos_courier):
         "recipientAddressNumber": destinatario.get("numero") or "",
         "recipientHouseNumber": destinatario.get("depto") or "",
         "recipientCommune": destinatario.get("comuna") or "",
-        "recipientPhone": destinatario.get("telefono") or "",
+        "recipientPhone": normalizar_telefono_cl(destinatario.get("telefono") or ""),
         "recipientEmail": destinatario.get("email") or "",
         "packagePrice": int(datos_courier.get("valor_declarado") or 0),
         "packageSize": int(datos_courier.get("package_size") or moveup_client.PACKAGE_SIZE_CAJA),
@@ -99,6 +99,16 @@ def _parsear_despacho_moveup(request):
                 if not (destinatario.get(campo) or "").strip()]
     if faltantes:
           raise ValueError(f"Faltan datos para MoveUP: {', '.join(faltantes)}.")
+
+    #MoveUP solo acepta el móvil como 9 dígitos partiendo en 9 (sin +56). Normalizamos los formatos
+    #buenos-pero-sucios y validamos antes de despachar, para fallar con mensaje claro en vez de un 400.
+    telefono = normalizar_telefono_cl(destinatario.get("telefono"))
+    if not es_movil_cl(telefono):
+        raise ValueError(
+            f"Teléfono inválido para MoveUP (móvil de 9 dígitos partiendo en 9): {destinatario.get('telefono')}"
+        )
+    destinatario["telefono"] = telefono   # ya normalizado, listo para _despachar_moveup
+
     return [], destinatario, datos_courier
 
 PARSEAR_DESPACHO = {
