@@ -4,14 +4,17 @@ from django.views.decorators.http import require_POST
 from django.contrib import messages
 from pedidos.permisos import es_logistica
 from cuentas.models import PerfilUsuario
+from ejecutivos.models import Ejecutivo
 from .models import EnvioCourier
 from .services import parsear_bultos
+from . import reportes
 from integraciones.seguimiento import refrescar_estados_courier, actualizar_estado_courier
 from utils import Courier
 from pedidos import permisos
 from django.urls import reverse
 from django.http import HttpResponse
 from django.core.paginator import Paginator
+import datetime
 
 
 @login_required
@@ -161,3 +164,59 @@ def eliminar_envio(request, pk):
     resp = HttpResponse(status=204)
     resp["HX-Redirect"] = reverse("envios:lista")
     return resp
+
+
+"""
+Reporte de envíos (por fecha / courier / ejecutivo) — descargable en Excel o imprimible a PDF.
+"""
+
+#Ejecutivos que el usuario puede elegir en el filtro: Logística/Admin ven todos; el Ejecutivo solo
+#los suyos (mismos códigos SAP de su perfil).
+def _ejecutivos_para(usuario):
+    if es_logistica(usuario):
+        return Ejecutivo.objects.order_by("nombre")
+    if permisos.obtener_rol(usuario) == PerfilUsuario.Rol.EJECUTIVO:
+        return Ejecutivo.objects.filter(
+            codigo_sap__in=permisos.codigos_sap_usuario(usuario)).order_by("nombre")
+    return Ejecutivo.objects.none()
+
+
+#Lee y limpia los parámetros del reporte desde el GET (compartido por la vista imprimible y el Excel).
+def _parametros_reporte(request):
+    def _fecha(nombre):
+        valor = (request.GET.get(nombre) or "").strip()
+        try:
+            return datetime.date.fromisoformat(valor) if valor else None
+        except ValueError:
+            return None
+
+    couriers = request.GET.getlist("courier")
+    ejecutivo_ids = [int(x) for x in request.GET.getlist("ejecutivo") if x.isdigit()]
+    return _fecha("desde"), _fecha("hasta"), couriers, ejecutivo_ids
+
+
+@login_required
+def reporte_form(request):
+    return render(request, "envios/reporte_form.html", {
+        "courier_choices": Courier.choices,
+        "ejecutivos": _ejecutivos_para(request.user),
+    })
+
+
+@login_required
+def reporte_ver(request):
+    desde, hasta, couriers, ejecutivo_ids = _parametros_reporte(request)
+    filas = reportes.filas_reporte(desde, hasta, couriers, ejecutivo_ids, request.user)
+    return render(request, "envios/reporte_ver.html", {
+        "filas": filas,
+        "desde": desde, "hasta": hasta,
+        "total_valor": sum(f["valor_declarado"] for f in filas),
+        "total_bultos": sum(f["n_bultos"] for f in filas),
+    })
+
+
+@login_required
+def reporte_xlsx(request):
+    desde, hasta, couriers, ejecutivo_ids = _parametros_reporte(request)
+    filas = reportes.filas_reporte(desde, hasta, couriers, ejecutivo_ids, request.user)
+    return reportes.exportar_xlsx(filas)

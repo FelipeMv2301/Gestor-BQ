@@ -7,14 +7,19 @@ INPUT = "w-full text-sm rounded-lg border border-linestrong bg-field text-body p
 class PedidoEditForm(forms.ModelForm):
     class Meta:
         model = Pedido
+        # estado_comercial / estado_notificacion son SOLO para Admin (override manual, sin efectos
+        # colaterales). Se ofrecen aquí, pero las listas CAMPOS_EDITABLES_* de ejecutivo/logística
+        # NO los incluyen → el __init__ los popea para esos roles. Admin (permitidos=None) los ve.
         fields = ["rut", "razon_social", "nombre_contacto", "telefono_contacto", "email_contacto",
                   "direccion_calle", "direccion_depto", "direccion_comuna", "direccion_ciudad",
-                  "tipo_entrega", "courier", "retirar_en", "observaciones"]
+                  "tipo_entrega", "courier", "retirar_en",
+                  "estado_comercial", "estado_notificacion", "observaciones"]
         labels = {
             "rut": "RUT", "razon_social": "Razón social", "nombre_contacto": "Contacto",
             "telefono_contacto": "Teléfono", "email_contacto": "Email", "direccion_calle": "Calle",
             "direccion_depto": "Depto / Of.", "direccion_comuna": "Comuna", "direccion_ciudad": "Ciudad",
             "tipo_entrega": "Tipo de entrega", "courier": "Courier", "retirar_en": "Retiro en",
+            "estado_comercial": "Estado comercial", "estado_notificacion": "Estado de notificación",
             "observaciones": "Observaciones",
         }
 

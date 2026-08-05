@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reporte de Envíos — Portal Bioquímica</title>
+  <style>
+    /* Página imprimible standalone (no usa el CSS de la app, para que el PDF salga limpio). */
+    :root { --tinta:#12262a; --suave:#5f7476; --linea:#c6d8d8; --marca:#0b8f9c; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+           color: var(--tinta); margin: 2rem; font-size: 12px; }
+    h1 { font-size: 1.4rem; margin: 0; color: var(--marca); }
+    .meta { color: var(--suave); font-size: 12px; margin-top: .35rem; }
+    .barra { display: flex; justify-content: space-between; align-items: flex-end;
+             border-bottom: 2px solid var(--marca); padding-bottom: .6rem; margin-bottom: 1rem; }
+    button { font: inherit; font-weight: 600; cursor: pointer; padding: .5rem 1.1rem;
+             border: 1px solid var(--marca); background: var(--marca); color: #fff; border-radius: 999px; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { background: #eef4f6; text-align: left; }
+    th, td { border: 1px solid var(--linea); padding: .4rem .55rem; vertical-align: top; }
+    th { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: var(--suave); }
+    td.num, th.num { text-align: right; white-space: nowrap; }
+    tfoot td { font-weight: 700; background: #f6fafa; }
+    .vacio { color: var(--suave); padding: 2rem 0; text-align: center; }
+    @media print {
+      body { margin: 0; }
+      .no-print { display: none !important; }
+      thead { display: table-header-group; }   /* repite encabezado en cada página */
+    }
+  </style>
+</head>
+<body>
+  <div class="barra">
+    <div>
+      <h1>Reporte de Envíos</h1>
+      <div class="meta">
+        {% if desde or hasta %}
+          Rango: {{ desde|default:"inicio" }} — {{ hasta|default:"hoy" }}
+        {% else %}
+          Rango: todos
+        {% endif %}
+        · Generado el {% now "Y-m-d H:i" %} · {{ filas|length }} envío(s)
+      </div>
+    </div>
+    <button class="no-print" onclick="window.print()">Imprimir / Guardar PDF</button>
+  </div>
+
+  {% if filas %}
+  <table>
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Courier</th>
+        <th>OT</th>
+        <th>Pedidos</th>
+        <th>Ejecutivo</th>
+        <th>Medidas (LxAxA)</th>
+        <th class="num">N° Bultos</th>
+        <th class="num">Valor Declarado</th>
+        <th>Estado Courier</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for fila in filas %}
+      <tr>
+        <td>{{ fila.fecha|date:"Y-m-d H:i" }}</td>
+        <td>{{ fila.courier }}</td>
+        <td>{{ fila.ot|default:"—" }}</td>
+        <td>{{ fila.pedidos }}</td>
+        <td>{{ fila.ejecutivo|default:"—" }}</td>
+        <td>{{ fila.medidas|default:"—" }}</td>
+        <td class="num">{{ fila.n_bultos }}</td>
+        <td class="num">${{ fila.valor_declarado }}</td>
+        <td>{{ fila.estado_courier|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="6">Totales</td>
+        <td class="num">{{ total_bultos }}</td>
+        <td class="num">${{ total_valor }}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+  {% else %}
+  <p class="vacio">Sin envíos para los filtros seleccionados.</p>
+  {% endif %}
+</body>
+</html>

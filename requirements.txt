@@ -6,8 +6,10 @@ charset-normalizer==3.4.9
 cryptography==49.0.0
 Django==5.2.16
 django-allauth==65.18.0
+et-xmlfile==2.0.0
 gunicorn==26.0.0
 idna==3.18
+openpyxl==3.1.5
 packaging==26.2
 psutil==7.2.2
 psycopg2-binary==2.9.12

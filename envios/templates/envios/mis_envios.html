@@ -35,6 +35,8 @@
                  class="w-full text-sm rounded-lg border border-linestrong bg-field text-body pl-9 pr-3 py-2 focus:border-brand focus:outline-none">
           <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">🔍</span>
         </div>
+        <a href="{% url 'envios:reporte_form' %}"
+           class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-brand-ink hover:border-brand shadow-sm">Reporte</a>
       </div>
       <div id="tabla-envios">
         {% include "envios/_tabla_envios.html" %}

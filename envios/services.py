@@ -4,7 +4,7 @@ from integraciones import moveup_client
 from pedidos.models import Pedido
 from pedidos.services  import notificar_pedido
 from django.db import transaction
-from utils import Courier, normalizar_telefono_cl, es_movil_cl, normalizar_telefono_cl
+from utils import Courier, normalizar_telefono_cl, es_movil_cl
 
 
 """
@@ -15,6 +15,26 @@ def _despachar_chibra(pedidos, destinatario, datos_courier):
         pedidos, datos_courier.get("bultos", []), destinatario, datos_courier
     )
     return {"orden_transporte": resultado["numero_envio"]}
+
+def _despachar_sin_integracion(pedidos, destinatario, datos_courier):
+    # Sin API: el envío se crea igual; la OT es la que ingresó Logística (o vacía).
+    return {"orden_transporte": datos_courier.get("orden_transporte", "")}
+
+def _parsear_despacho_simple(request):
+    # Bultos opcionales: solo se arma un bulto si ingresaron cantidad o peso; si no, lista vacía.
+    cantidad = request.POST.get("simple_cantidad")
+    peso = request.POST.get("simple_peso_total")
+    bultos = []
+    if cantidad or peso:
+        bultos = [{"tipo": "CAJA", "cantidad": int(cantidad or 1),
+                    "alto": "", "ancho": "", "largo": "",
+                    "peso": float(peso or 0), "tipo_contenido": "SECO"}]
+    datos_courier = {
+        "orden_transporte": (request.POST.get("orden_transporte") or "").strip(),
+        "valor_declarado": request.POST.get("valor_declarado") or 0,
+        "observaciones": request.POST.get("observaciones") or "",
+    }
+    return bultos, {}, datos_courier   # destinatario {} → estos couriers no arman payload
 
 def _despachar_moveup(pedidos, destinatario, datos_courier):
     # MoveUP no tiene campo de referencia externa → las referencias de pedido (num_pedido / DocNum SAP)
@@ -46,6 +66,8 @@ def _despachar_moveup(pedidos, destinatario, datos_courier):
 SELECCIONAR_COURIER = {
     Courier.CHIBRA: _despachar_chibra,
     Courier.MOVEUP: _despachar_moveup,
+    Courier.BIOQUIMICACL: _despachar_sin_integracion,
+    Courier.CYS: _despachar_sin_integracion,
 }
 
 def _parsear_despacho_chibra(request):
@@ -114,6 +136,8 @@ def _parsear_despacho_moveup(request):
 PARSEAR_DESPACHO = {
     Courier.CHIBRA: _parsear_despacho_chibra,
     Courier.MOVEUP: _parsear_despacho_moveup,
+    Courier.BIOQUIMICACL: _parsear_despacho_simple,
+    Courier.CYS: _parsear_despacho_simple,
 }
 
 #Valida que un grupo de pedidos pueda agruparse en un solo despacho. Se usa apenas se selecciona
