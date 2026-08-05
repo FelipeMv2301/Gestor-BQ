@@ -23,10 +23,16 @@ def opciones_courier_servicio():
     etiquetas_courier = dict(Courier.choices)
 
     opciones = [("", "— Sin courier —")]
+    couriers_con_servicio = set()
     for courier_valor, codigo, nombre in filas_servicio:
         etiqueta_courier = etiquetas_courier.get(courier_valor, courier_valor)
         opciones.append((f"{courier_valor}|{codigo}", f"{etiqueta_courier} — {nombre}"))
+        couriers_con_servicio.add(courier_valor)
+    # Solo la versión "pelada" de los couriers SIN servicios configurados: los que ya salieron con
+    # sus variantes (ej. Chibra — Express/Terrestre) no se repiten sueltos.
     for courier_valor, etiqueta_courier in Courier.choices:
+        if courier_valor in couriers_con_servicio:
+            continue
         opciones.append((courier_valor, f"{etiqueta_courier}"))
     return opciones
 
