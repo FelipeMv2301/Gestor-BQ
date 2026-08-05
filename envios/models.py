@@ -28,6 +28,20 @@ class EnvioCourierQuerySet(models.QuerySet):
     def de_ejecutivo(self, codigos_sap):
         return self.filter(pedidos__ejecutivo__codigo_sap__in=codigos_sap).distinct() if codigos_sap else self.none()
 
+    #Rango de fechas por creado_en (fecha del despacho). Cada extremo es opcional.
+    def con_fecha(self, desde, hasta):
+        qs = self
+        if desde:
+            qs = qs.filter(creado_en__date__gte=desde)
+        if hasta:
+            qs = qs.filter(creado_en__date__lte=hasta)
+        return qs
+
+    #Filtro elegible del reporte: envíos que agrupan un pedido de alguno de estos ejecutivos (por pk).
+    #Vacío = sin filtro (todos los que el scope de rol ya dejó ver).
+    def con_ejecutivos(self, ejecutivo_ids):
+        return self.filter(pedidos__ejecutivo_id__in=ejecutivo_ids).distinct() if ejecutivo_ids else self
+
 
 class EnvioCourier(models.Model):
     objects = EnvioCourierQuerySet.as_manager()

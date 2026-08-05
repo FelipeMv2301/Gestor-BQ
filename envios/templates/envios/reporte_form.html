@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block titulo %}Reporte de Envíos — Portal Bioquímica{% endblock %}
+{% block content %}
+<div class="mb-5">
+  <h1 class="text-2xl font-bold text-ink">Reporte de Envíos</h1>
+  <p class="text-sm text-muted mt-1">Filtra por fecha, courier y ejecutivo. Descarga en Excel o abre la vista imprimible para guardar como PDF.</p>
+</div>
+
+<form method="get" class="bg-surface border border-line rounded-2xl p-4 flex flex-col gap-5 max-w-3xl">
+
+  {# --- Rango de fechas --- #}
+  <div class="grid gap-4 sm:grid-cols-2">
+    <label class="flex flex-col gap-1.5">
+      <span class="text-xs font-bold uppercase tracking-wide text-muted">Desde</span>
+      <input type="date" name="desde" value="{{ request.GET.desde }}"
+             class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+    </label>
+    <label class="flex flex-col gap-1.5">
+      <span class="text-xs font-bold uppercase tracking-wide text-muted">Hasta</span>
+      <input type="date" name="hasta" value="{{ request.GET.hasta }}"
+             class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+    </label>
+  </div>
+
+  {# --- Courier (vacío = todos) --- #}
+  <div class="flex flex-col gap-1.5 border-t border-line pt-3">
+    <span class="text-xs font-bold uppercase tracking-wide text-muted">Courier</span>
+    <span class="text-xs text-muted">Ninguno marcado = todos</span>
+    <div class="flex flex-wrap gap-4 mt-1">
+      {% for valor, etiqueta in courier_choices %}
+      <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="courier" value="{{ valor }}" class="accent-brand w-4 h-4"> {{ etiqueta }}</label>
+      {% endfor %}
+    </div>
+  </div>
+
+  {# --- Ejecutivo (vacío = todos los visibles) --- #}
+  <div class="flex flex-col gap-1.5 border-t border-line pt-3">
+    <span class="text-xs font-bold uppercase tracking-wide text-muted">Ejecutivo</span>
+    <span class="text-xs text-muted">Ninguno marcado = todos</span>
+    {% if ejecutivos %}
+    <div class="grid sm:grid-cols-2 gap-2 mt-1">
+      {% for ejecutivo in ejecutivos %}
+      <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="ejecutivo" value="{{ ejecutivo.pk }}" class="accent-brand w-4 h-4"> {{ ejecutivo.nombre }}</label>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-muted">No hay ejecutivos disponibles para tu perfil.</p>
+    {% endif %}
+  </div>
+
+  {# --- Acciones: Ver PDF (nueva pestaña) / Descargar Excel --- #}
+  <div class="flex flex-wrap gap-3 border-t border-line pt-3">
+    <button type="submit" formaction="{% url 'envios:reporte_ver' %}" formtarget="_blank"
+            class="text-sm font-semibold px-5 py-2 rounded-full border border-linestrong bg-surface text-brand-ink hover:border-brand shadow-sm">
+      Ver PDF (imprimible)
+    </button>
+    <button type="submit" formaction="{% url 'envios:reporte_xlsx' %}"
+            class="text-sm font-semibold px-5 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink shadow-sm">
+      Descargar Excel
+    </button>
+  </div>
+
+</form>
+{% endblock %}

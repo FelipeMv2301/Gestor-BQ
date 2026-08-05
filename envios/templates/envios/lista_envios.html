@@ -37,6 +37,8 @@
         </div>
         <div class="flex items-center gap-2">
           <span id="spin-estados" class="htmx-indicator text-sm text-muted">Consultando…</span>
+          <a href="{% url 'envios:reporte_form' %}"
+             class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-brand-ink hover:border-brand shadow-sm">Reporte</a>
           <button type="button" hx-post="{% url 'envios:refrescar_estados' %}" hx-indicator="#spin-estados"
                   class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink shadow-sm">Actualizar estados</button>
         </div>
