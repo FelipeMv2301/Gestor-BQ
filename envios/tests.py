@@ -2,7 +2,7 @@ from unittest.mock import patch
 from django.test import TestCase, RequestFactory, Client
 from cuentas.models import PerfilUsuario
 from pedidos.models import Pedido
-from pedidos.tests.factories import crear_pedido, crear_usuario
+from pedidos.tests.factories import crear_pedido, crear_usuario, crear_ejecutivo
 from utils import Courier
 from .services import parsear_bultos, validar_pedidos_para_despacho, despachar_pedidos
 from .models import EnvioCourier
@@ -243,3 +243,60 @@ class EliminarEnvioViewTest(TestCase):
         self.assertFalse(EnvioCourier.objects.filter(pk=self.envio.pk).exists())
         self.pedido.refresh_from_db()
         self.assertIsNone(self.pedido.envio_id)
+
+
+class RefrescarEstadoViewsTest(TestCase):
+    """El ejecutivo también puede refrescar el estado-courier: individual de los envíos que ve,
+    y el batch acotado a los suyos. Logística/Admin sobre todos."""
+
+    def setUp(self):
+        self.client = Client()
+        self.ejec_obj = crear_ejecutivo(codigo_sap=10)
+        self.ejec_obj_b = crear_ejecutivo(codigo_sap=20, nombre="Otro", email="otro@bioquimica.cl")
+        self.dueno = crear_usuario("dueno@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=10)
+        self.ajeno = crear_usuario("ajeno@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=20)
+        self.logi = crear_usuario("logi@bioquimica.cl", Rol.LOGISTICA)
+        self.envio_a = EnvioCourier.objects.create(courier=Courier.MOVEUP)   # del dueño (código 10)
+        crear_pedido("3001", envio=self.envio_a, ejecutivo=self.ejec_obj)
+        self.envio_b = EnvioCourier.objects.create(courier=Courier.MOVEUP)   # del ajeno (código 20)
+        crear_pedido("3002", envio=self.envio_b, ejecutivo=self.ejec_obj_b)
+
+    # --- individual (refrescar_estado_envio) ---
+    @patch("envios.views.actualizar_estado_courier", return_value=True)
+    def test_individual_ejecutivo_dueno_refresca(self, mock_act):
+        self.client.force_login(self.dueno)
+        resp = self.client.post(f"/envios/{self.envio_a.pk}/refrescar-estado/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(mock_act.called)
+
+    @patch("envios.views.actualizar_estado_courier", return_value=True)
+    def test_individual_ejecutivo_ajeno_no_refresca(self, mock_act):
+        self.client.force_login(self.ajeno)
+        self.client.post(f"/envios/{self.envio_a.pk}/refrescar-estado/")   # envío de otro
+        self.assertFalse(mock_act.called)   # cortó por puede_ver_envio, no llamó a la API
+
+    @patch("envios.views.actualizar_estado_courier", return_value=True)
+    def test_individual_logistica_refresca_cualquiera(self, mock_act):
+        self.client.force_login(self.logi)
+        resp = self.client.post(f"/envios/{self.envio_b.pk}/refrescar-estado/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(mock_act.called)
+
+    # --- batch (refrescar_estados) ---
+    @patch("envios.views.refrescar_estados_courier", return_value=1)
+    def test_batch_ejecutivo_solo_los_suyos(self, mock_batch):
+        self.client.force_login(self.dueno)
+        resp = self.client.post("/envios/refrescar-estados/")
+        self.assertEqual(resp.status_code, 204)
+        pks = set(mock_batch.call_args[0][0].values_list("pk", flat=True))
+        self.assertIn(self.envio_a.pk, pks)
+        self.assertNotIn(self.envio_b.pk, pks)   # el ajeno NO entra
+
+    @patch("envios.views.refrescar_estados_courier", return_value=2)
+    def test_batch_logistica_todos(self, mock_batch):
+        self.client.force_login(self.logi)
+        resp = self.client.post("/envios/refrescar-estados/")
+        self.assertEqual(resp.status_code, 204)
+        pks = set(mock_batch.call_args[0][0].values_list("pk", flat=True))
+        self.assertIn(self.envio_a.pk, pks)
+        self.assertIn(self.envio_b.pk, pks)
