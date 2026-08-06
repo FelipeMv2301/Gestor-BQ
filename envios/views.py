@@ -74,32 +74,43 @@ def detalle_envio(request, pk):
     envio = get_object_or_404(EnvioCourier.objects.prefetch_related("pedidos"), pk=pk)
     if not permisos.puede_ver_envio(request.user, envio):
         return redirect("inicio")
-    # Ejecutivo: read-only (sin botones de acción). Logística/Admin: gestiona.
+    # Ejecutivo: read-only en gestión (editar/eliminar/marcar), pero SÍ puede refrescar el estado
+    # de courier de los envíos que ve (mismo criterio que el acceso: puede_ver_envio).
     return render(request, "envios/detalle_envio.html",
-                  {"envio": envio, "puede_gestionar": es_logistica(request.user)})
+                  {"envio": envio, "puede_gestionar": es_logistica(request.user),
+                   "puede_refrescar": True})
 
 
-#Batch: refresca el estado-courier de todos los MoveUP en 1 sola llamada a la API (ver seguimiento.py).
+#Batch: refresca el estado-courier de los MoveUP en 1 sola llamada a la API (ver seguimiento.py).
+#Logística/Admin refrescan todos; el Ejecutivo solo los suyos (los que agrupan un pedido suyo).
 @login_required
 @require_POST
 def refrescar_estados(request):
-    if not es_logistica(request.user):
+    if es_logistica(request.user):
+        envios = EnvioCourier.objects.filter(courier=Courier.MOVEUP)
+        destino = "envios:lista"
+    elif permisos.obtener_rol(request.user) == PerfilUsuario.Rol.EJECUTIVO:
+        codigos = permisos.codigos_sap_usuario(request.user)
+        envios = EnvioCourier.objects.de_ejecutivo(codigos).filter(courier=Courier.MOVEUP)
+        destino = "envios:mis_envios"
+    else:
         return redirect("inicio")
-    envios = EnvioCourier.objects.filter(courier=Courier.MOVEUP)
+
     total = refrescar_estados_courier(envios)
     messages.success(request, f"Estados de courier actualizados ({total} envío/s).")
     resp = HttpResponse(status=204)
-    resp["HX-Redirect"] = reverse("envios:lista")
+    resp["HX-Redirect"] = reverse(destino)
     return resp
 
 
 #Individual: refresca el estado-courier de UN envío (1 llamada). Para el botón del detalle.
+#Puede hacerlo cualquiera que pueda VER el envío (Logística/Admin todos; Ejecutivo los suyos).
 @login_required
 @require_POST
 def refrescar_estado_envio(request, pk):
-    if not es_logistica(request.user):
-        return redirect("inicio")
     envio = get_object_or_404(EnvioCourier, pk=pk)
+    if not permisos.puede_ver_envio(request.user, envio):
+        return redirect("inicio")
     try:
         if actualizar_estado_courier(envio):
             messages.success(request, f"Estado actualizado: {envio.estado_courier or '—'}.")
