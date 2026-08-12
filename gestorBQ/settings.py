@@ -126,14 +126,21 @@ SOCIALACCOUNT_ADAPTER = "cuentas.adapters.BioquimicaSocialAccountAdapter"
 
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 
-#Login solo por email — el modelo User de Django trae un campo `username` obligatorio que
-#allauth, por defecto, sigue pidiendo en el signup social. Lo desactivamos para que la
-#identidad sea el correo @bioquimica.cl y nada más (sin pantalla "elige nombre de usuario").
-ACCOUNT_USER_MODEL_USERNAME_FIELD = None
-ACCOUNT_USERNAME_REQUIRED = False
+#Login solo por email: la identidad es el correo @bioquimica.cl. Lo que evita la pantalla
+#"elige nombre de usuario" es ACCOUNT_SIGNUP_FIELDS (username no está entre los campos del alta),
+#no un setting sobre el modelo.
+#
+#NO volver a agregar `ACCOUNT_USER_MODEL_USERNAME_FIELD = None` (estuvo acá hasta 2026-08-12):
+#le declara a allauth que el modelo de usuario no tiene campo `username`, pero `auth_user.username`
+#es NOT NULL UNIQUE. Con ese setting, `populate_username()` (allauth/account/adapter.py) se saltea
+#completo y toda cuenta nueva se guardaba con `username=''`: la PRIMERA entraba y de la segunda en
+#adelante el alta reventaba con IntegrityError (unique de auth_user.username) → 500 en el login de
+#cualquier usuario nuevo. Reproducido y verificado.
+#
+#ACCOUNT_USERNAME_REQUIRED y ACCOUNT_EMAIL_REQUIRED se quitaron acá mismo: quedaron obsoletos en
+#allauth 65 (los system checks lo advertían) y ya están cubiertos por ACCOUNT_SIGNUP_FIELDS.
 ACCOUNT_LOGIN_METHODS = {'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*']
-ACCOUNT_EMAIL_REQUIRED = True
 
 #Conecta automáticamente un login Google a un User existente que tenga el mismo email
 #(verificado por Google). Sin esto, si falta la fila SocialAccount enlazada, allauth trata
