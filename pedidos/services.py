@@ -1,3 +1,4 @@
+import logging
 from integraciones import woo_client, sap_client, email_client
 from django.conf import settings
 from .models import Pedido, SkuCourier, Aviso
@@ -10,6 +11,8 @@ from django.db import transaction
 from django.db.models import Q
 from cuentas.models import PerfilUsuario
 from utils import Courier
+
+logger = logging.getLogger(__name__)
 
 #Arma las opciones de courier+servicio combinadas en una sola ("CHIBRA|10" -> "Chibra — Express"),
 #leyendo los servicios configurados en SkuCourier. Reusado por PedidoEditForm y por el select rápido
@@ -159,7 +162,11 @@ def _mapear_orden_sap(orden, cache_bp, cookies, mapa_sku=None, mapa_ejecutivos=N
         "rut": limpiar_rut_sap(orden.get("CardCode")),
         "razon_social": orden.get("CardName") or "",
         "direccion_calle": addr_ext.get("ShipToStreet") or "",
-        "direccion_comuna": addr_ext.get("ShipToCounty", ""),
+        #`or ""` y NO `.get("ShipToCounty", "")`: el default de .get solo aplica si la clave FALTA, y
+        #SAP manda la clave presente con valor null en NV sin dirección de destino. Eso metía None en
+        #un CharField sin null=True → NotNullViolation, que en Postgres tumbaba la ingesta entera
+        #(en la carga individual salía como 500). Detectado con la NV 2601790 el 2026-08-13.
+        "direccion_comuna": addr_ext.get("ShipToCounty") or "",
         "direccion_ciudad": addr_ext.get("ShipToCity") or "",
         "ejecutivo": mapa_ejecutivos.get(orden.get("SalesPersonCode")),
         "observaciones": orden.get("Comments") or "",
@@ -243,6 +250,7 @@ def guardar_pedidos_sap(after=None, before=None):
 
     creados = 0
     omitidos = 0
+    fallidos = 0
 
     for orden in ordenes:
         num_pedido = str(orden.get("DocNum"))
@@ -254,14 +262,26 @@ def guardar_pedidos_sap(after=None, before=None):
             omitidos += 1
             continue
 
-        Pedido.objects.create(
-            num_pedido=num_pedido,
-            origen=Pedido.Origen.SAP,
-            **_mapear_orden_sap(orden, cache_bp, cookies, mapa_sku, mapa_ejecutivos),
-        )
+        #Una NV con datos que el modelo no acepta no puede matar el lote entero. Antes, cualquier
+        #excepción acá abortaba el `for` y las órdenes que venían DESPUÉS no se procesaban nunca
+        #(el cron solo dejaba un "falló la sincronización" sin decir en qué NV). Ahora se cuenta,
+        #se loguea con su DocNum y se sigue. El `atomic` de a una es un savepoint: sin él, un
+        #INSERT fallido deja la transacción abortada y las consultas siguientes también revientan.
+        try:
+            with transaction.atomic():
+                Pedido.objects.create(
+                    num_pedido=num_pedido,
+                    origen=Pedido.Origen.SAP,
+                    **_mapear_orden_sap(orden, cache_bp, cookies, mapa_sku, mapa_ejecutivos),
+                )
+        except Exception:
+            fallidos += 1
+            logger.exception("Ingesta SAP: la NV %s falló, se omite y se sigue con el resto.", num_pedido)
+            continue
+
         creados += 1
 
-    return {"creados": creados, "omitidos": omitidos}
+    return {"creados": creados, "omitidos": omitidos, "fallidos": fallidos}
 
 def guardar_un_pedido_sap(num_pedido, ignorar_rechazado=False):
     cookies = sap_client.obtener_cookies_sap()

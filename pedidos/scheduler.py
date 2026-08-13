@@ -51,7 +51,8 @@ def _job_sincronizar_sap():
     logger.info("Cron SAP: iniciando sincronización (ayer + hoy)...")
     try:
         resultado = sincronizar_sap_reciente()
-        logger.info("Cron SAP: %s creados, %s omitidos.", resultado["creados"], resultado["omitidos"])
+        logger.info("Cron SAP: %s creados, %s omitidos, %s con error.",
+                    resultado["creados"], resultado["omitidos"], resultado.get("fallidos", 0))
     except Exception:
         logger.exception("Cron SAP: falló la sincronización.")
 

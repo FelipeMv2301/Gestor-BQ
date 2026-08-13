@@ -137,7 +137,7 @@ class GuardarPedidosSapTest(TestCase):
         with m1, m2, m3:
             resultado = services.guardar_pedidos_sap(after="2026-01-01", before="2026-01-02")
 
-        self.assertEqual(resultado, {"creados": 1, "omitidos": 0})
+        self.assertEqual(resultado, {"creados": 1, "omitidos": 0, "fallidos": 0})
         pedido = Pedido.objects.get(origen=Pedido.Origen.SAP, num_pedido="8001")
         self.assertEqual(pedido.rut, "12345678-9")  # limpiar_rut_sap le quita el prefijo CN
         self.assertEqual(pedido.ejecutivo, self.ejecutivo)
@@ -149,14 +149,14 @@ class GuardarPedidosSapTest(TestCase):
         m1, m2, m3 = self._mockear([_orden_sap("8002")])
         with m1, m2, m3:
             resultado = services.guardar_pedidos_sap()
-        self.assertEqual(resultado, {"creados": 0, "omitidos": 1})
+        self.assertEqual(resultado, {"creados": 0, "omitidos": 1, "fallidos": 0})
 
     def test_omite_pedido_ya_rechazado(self):
         PedidoRechazado.objects.create(origen=Pedido.Origen.SAP, num_pedido="8003", snapshot={})
         m1, m2, m3 = self._mockear([_orden_sap("8003")])
         with m1, m2, m3:
             resultado = services.guardar_pedidos_sap()
-        self.assertEqual(resultado, {"creados": 0, "omitidos": 1})
+        self.assertEqual(resultado, {"creados": 0, "omitidos": 1, "fallidos": 0})
         self.assertFalse(Pedido.objects.filter(origen=Pedido.Origen.SAP, num_pedido="8003").exists())
 
     def test_retiro_bioquimica_por_transportation_code_3(self):
@@ -165,6 +165,43 @@ class GuardarPedidosSapTest(TestCase):
             services.guardar_pedidos_sap()
         pedido = Pedido.objects.get(num_pedido="8004")
         self.assertEqual(pedido.tipo_entrega, Pedido.TipoEntrega.RETIRO_BIOQUIMICA)
+
+    def test_direccion_nula_en_sap_se_guarda_como_texto_vacio(self):
+        """NV real 2601790 (2026-08-13): SAP manda las claves de AddressExtension PRESENTES pero en
+        null cuando la NV no tiene dirección de destino. `.get(clave, "")` devolvía None (el default
+        solo aplica si la clave falta), y None en un CharField sin null=True es NotNullViolation en
+        Postgres — reventaba la ingesta completa."""
+        orden = _orden_sap("8005", AddressExtension={
+            "ShipToStreet": None, "ShipToCounty": None, "ShipToCity": None})
+        m1, m2, m3 = self._mockear([orden])
+        with m1, m2, m3:
+            resultado = services.guardar_pedidos_sap()
+
+        self.assertEqual(resultado, {"creados": 1, "omitidos": 0, "fallidos": 0})
+        pedido = Pedido.objects.get(num_pedido="8005")
+        self.assertEqual(pedido.direccion_calle, "")
+        self.assertEqual(pedido.direccion_comuna, "")
+        self.assertEqual(pedido.direccion_ciudad, "")
+
+    def test_una_nv_con_error_no_aborta_el_lote(self):
+        """Antes, una sola NV que fallara abortaba el `for` y las órdenes SIGUIENTES no se procesaban
+        nunca. La clave de este test es la última aserción: la NV posterior al fallo sí entra."""
+        mapear_real = services._mapear_orden_sap
+
+        def mapear_fallando_la_del_medio(orden, *args, **kwargs):
+            if str(orden.get("DocNum")) == "8007":
+                raise ValueError("dato inesperado de SAP")
+            return mapear_real(orden, *args, **kwargs)
+
+        m1, m2, m3 = self._mockear([_orden_sap("8006"), _orden_sap("8007"), _orden_sap("8008")])
+        with m1, m2, m3, patch("pedidos.services._mapear_orden_sap",
+                               side_effect=mapear_fallando_la_del_medio):
+            resultado = services.guardar_pedidos_sap()
+
+        self.assertEqual(resultado, {"creados": 2, "omitidos": 0, "fallidos": 1})
+        self.assertTrue(Pedido.objects.filter(num_pedido="8006").exists())
+        self.assertFalse(Pedido.objects.filter(num_pedido="8007").exists())
+        self.assertTrue(Pedido.objects.filter(num_pedido="8008").exists())
 
 
 class GuardarUnPedidoSapTest(TestCase):
