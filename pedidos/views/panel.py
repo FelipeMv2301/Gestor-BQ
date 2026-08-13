@@ -37,6 +37,10 @@ def sincronizar(request):
         try:
             r = services.guardar_pedidos_sap(after=desde, before=hasta)
             messages.success(request, f"SAP: {r['creados']} creados, {r['omitidos']} omitidos.")
+            #`.get`: Woo todavía no devuelve esta clave, y los tests mockean el dict sin ella.
+            if r.get("fallidos"):
+                messages.warning(request, f"SAP: {r['fallidos']} NV con error, quedaron sin cargar "
+                                          f"(el detalle y su N° están en el log del servidor).")
         except Exception as exc:
             messages.error(request, f"Error SAP: {exc}")
     resp = HttpResponse(status=204)
@@ -61,7 +65,10 @@ def cargar_individual(request):
             else:
                 raise ValueError(f"Origen '{origen}' no reconocido.")
             messages.success(request, msg)
-        except ValueError as exc:
+        #`Exception`, no solo `ValueError`: la ingesta también puede fallar con un error HTTP de SAP/Woo
+        #o de base de datos (ej. NotNullViolation por un campo que SAP manda en null). Atrapando solo
+        #ValueError, esos casos subían sin manejar y el usuario veía un 500 pelado, sin pista del motivo.
+        except Exception as exc:
             messages.error(request, str(exc).replace("[!] Error: ", ""))
     resp = HttpResponse(status=204)
     resp["HX-Redirect"] = reverse("pedidos:panel_admin")
