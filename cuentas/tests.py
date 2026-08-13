@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from unittest.mock import Mock
 from django.contrib.auth.models import User
 from django.test import TestCase, Client
 from allauth.core.exceptions import ImmediateHttpResponse
@@ -10,8 +11,14 @@ from pedidos.tests.factories import crear_usuario
 Rol = PerfilUsuario.Rol
 
 
-def _sociallogin(email):
-    return SimpleNamespace(account=SimpleNamespace(extra_data={"email": email}))
+#`is_existing` y `connect` los usa la reconciliación por email de pre_social_login: sin ellos, el
+#doble se queda corto y el test revienta con AttributeError en vez de probar algo.
+def _sociallogin(email, is_existing=False):
+    return SimpleNamespace(
+        account=SimpleNamespace(extra_data={"email": email}),
+        is_existing=is_existing,
+        connect=Mock(),
+    )
 
 
 class BioquimicaSocialAccountAdapterTest(TestCase):
@@ -20,6 +27,24 @@ class BioquimicaSocialAccountAdapterTest(TestCase):
 
     def test_dominio_permitido_pasa(self):
         self.adapter.pre_social_login(None, _sociallogin("persona@bioquimica.cl"))  # no debe lanzar
+
+    def test_login_ya_enlazado_no_intenta_reconciliar(self):
+        sociallogin = _sociallogin("persona@bioquimica.cl", is_existing=True)
+        self.adapter.pre_social_login(None, sociallogin)
+        sociallogin.connect.assert_not_called()
+
+    def test_reconcilia_con_el_usuario_existente_del_mismo_email(self):
+        """Sin esto, allauth trataría el login como registro nuevo y caería al formulario de signup."""
+        usuario = User.objects.create(username="ya.estaba", email="ya.estaba@bioquimica.cl")
+        sociallogin = _sociallogin("YA.ESTABA@bioquimica.cl")  # el match es case-insensitive
+        self.adapter.pre_social_login(None, sociallogin)
+        sociallogin.connect.assert_called_once()
+        self.assertEqual(sociallogin.connect.call_args[0][1], usuario)
+
+    def test_sin_usuario_previo_no_reconcilia_nada(self):
+        sociallogin = _sociallogin("nuevo@bioquimica.cl")
+        self.adapter.pre_social_login(None, sociallogin)
+        sociallogin.connect.assert_not_called()
 
     def test_dominio_no_permitido_rechaza(self):
         with self.assertRaises(ImmediateHttpResponse):
