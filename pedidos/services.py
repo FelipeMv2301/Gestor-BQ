@@ -231,9 +231,19 @@ def guardar_pedidos_sap(after=None, before=None):
     mapa_sku = _armar_mapa_sku()
     mapa_ejecutivos = {e.codigo_sap: e for e in Ejecutivo.objects.all()}
 
+    #El retiro en Bioquímica (TransportationCode 3) entra SIEMPRE, sin exigir U_BQ_CrearEnvio: el campo
+    #se llama "Crear Envío" y en un retiro no hay envío que crear, así que Comercial lo deja en 'N' con
+    #toda lógica y el pedido nunca llegaba a Logística (visto en vivo: NV 2601820 y 2601832, retiros
+    #reales excluidos solo por el flag). El flag queda como compuerta únicamente de la rama de courier.
+    #Decisión de Felipe 2026-08-13; reemplaza la del 2026-07-22, que lo exigía para ambas ramas.
+    #El `Cancelled eq 'tNO'` va en la rama de retiro porque, al sacarle el flag, esa rama quedaba sin
+    #ninguna compuerta y entraban también los retiros anulados. La rama de courier no lo lleva: ahí el
+    #flag ya acota, y agregarlo cambiaría un comportamiento que hoy funciona.
     filtro = sap_client.agregar_rango_fechas(
-        "U_BQ_CrearEnvio eq 'Y' and (TransportationCode eq 3 or (TransportationCode eq 1 and (U_BQ_TipoEntrega eq 'HOME' or U_BQ_TipoEntrega eq 'BRANCH')))", 
-        "UpdateDate", 
+        "(TransportationCode eq 3 and Cancelled eq 'tNO')"
+        " or (U_BQ_CrearEnvio eq 'Y' and TransportationCode eq 1"
+        " and (U_BQ_TipoEntrega eq 'HOME' or U_BQ_TipoEntrega eq 'BRANCH'))",
+        "UpdateDate",
         after=after,
         before=before,
     )

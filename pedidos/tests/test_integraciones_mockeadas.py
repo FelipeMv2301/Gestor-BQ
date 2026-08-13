@@ -166,6 +166,23 @@ class GuardarPedidosSapTest(TestCase):
         pedido = Pedido.objects.get(num_pedido="8004")
         self.assertEqual(pedido.tipo_entrega, Pedido.TipoEntrega.RETIRO_BIOQUIMICA)
 
+    def test_el_filtro_no_exige_crear_envio_para_los_retiros(self):
+        """Decisión 2026-08-13: un retiro en Bioquímica (TransportationCode 3) entra aunque
+        U_BQ_CrearEnvio esté en 'N' — en un retiro no hay envío que crear. El flag solo restringe
+        la rama de courier. Se afirma por rama, no la cadena completa, para no ser frágil."""
+        with patch("pedidos.services.sap_client.obtener_cookies_sap", return_value={}), \
+             patch("pedidos.services.sap_client.obtener_todas_las_paginas",
+                   return_value=[]) as mock_paginas:
+            services.guardar_pedidos_sap(after="2026-01-01")
+
+        filtro = mock_paginas.call_args[0][1]["$filter"]
+        rama_retiro, _, rama_courier = filtro.partition(" or ")
+        self.assertIn("TransportationCode eq 3", rama_retiro)
+        self.assertNotIn("U_BQ_CrearEnvio", rama_retiro)
+        #Sin el flag, esta rama queda sin compuerta: al menos no traer los retiros anulados.
+        self.assertIn("Cancelled eq 'tNO'", rama_retiro)
+        self.assertIn("U_BQ_CrearEnvio eq 'Y'", rama_courier)
+
     def test_direccion_nula_en_sap_se_guarda_como_texto_vacio(self):
         """NV real 2601790 (2026-08-13): SAP manda las claves de AddressExtension PRESENTES pero en
         null cuando la NV no tiene dirección de destino. `.get(clave, "")` devolvía None (el default
