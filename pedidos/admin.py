@@ -152,11 +152,15 @@ class PedidoAdmin(admin.ModelAdmin):
             return redirect("admin:pedidos_pedido_changelist")
 
         contexto = {
-            **self.admin_site.each_context(request),
-            "pedidos": pedidos,
-            "courier": courier,
-            "ids_texto": ids_texto,
-        }
+                    **self.admin_site.each_context(request),
+                    "pedidos": pedidos,
+                    "courier": courier,
+                    "ids_texto": ids_texto,
+                    "observaciones_sugeridas": " | ".join(
+                        f"{p.origen}-{p.num_pedido}: {p.observaciones.strip()}"
+                        for p in pedidos if p.observaciones and p.observaciones.strip()
+                    ),
+                }
         return TemplateResponse(request, "admin/pedidos/pedido/armar_despacho.html", contexto)
 
     #Filtra los datos de la tabla para cada rol.

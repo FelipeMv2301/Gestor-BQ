@@ -49,5 +49,10 @@ def armar_despacho(request):
             messages.warning(request, f"{pedido.origen}-{pedido.num_pedido} despachado pero no se notificó: {error}")
         return redirect("pedidos:despachos")
 
+    observaciones_sugeridas = " | ".join(
+        f"{p.origen}-{p.num_pedido}: {p.observaciones.strip()}"
+        for p in pedidos if p.observaciones and p.observaciones.strip()
+    )
     return render(request, "pedidos/armar_despacho.html",
-                  {"pedidos": pedidos, "courier": courier, "ids_texto": ids_texto})
+                {"pedidos": pedidos, "courier": courier, "ids_texto": ids_texto,
+                    "observaciones_sugeridas": observaciones_sugeridas})
