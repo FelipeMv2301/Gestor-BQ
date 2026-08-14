@@ -18,7 +18,7 @@ modelo pueda importar url_seguimiento en una property sin ciclo de imports.
 # --- URL de tracking por courier (para linkear la Orden de Transporte) ---
 TRACKING_URL = {
     Courier.CHIBRA: lambda envio: f"{settings.CHIBRA_BASE_URL.rstrip('/')}/gts/priv/expediciones/busqueda_avanzada.seam",   # provisorio; URL real cuando la haya
-    # Courier.MOVEUP: cuando haya URL pública de tracking
+    Courier.MOVEUP: lambda envio: f"{"https://moveuplogistica.firebaseapp.com/client/packages/view-packages"}"
 }
 
 
