@@ -1,6 +1,5 @@
 from .models import EnvioCourier
-from integraciones import chibra_client
-from integraciones import moveup_client
+from integraciones import chibra_client, moveup_client, starken_client
 from pedidos.models import Pedido
 from pedidos.services  import notificar_pedido
 from django.db import transaction
@@ -15,6 +14,12 @@ def _despachar_chibra(pedidos, destinatario, datos_courier):
         pedidos, datos_courier.get("bultos", []), destinatario, datos_courier
     )
     return {"orden_transporte": resultado["numero_envio"]}
+
+def _despachar_starken(pedidos, destinatario, datos_courier):
+    resultado = starken_client.emitir_of(
+        pedidos, datos_courier.get("bultos", []), destinatario, datos_courier
+    )
+    return {"orden_transporte": resultado["numero_orden_flete"]}
 
 def _despachar_sin_integracion(pedidos, destinatario, datos_courier):
     # Sin API: el envío se crea igual; la OT es la que ingresó Logística (o vacía).
@@ -68,6 +73,7 @@ SELECCIONAR_COURIER = {
     Courier.MOVEUP: _despachar_moveup,
     Courier.BIOQUIMICACL: _despachar_sin_integracion,
     Courier.CYS: _despachar_sin_integracion,
+    Courier.STARKEN: _despachar_starken
 }
 
 def _parsear_despacho_chibra(request):
@@ -133,11 +139,39 @@ def _parsear_despacho_moveup(request):
 
     return [], destinatario, datos_courier
 
+def _parsear_despacho_starken(request):
+    bultos = parsear_bultos(request)
+    destinatario = {
+        "nombre": request.POST.get("destinatario_nombre"),
+        "rut": request.POST.get("destinatario_rut"),
+        "direccion": request.POST.get("starken_calle"),
+        "numero": request.POST.get("starken_numero"),
+        "depto": request.POST.get("starken_depto"),
+        "comuna": request.POST.get("destinatario_comuna"),
+        "telefono": request.POST.get("destinatario_telefono"),
+        "email": request.POST.get("destinatario_email"),
+    }
+
+    faltantes = [etiqueta for campo, etiqueta in
+                [("nombre", "Nombre"), ("direccion", "Calle"), ("numero", "Número"), ("comuna", "Comuna")]
+                if not (destinatario.get(campo) or "").strip()]
+    if faltantes:
+        raise ValueError(f"Faltan datos para Starken: {', '.join(faltantes)}.")
+
+    datos_courier = {
+        "valor_declarado": request.POST.get("valor_declarado") or 0,
+        "servicio": request.POST.get("servicio") or "0",
+        "observaciones": request.POST.get("observaciones"),
+    }
+
+    return bultos, destinatario, datos_courier
+
 PARSEAR_DESPACHO = {
     Courier.CHIBRA: _parsear_despacho_chibra,
     Courier.MOVEUP: _parsear_despacho_moveup,
     Courier.BIOQUIMICACL: _parsear_despacho_simple,
     Courier.CYS: _parsear_despacho_simple,
+    Courier.STARKEN: _parsear_despacho_starken
 }
 
 #Valida que un grupo de pedidos pueda agruparse en un solo despacho. Se usa apenas se selecciona

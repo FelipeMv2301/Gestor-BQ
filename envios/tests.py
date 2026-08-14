@@ -1,9 +1,12 @@
+import base64
 from unittest.mock import patch
 from django.test import TestCase, RequestFactory, Client
+from django.conf import settings
 from cuentas.models import PerfilUsuario
 from pedidos.models import Pedido
 from pedidos.tests.factories import crear_pedido, crear_usuario, crear_ejecutivo
 from utils import Courier
+from integraciones import starken_client
 from .services import parsear_bultos, validar_pedidos_para_despacho, despachar_pedidos
 from .models import EnvioCourier
 
@@ -162,6 +165,205 @@ class DespacharPedidosTest(TestCase):
         self.assertEqual(p1.envio_id, envio.id)  # el despacho quedó igual, solo falló el email
         self.assertEqual(len(fallidas), 1)
         self.assertEqual(fallidas[0][0], p1)
+
+    # No mockea chibra_client.documentar_envio a propósito: ejercita la validación real de
+    # utils.validar_rut que chibra_client.py ya usa (sin test hasta ahora, agregado en paridad con Starken).
+    def test_rut_invalido_falla_y_no_crea_envio(self):
+        p1 = crear_pedido("2005", **self.aprobado)
+        destinatario = {**_destinatario(), "rut": "11111111-9"}  # dígito verificador incorrecto
+        with self.assertRaises(ValueError):
+            despachar_pedidos([p1], Courier.CHIBRA, _bultos(), destinatario, _datos_courier(), self.usuario)
+        self.assertEqual(EnvioCourier.objects.count(), 0)
+
+
+class DespacharMoveupTest(TestCase):
+    def setUp(self):
+        self.usuario = crear_usuario("logi@bioquimica.cl")
+        self.aprobado = dict(
+            estado_comercial=Pedido.EstadoComercial.APROBADO, courier=Courier.MOVEUP, rut="11111111-1",
+            telefono_contacto="+56911112222", direccion_calle="Av. Providencia 123", direccion_comuna="Providencia",
+        )
+
+    def test_despacho_ok_crea_envio_y_liga_pedidos(self):
+        p1 = crear_pedido("6001", **self.aprobado)
+        p2 = crear_pedido("6002", **self.aprobado)
+        destinatario = {**_destinatario(), "numero": "123", "depto": ""}
+        with patch("envios.services.moveup_client.crear_paquetes", return_value=[{"id": 555}]), \
+             patch("envios.services.notificar_pedido") as mock_notificar:
+            envio, fallidas = despachar_pedidos([p1, p2], Courier.MOVEUP, [], destinatario, _datos_courier(), self.usuario)
+
+        self.assertEqual(envio.orden_transporte, "555")
+        self.assertEqual(envio.estado, EnvioCourier.Estado.DESPACHADO)
+        self.assertEqual(fallidas, [])
+        p1.refresh_from_db(); p2.refresh_from_db()
+        self.assertEqual(p1.envio_id, envio.id)
+        self.assertEqual(p2.envio_id, envio.id)
+        self.assertEqual(mock_notificar.call_count, 2)
+
+    def test_notificacion_fallida_no_impide_el_despacho(self):
+        p1 = crear_pedido("6003", **self.aprobado)
+        destinatario = {**_destinatario(), "numero": "123", "depto": ""}
+        with patch("envios.services.moveup_client.crear_paquetes", return_value=[{"id": 556}]), \
+             patch("envios.services.notificar_pedido", side_effect=ValueError("SMTP caído")):
+            envio, fallidas = despachar_pedidos([p1], Courier.MOVEUP, [], destinatario, _datos_courier(), self.usuario)
+
+        self.assertIsNotNone(envio.pk)
+        p1.refresh_from_db()
+        self.assertEqual(p1.envio_id, envio.id)
+        self.assertEqual(len(fallidas), 1)
+        self.assertEqual(fallidas[0][0], p1)
+
+    def test_sin_paquetes_creados_deja_orden_transporte_vacia(self):
+        p1 = crear_pedido("6004", **self.aprobado)
+        destinatario = {**_destinatario(), "numero": "123", "depto": ""}
+        with patch("envios.services.moveup_client.crear_paquetes", return_value=[]), \
+             patch("envios.services.notificar_pedido"):
+            envio, _ = despachar_pedidos([p1], Courier.MOVEUP, [], destinatario, _datos_courier(), self.usuario)
+        self.assertEqual(envio.orden_transporte, "")
+
+
+class DespacharStarkenTest(TestCase):
+    def setUp(self):
+        self.usuario = crear_usuario("logi@bioquimica.cl")
+        self.aprobado = dict(
+            estado_comercial=Pedido.EstadoComercial.APROBADO, courier=Courier.STARKEN, rut="11111111-1",
+            telefono_contacto="+56911112222", direccion_calle="Av. Providencia 123", direccion_comuna="Providencia",
+        )
+
+    def test_despacho_ok_crea_envio_con_bultos_y_liga_pedidos(self):
+        p1 = crear_pedido("5001", **self.aprobado)
+        p2 = crear_pedido("5002", **self.aprobado)
+        with patch("envios.services.starken_client.emitir_of", return_value={"numero_orden_flete": "222607751"}), \
+             patch("envios.services.notificar_pedido") as mock_notificar:
+            envio, fallidas = despachar_pedidos([p1, p2], Courier.STARKEN, _bultos(), _destinatario(), _datos_courier(), self.usuario)
+
+        self.assertEqual(envio.orden_transporte, "222607751")
+        self.assertEqual(envio.estado, EnvioCourier.Estado.DESPACHADO)
+        self.assertEqual(envio.datos_courier["bultos"], _bultos())
+        self.assertEqual(fallidas, [])
+        p1.refresh_from_db(); p2.refresh_from_db()
+        self.assertEqual(p1.envio_id, envio.id)
+        self.assertEqual(p2.envio_id, envio.id)
+        self.assertEqual(mock_notificar.call_count, 2)
+
+    def test_notificacion_fallida_no_impide_el_despacho(self):
+        p1 = crear_pedido("5003", **self.aprobado)
+        with patch("envios.services.starken_client.emitir_of", return_value={"numero_orden_flete": "222607751"}), \
+             patch("envios.services.notificar_pedido", side_effect=ValueError("SMTP caído")):
+            envio, fallidas = despachar_pedidos([p1], Courier.STARKEN, _bultos(), _destinatario(), _datos_courier(), self.usuario)
+
+        self.assertIsNotNone(envio.pk)
+        p1.refresh_from_db()
+        self.assertEqual(p1.envio_id, envio.id)
+        self.assertEqual(len(fallidas), 1)
+        self.assertEqual(fallidas[0][0], p1)
+
+    # No mockea starken_client.emitir_of a propósito: ejercita la validación real de
+    # utils.validar_rut agregada esta sesión — debe fallar ANTES de intentar el POST a Starken.
+    def test_rut_invalido_falla_y_no_crea_envio(self):
+        p1 = crear_pedido("5004", **self.aprobado)
+        destinatario = {**_destinatario(), "rut": "11111111-9"}  # dígito verificador incorrecto
+        with self.assertRaises(ValueError):
+            despachar_pedidos([p1], Courier.STARKEN, _bultos(), destinatario, _datos_courier(), self.usuario)
+        self.assertEqual(EnvioCourier.objects.count(), 0)
+
+
+# No hay wrapper en envios/services.py que llame a esto todavía (no está conectado a ningún view) —
+# se testea el cliente directo, mockeando requests.post, mismo criterio que los dry-run manuales.
+class GenerarEtiquetaTest(TestCase):
+    def _fake_response(self, status=200, data=None, message="OK"):
+        class FakeResponse:
+            def raise_for_status(self):
+                pass
+            def json(self):
+                return {"status": status, "data": data or [], "message": message}
+        return FakeResponse()
+
+    def test_decodifica_las_etiquetas_en_base64(self):
+        etiqueta_b64 = base64.b64encode(b"%PDF-fake").decode()
+        with patch("integraciones.starken_client.requests.post",
+                    return_value=self._fake_response(data=[etiqueta_b64])) as mock_post:
+            resultado = starken_client.generar_etiqueta(222607751)
+
+        self.assertEqual(resultado, [b"%PDF-fake"])
+        mock_post.assert_called_once_with(
+            settings.STARKEN_ETIQUETA_URL,
+            auth=(settings.STARKEN_ETIQUETA_USER, settings.STARKEN_ETIQUETA_PASSWORD),
+            params={"ordenFlete": 222607751, "tipoSalida": starken_client.TIPO_SALIDA_BASE64_10X10},
+            timeout=30,
+        )
+
+    def test_varias_etiquetas_se_decodifican_todas(self):
+        etiquetas_b64 = [base64.b64encode(b"bulto-1").decode(), base64.b64encode(b"bulto-2").decode()]
+        with patch("integraciones.starken_client.requests.post",
+                    return_value=self._fake_response(data=etiquetas_b64)):
+            resultado = starken_client.generar_etiqueta(222607751)
+        self.assertEqual(resultado, [b"bulto-1", b"bulto-2"])
+
+    def test_status_distinto_de_200_lanza_error(self):
+        with patch("integraciones.starken_client.requests.post",
+                    return_value=self._fake_response(status=400, message="Orden de flete no encontrada")):
+            with self.assertRaises(ValueError):
+                starken_client.generar_etiqueta(999)
+
+
+class DescargarDocumentoViewTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.logi = crear_usuario("logi@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec_sin_pedidos = crear_usuario("ejec@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=99)
+        self.envio_starken = EnvioCourier.objects.create(courier=Courier.STARKEN, orden_transporte="222607751")
+        self.envio_chibra = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-1")
+
+    def test_descarga_un_solo_archivo_como_pdf(self):
+        self.client.force_login(self.logi)
+        with patch("envios.views.generar_documento", return_value=[b"%PDF-fake"]):
+            resp = self.client.get(f"/envios/{self.envio_starken.pk}/documento/etiqueta/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertIn("attachment", resp["Content-Disposition"])
+        self.assertEqual(resp.content, b"%PDF-fake")
+
+    def test_varios_archivos_se_empaquetan_en_zip(self):
+        self.client.force_login(self.logi)
+        with patch("envios.views.generar_documento", return_value=[b"a", b"b"]):
+            resp = self.client.get(f"/envios/{self.envio_starken.pk}/documento/etiqueta/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/zip")
+
+    # No mockea generar_documento: ejercita el ValueError real de integraciones.documentos cuando
+    # el courier no tiene ese tipo registrado (Chibra no está en DOCUMENTOS_COURIER).
+    def test_courier_sin_ese_documento_muestra_error(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get(f"/envios/{self.envio_chibra.pk}/documento/etiqueta/")
+        self.assertRedirects(resp, f"/envios/{self.envio_chibra.pk}/")
+
+    def test_sin_orden_transporte_no_intenta_generar(self):
+        self.client.force_login(self.logi)
+        envio_sin_ot = EnvioCourier.objects.create(courier=Courier.STARKEN)
+        with patch("envios.views.generar_documento") as mock_generar:
+            resp = self.client.get(f"/envios/{envio_sin_ot.pk}/documento/etiqueta/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(mock_generar.called)
+
+    def test_ejecutivo_sin_pedidos_en_el_envio_no_puede_descargar(self):
+        self.client.force_login(self.ejec_sin_pedidos)
+        with patch("envios.views.generar_documento") as mock_generar:
+            resp = self.client.get(f"/envios/{self.envio_starken.pk}/documento/etiqueta/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(mock_generar.called)
+
+    def test_detalle_envio_muestra_documentos_disponibles(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get(f"/envios/{self.envio_starken.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context["documentos"], [("etiqueta", "Etiqueta de envío")])
+
+    def test_detalle_envio_chibra_sin_documentos(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get(f"/envios/{self.envio_chibra.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context["documentos"], [])
 
 
 class CambiarEstadoEnvioViewTest(TestCase):

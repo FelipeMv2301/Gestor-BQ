@@ -55,7 +55,7 @@ class Courier(models.TextChoices):
     CYS = "CYS", "C&S"
     BIOQUIMICACL = "BIOQUIMICACL", "Bioquimica.cl"
     #Contemplados a futuro (anotado 2026-07-29, sin integración construida todavía):
-    #STARKEN = "STARKEN", "Starken"
+    STARKEN = "STARKEN", "Starken"
     #ALAS = "ALAS", "Alas"
 
 #Normaliza un móvil chileno al formato que espera MoveUP: 9 dígitos partiendo en 9.
