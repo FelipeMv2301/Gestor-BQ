@@ -11,14 +11,22 @@ VALOR_DECLARADO_MINIMO_CON_DOCUMENTO = 50000 #Sobre este monto, Starken exige un
 """
 Helpers
 """
-#Uniforma los errores de red/HTTP de Starken (DNS caído, timeout, 500, etc.) en un mensaje legible
-#para Logística en vez del texto crudo de requests (ej. "HTTPSConnectionPool(...)").
+#Uniforma los errores de red y HTTP de Starken en un mensaje legible para Logística. Van separados
+#a propósito: no llegar a Starken (DNS caído, timeout) no es lo mismo que Starken SÍ responder pero
+#con un HTTP de error (400/403/500) — bug real detectado 2026-08-18, un 400 real (endpoint/método mal
+#armado) se mostraba como "no se pudo conectar", escondiendo el detalle que hacía falta para depurar.
 def _solicitud(metodo, url, **kwargs):
     try:
         respuesta = metodo(url, timeout=30, **kwargs)
-        respuesta.raise_for_status()
     except requests.exceptions.RequestException as exc:
         raise ValueError(f"[!] Error: no se pudo conectar con Starken. Revisa la conexión o el ambiente configurado ({url}).") from exc
+
+    try:
+        respuesta.raise_for_status()
+    except requests.exceptions.HTTPError as exc:
+        raise ValueError(
+            f"[!] Error: Starken respondió HTTP {respuesta.status_code} en {url}. Detalle: {respuesta.text[:300]}"
+        ) from exc
     return respuesta
 # Sirve para gestionar los documentos (maximo 5) que se pueden incorporar en starken
 def _referencias_documentos(documentos):

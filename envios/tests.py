@@ -141,6 +141,31 @@ class EmitirOfStarkenMultibultosTest(TestCase):
         self.assertNotIn("Max retries", mensaje)
         self.assertIn("Starken", mensaje)
 
+    def test_error_http_de_starken_muestra_status_y_detalle_no_generico(self):
+        # Bug real detectado 2026-08-18: un HTTP 400/403/500 (la conexión SÍ llegó a Starken, pero
+        # Starken respondió con un error) se mostraba con el mismo mensaje genérico de "no se pudo
+        # conectar" que una falla de red real — escondiendo justo el detalle que hacía falta para
+        # depurar (confirmado con curl/shell en el servidor: la conexión funcionaba perfecto).
+        import requests
+
+        def fake_post_400(url, json=None, timeout=None):
+            class FakeResponse400:
+                status_code = 400
+                text = '{"code":400,"message":"Metodo no permitido"}'
+                def raise_for_status(self):
+                    raise requests.exceptions.HTTPError(response=self)
+            return FakeResponse400()
+
+        bultos = [{"cantidad": 1, "peso": 1.0, "alto": "1", "ancho": "1", "largo": "1", "tipo_contenido": ""}]
+        with patch("integraciones.starken_client.requests.post", side_effect=fake_post_400):
+            with self.assertRaises(ValueError) as ctx:
+                starken_client.emitir_of([], bultos, self._destinatario(), {"servicio": "0"})
+
+        mensaje = str(ctx.exception)
+        self.assertIn("400", mensaje)
+        self.assertIn("Metodo no permitido", mensaje)
+        self.assertNotIn("no se pudo conectar", mensaje)
+
 
 class ParsearBultosTest(TestCase):
     def setUp(self):
