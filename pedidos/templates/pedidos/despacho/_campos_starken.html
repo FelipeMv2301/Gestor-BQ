@@ -1,0 +1,127 @@
+<div class="bg-surface border border-line rounded-2xl p-6">
+  <h2 class="text-sm font-bold text-ink mb-4">Dirección</h2>
+  <p class="text-xs text-muted mb-3">Starken pide calle y número separados. Revisa y ajusta antes de despachar.</p>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Calle</span>
+      <input type="text" name="starken_calle" value="{{ pedidos.0.direccion_calle }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Número</span>
+      <input type="text" name="starken_numero" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Depto / Casa</span>
+      <input type="text" name="starken_depto" value="{{ pedidos.0.direccion_depto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Comuna</span>
+      <input type="text" name="destinatario_comuna" data-comuna value="{{ pedidos.0.direccion_comuna }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+  </div>
+</div>
+
+<div class="bg-surface border border-line rounded-2xl p-6">
+  <h2 class="text-sm font-bold text-ink mb-4">Tipo de entrega</h2>
+  <div class="inline-flex bg-appbg border border-line p-1 rounded-xl gap-1 text-sm mb-4">
+    <label class="cursor-pointer"><input type="radio" name="starken_tipo_entrega" value="domicilio" class="peer sr-only" checked onclick="mostrarTipoEntrega()">
+      <span class="block px-3 py-1 rounded-lg text-muted font-semibold peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Domicilio</span></label>
+    <label class="cursor-pointer"><input type="radio" name="starken_tipo_entrega" value="agencia" class="peer sr-only" onclick="mostrarTipoEntrega()">
+      <span class="block px-3 py-1 rounded-lg text-muted font-semibold peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Retiro en agencia</span></label>
+  </div>
+  <div id="starken-agencia-codigo" class="hidden sm:max-w-xs">
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Código de agencia Starken</span>
+      <input type="text" name="codigo_agencia_destino" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+    <p class="text-xs text-muted mt-1">Todavía no hay selector de agencias en el portal — escribe el código manualmente (ej. "1467").</p>
+  </div>
+</div>
+
+<div class="bg-surface border border-line rounded-2xl p-6">
+  <h2 class="text-sm font-bold text-ink mb-4">Datos del courier</h2>
+  <div class="grid gap-4 sm:grid-cols-2">
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Servicio</span>
+      <input type="text" name="servicio" value="{{ pedidos.0.servicio_courier_codigo|default:"0" }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+      <p class="text-xs text-muted mt-1">{% if pedidos.0.servicio_courier_nombre %}Detectado desde SAP: {{ pedidos.0.servicio_courier_nombre }}. {% endif %}"0" = Normal (único código confirmado en el manual de Starken); ajustar si corresponde otro.</p>
+    </label>
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Valor declarado</span>
+      <input type="number" name="valor_declarado" value="0" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+      <p class="text-xs text-muted mt-1">Junto con una Factura en "Documentos" (abajo), habilita el servicio COD del manual.</p>
+    </label>
+    <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Observaciones</span>
+      <textarea name="observaciones" maxlength="255" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">{{ observaciones_sugeridas }}</textarea></label>
+  </div>
+</div>
+
+<div class="bg-surface border border-line rounded-2xl p-6">
+  <h2 class="text-sm font-bold text-ink mb-4">Bultos</h2>
+  <p class="text-xs text-muted mb-4">Starken exige alto/ancho/largo por bulto (en centímetros, confirmado en el manual) para calcular el peso volumétrico. Multibultos: suma el largo de todos los bultos y toma el mayor ancho/alto entre ellos.</p>
+
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[560px]">
+      <thead><tr class="text-xs uppercase tracking-wide text-muted text-left">
+        <th class="py-2 pr-2">Cant.</th><th class="py-2 px-2">Alto (cm)</th><th class="py-2 px-2">Ancho (cm)</th><th class="py-2 px-2">Largo (cm)</th><th class="py-2 px-2">Peso (kg)</th><th class="py-2 pl-2">Contenido</th><th class="py-2 pl-2 w-8"></th>
+      </tr></thead>
+      <tbody id="filas-bultos">
+        <tr>
+          <td class="py-1 pr-2">
+            <input type="hidden" name="bulto_tipo" value="CAJA">
+            <input type="number" name="bulto_cantidad" value="1" min="1" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 px-2"><input type="text" name="bulto_alto" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 px-2"><input type="text" name="bulto_ancho" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 px-2"><input type="text" name="bulto_largo" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 px-2"><input type="number" name="bulto_peso" step="0.01" required class="w-20 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 pl-2"><select name="bulto_tipo_contenido" class="text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5">
+            <option value="SECO">SECO</option><option value="REFRIGERADO">REFRIGERADO</option><option value="REFRIGERADO CON SENSOR">REFRIGERADO CON SENSOR</option>
+          </select></td>
+          <td class="py-1 pl-2 text-center"><button type="button" onclick="quitarFilaBulto(this)" class="text-muted hover:text-rech-ink" title="Quitar">✕</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <button type="button" onclick="agregarFilaBulto()" class="text-sm font-semibold text-brand-ink hover:underline mt-3">+ Agregar bulto</button>
+</div>
+
+<div class="bg-surface border border-line rounded-2xl p-6">
+  <div class="flex items-center justify-between mb-1">
+    <h2 class="text-sm font-bold text-ink">Documentos de referencia</h2>
+    <button type="button" onclick="agregarFilaDocumento()" class="text-sm font-semibold text-brand-ink hover:underline">+ Agregar documento</button>
+  </div>
+  <p class="text-xs text-muted mb-4">Opcional, máximo 5. Habilita los servicios DD (retorno de guía/factura digitalizada) y COD del manual de Starken.</p>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="text-xs uppercase tracking-wide text-muted text-left">
+        <th class="py-2 pr-2 w-1/2">Tipo documento</th><th class="py-2 px-2">N° documento</th><th class="py-2 pl-2 w-8"></th>
+      </tr></thead>
+      <tbody id="filas-documentos">
+        <tr>
+          <td class="py-1 pr-2"><select name="doc_tipo" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5">
+            <option value="">Seleccione tipo</option>
+            <option value="26">Factura</option>
+            <option value="27">Guía de despacho</option>
+            <option value="28">Boleta</option>
+          </select></td>
+          <td class="py-1 px-2"><input type="text" name="doc_numero" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 pl-2 text-center"><button type="button" onclick="quitarFilaDocumento(this)" class="text-muted hover:text-rech-ink" title="Quitar">✕</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  function agregarFilaBulto() {
+    var filaOriginal = document.querySelector("#filas-bultos tr");
+    var filaNueva = filaOriginal.cloneNode(true);
+    document.getElementById("filas-bultos").appendChild(filaNueva);
+  }
+  function quitarFilaBulto(boton) {
+    if (document.querySelectorAll('#filas-bultos tr').length > 1) boton.closest('tr').remove();
+  }
+  function agregarFilaDocumento() {
+    var fila = document.querySelector('#filas-documentos tr');
+    var nueva = fila.cloneNode(true);
+    nueva.querySelectorAll('select, input').forEach(function (c) { c.value = ''; });
+    document.getElementById('filas-documentos').appendChild(nueva);
+  }
+  function quitarFilaDocumento(boton) {
+    if (document.querySelectorAll('#filas-documentos tr').length > 1) boton.closest('tr').remove();
+  }
+  function mostrarTipoEntrega() {
+    var esAgencia = document.querySelector('input[name="starken_tipo_entrega"][value="agencia"]').checked;
+    var campoAgencia = document.getElementById('starken-agencia-codigo');
+    campoAgencia.classList.toggle('hidden', !esAgencia);
+    campoAgencia.querySelector('input[name="codigo_agencia_destino"]').required = esAgencia;
+  }
+</script>

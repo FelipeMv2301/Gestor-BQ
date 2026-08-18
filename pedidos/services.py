@@ -60,7 +60,7 @@ def _mapear_pedido_woo(pedido_woo, mapa_comunas, ejecutivo_web):
         "direccion_depto": shipping.get("address_2", ""),
         "direccion_comuna": mapa_comunas.get(shipping.get("state", ""), shipping.get("state", "")),
         "direccion_ciudad": shipping.get("city", ""),
-        "observaciones": pedido_woo.get("customer_note", ""),
+        "observaciones": _nota_despacho_woo(pedido_woo),
     }
 
 #Valida si es Despacho o Retiro por pedido para WooCommerce
@@ -410,3 +410,12 @@ def sincronizar_woo_reciente():
     hoy = datetime.date.today()
     ayer = hoy - datetime.timedelta(days=1)
     return guardar_pedidos_woo(after=f"{ayer.isoformat()}T00:00:00", before=f"{hoy.isoformat()}T23:59:59")
+
+def _nota_despacho_woo(pedido_woo):
+    meta = {m.get("key"): m.get("value") for m in pedido_woo.get("meta_data", [])}
+    return (
+        meta.get("_wc_shipping/bioquimicacl/shipping_note")
+        or meta.get("_wc_billing/bioquimicacl/shipping_note")
+        or pedido_woo.get("customer_note")
+        or ""
+    )

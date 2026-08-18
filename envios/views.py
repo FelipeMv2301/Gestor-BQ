@@ -15,6 +15,8 @@ from django.urls import reverse
 from django.http import HttpResponse
 from django.core.paginator import Paginator
 import datetime
+import io, zipfile
+from integraciones.documentos import generar_documento, documentos_disponibles, ETIQUETAS_TIPO_DOCUMENTO
 
 
 @login_required
@@ -67,18 +69,6 @@ def mis_envios(request):
     }
     plantilla = "envios/_tabla_envios.html" if request.headers.get("HX-Request") else "envios/mis_envios.html"
     return render(request, plantilla, contexto)
-
-
-@login_required
-def detalle_envio(request, pk):
-    envio = get_object_or_404(EnvioCourier.objects.prefetch_related("pedidos"), pk=pk)
-    if not permisos.puede_ver_envio(request.user, envio):
-        return redirect("inicio")
-    # Ejecutivo: read-only en gestión (editar/eliminar/marcar), pero SÍ puede refrescar el estado
-    # de courier de los envíos que ve (mismo criterio que el acceso: puede_ver_envio).
-    return render(request, "envios/detalle_envio.html",
-                  {"envio": envio, "puede_gestionar": es_logistica(request.user),
-                   "puede_refrescar": True})
 
 
 #Batch: refresca el estado-courier de los MoveUP en 1 sola llamada a la API (ver seguimiento.py).
@@ -231,3 +221,43 @@ def reporte_xlsx(request):
     desde, hasta, couriers, ejecutivo_ids = _parametros_reporte(request)
     filas = reportes.filas_reporte(desde, hasta, couriers, ejecutivo_ids, request.user)
     return reportes.exportar_xlsx(filas)
+
+@login_required
+def detalle_envio(request, pk):
+    envio = get_object_or_404(EnvioCourier.objects.prefetch_related("pedidos"), pk=pk)
+    if not permisos.puede_ver_envio(request.user, envio):
+        return redirect("inicio")
+    documentos = [(tipo, ETIQUETAS_TIPO_DOCUMENTO.get(tipo, tipo)) for tipo in documentos_disponibles(envio.courier)]
+    return render(request, "envios/detalle_envio.html",
+                {"envio": envio, "puede_gestionar": es_logistica(request.user),
+                    "puede_refrescar": True, "documentos": documentos})
+
+@login_required
+def descargar_documento(request, pk, tipo):
+    envio = get_object_or_404(EnvioCourier, pk=pk)
+    if not permisos.puede_ver_envio(request.user, envio):
+        return redirect("inicio")
+
+    if not envio.orden_transporte:
+        messages.error(request, "Este envío no tiene orden de transporte todavía.")
+        return redirect("envios:detalle", pk=pk)
+
+    try:
+        archivos = generar_documento(envio.courier, tipo, envio.orden_transporte)
+    except Exception as exc:
+        messages.error(request, f"No se pudo generar el documento: {exc}")
+        return redirect("envios:detalle", pk=pk)
+
+    if len(archivos) == 1:
+        respuesta = HttpResponse(archivos[0], content_type="application/pdf")
+        respuesta["Content-Disposition"] = f'attachment; filename="{tipo}_{envio.orden_transporte}.pdf"'
+        return respuesta
+
+    # Multibultos: Starken puede devolver una etiqueta por encargo — se empaquetan en un zip.
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zip_archivo:
+        for indice, contenido in enumerate(archivos, start=1):
+            zip_archivo.writestr(f"{tipo}_{envio.orden_transporte}_{indice}.pdf", contenido)
+    respuesta = HttpResponse(buffer.getvalue(), content_type="application/zip")
+    respuesta["Content-Disposition"] = f'attachment; filename="{tipo}_{envio.orden_transporte}.zip"'
+    return respuesta

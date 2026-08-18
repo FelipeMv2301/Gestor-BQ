@@ -76,6 +76,9 @@
       {% include "pedidos/_campo.html" with k="Actualizado" v=envio.estado_courier_actualizado|date:"d/m/Y H:i" %}
       {% endif %}
       <div class="flex flex-wrap gap-2.5 mt-3">
+        {% for tipo, etiqueta in documentos %}
+        <a href="{% url 'envios:descargar_documento' envio.pk tipo %}" class="inline-flex items-center text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Descargar {{ etiqueta|lower }} ⬇</a>
+        {% endfor %}
         {% if envio.url_seguimiento %}
         <a href="{{ envio.url_seguimiento }}" target="_blank" rel="noopener" class="inline-flex items-center text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Ir a portal courier ↗</a>
         {% endif %}
