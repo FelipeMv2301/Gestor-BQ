@@ -15,7 +15,8 @@ from django.urls import reverse
 from django.http import HttpResponse
 from django.core.paginator import Paginator
 import datetime
-import io, zipfile
+import io
+from pypdf import PdfWriter
 from integraciones.documentos import generar_documento, documentos_disponibles, ETIQUETAS_TIPO_DOCUMENTO
 
 
@@ -107,7 +108,7 @@ def refrescar_estado_envio(request, pk):
         else:
             messages.info(request, "Este courier no tiene consulta de estado por API.")
     except Exception as exc:
-        messages.error(request, f"No se pudo consultar el estado: {exc}")
+        messages.error(request, f"No se pudo consultar el estado: {str(exc).replace('[!] Error: ', '')}")
     return redirect("envios:detalle", pk=pk)
 
 
@@ -245,19 +246,22 @@ def descargar_documento(request, pk, tipo):
     try:
         archivos = generar_documento(envio.courier, tipo, envio.orden_transporte)
     except Exception as exc:
-        messages.error(request, f"No se pudo generar el documento: {exc}")
+        messages.error(request, f"No se pudo generar el documento: {str(exc).replace('[!] Error: ', '')}")
         return redirect("envios:detalle", pk=pk)
 
     if len(archivos) == 1:
-        respuesta = HttpResponse(archivos[0], content_type="application/pdf")
-        respuesta["Content-Disposition"] = f'attachment; filename="{tipo}_{envio.orden_transporte}.pdf"'
-        return respuesta
+        contenido = archivos[0]
+    else:
+        # Multibultos: Starken puede devolver una etiqueta por bulto/encargo — se fusionan en un
+        # solo PDF de N páginas para poder verlo/imprimirlo igual que el caso de un solo archivo,
+        # en vez de forzar un .zip (que no tiene visor nativo en el navegador).
+        writer = PdfWriter()
+        for pdf_bytes in archivos:
+            writer.append(io.BytesIO(pdf_bytes))
+        buffer = io.BytesIO()
+        writer.write(buffer)
+        contenido = buffer.getvalue()
 
-    # Multibultos: Starken puede devolver una etiqueta por encargo — se empaquetan en un zip.
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w") as zip_archivo:
-        for indice, contenido in enumerate(archivos, start=1):
-            zip_archivo.writestr(f"{tipo}_{envio.orden_transporte}_{indice}.pdf", contenido)
-    respuesta = HttpResponse(buffer.getvalue(), content_type="application/zip")
-    respuesta["Content-Disposition"] = f'attachment; filename="{tipo}_{envio.orden_transporte}.zip"'
+    respuesta = HttpResponse(contenido, content_type="application/pdf")
+    respuesta["Content-Disposition"] = f'inline; filename="{tipo}_{envio.orden_transporte}.pdf"'
     return respuesta

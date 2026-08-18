@@ -4,12 +4,22 @@ from utils import validar_rut, normalizar_telefono_cl
 
 TIPO_ENTREGA_AGENCIA = 1 #Para envíos a agencia de starken
 TIPO_ENTREGA_DOMICILIO = 2 #Para envíos a domicilio del cliente
-TIPO_ENCARGO_DEFAULT = "29" #Se desconoce su uso
+TIPO_ENCARGO_DEFAULT = "29" #Package in kilograms (Diccionario_H2H_Parametros_de_Entrada, hoja "Package classification")
 TIPO_SALIDA_BASE64_10X10 = 6 #Determinar el tamaño de la etiqueta
+VALOR_DECLARADO_MINIMO_CON_DOCUMENTO = 50000 #Sobre este monto, Starken exige un documento de referencia (Diccionario de Entrada)
 
 """
 Helpers
 """
+#Uniforma los errores de red/HTTP de Starken (DNS caído, timeout, 500, etc.) en un mensaje legible
+#para Logística en vez del texto crudo de requests (ej. "HTTPSConnectionPool(...)").
+def _solicitud(metodo, url, **kwargs):
+    try:
+        respuesta = metodo(url, timeout=30, **kwargs)
+        respuesta.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        raise ValueError(f"[!] Error: no se pudo conectar con Starken. Revisa la conexión o el ambiente configurado ({url}).") from exc
+    return respuesta
 # Sirve para gestionar los documentos (maximo 5) que se pueden incorporar en starken
 def _referencias_documentos(documentos):
     #Starken no acepta una lista de documentos: son 5 campos fijos con nombre (tipoDocumentoN/
@@ -28,8 +38,11 @@ def _referencias_documentos(documentos):
 def emitir_of(pedidos, bultos, destinatario, datos_courier):
     numero_bultos = sum(b["cantidad"] for b in bultos)
     kilos = sum(b["peso"] * b["cantidad"] for b in bultos)
-    #Multibultos (FAQ del manual): sumar UNA dimensión y tomar el máximo de las otras dos.
-    largo = sum(float(b.get("largo") or 0) for b in bultos)
+    #Multibultos (FAQ del manual): sumar UNA dimensión y tomar el máximo de las otras dos. El largo
+    #se suma por BULTO FÍSICO, no por fila del formulario — una fila con cantidad=3 cuenta 3 veces
+    #(bug real detectado 2026-08-18: antes solo sumaba el largo de la fila una vez, subestimando el
+    #volumen declarado a Starken cuando una fila agrupaba más de un bulto idéntico).
+    largo = sum(float(b.get("largo") or 0) * b["cantidad"] for b in bultos)
     ancho = max((float(b.get("ancho") or 0) for b in bultos), default=0)
     alto = max((float(b.get("alto") or 0) for b in bultos), default=0)
 
@@ -38,9 +51,20 @@ def emitir_of(pedidos, bultos, destinatario, datos_courier):
     comuna_destino = f"@{codigo_agencia}" if codigo_agencia else destinatario["comuna"]
 
     rut_cuerpo, _, rut_dv = destinatario["rut"].partition("-")
+    rut_dv = rut_dv.upper()  #Starken espera el DV en mayúscula ("K"); un "k" tipeado por Logística pasa validar_rut pero llegaría en minúscula si no se normaliza aquí.
 
     if not validar_rut(destinatario["rut"]):
         raise ValueError(f"[!] Error: RUT inválido para emitir la OF en Starken: {destinatario['rut']}")
+
+    valor_declarado = int(datos_courier.get("valor_declarado") or 0)
+    documentos = datos_courier.get("documentos") or []
+    if valor_declarado > VALOR_DECLARADO_MINIMO_CON_DOCUMENTO and not documentos:
+        valor_formateado = f"{valor_declarado:,}".replace(",", ".")
+        minimo_formateado = f"{VALOR_DECLARADO_MINIMO_CON_DOCUMENTO:,}".replace(",", ".")
+        raise ValueError(
+            f"[!] Error: el valor declarado (${valor_formateado}) supera ${minimo_formateado} — Starken "
+            "exige agregar al menos un documento de referencia (factura, guía o boleta)."
+        )
 
     payload = {
         "rutEmpresaEmisora": settings.STARKEN_RUT_EMPRESA_EMISORA,
@@ -53,7 +77,7 @@ def emitir_of(pedidos, bultos, destinatario, datos_courier):
         "apellidoMaternoRemitente": ".",
         "direccionRemitente": settings.STARKEN_DIRECCION_REMITENTE,
         "numeracionDireccionRemitente": settings.STARKEN_NUMERACION_DIRECCION_REMITENTE,
-        "departamentoRemitente": "",
+        "departamentoRemitente": settings.STARKEN_DEPARTAMENTO_REMITENTE,
         "emailRemitente": settings.STARKEN_EMAIL_REMITENTE,
         "telefonoRemitente": settings.STARKEN_TELEFONO_REMITENTE,
         "comunaRemitente": settings.STARKEN_COMUNA_REMITENTE,
@@ -84,7 +108,7 @@ def emitir_of(pedidos, bultos, destinatario, datos_courier):
         "ancho": str(ancho),
         "largo": str(largo),
         "tipoServicio": datos_courier.get("servicio") or "0",
-        **_referencias_documentos(datos_courier.get("documentos") or []),
+        **_referencias_documentos(documentos),
         "tipoEncargo1": TIPO_ENCARGO_DEFAULT,
         "cantidadEncargo1": str(numero_bultos),
         "tipoEncargo2": "", "cantidadEncargo2": "",
@@ -94,8 +118,7 @@ def emitir_of(pedidos, bultos, destinatario, datos_courier):
         "observacion": datos_courier.get("observaciones") or "",
     }
 
-    respuesta = requests.post(settings.STARKEN_BASE_URL, json=payload, timeout=30)
-    respuesta.raise_for_status()
+    respuesta = _solicitud(requests.post, settings.STARKEN_BASE_URL, json=payload)
     datos = respuesta.json()
 
     if datos.get("codigoError") != 0:
@@ -105,13 +128,11 @@ def emitir_of(pedidos, bultos, destinatario, datos_courier):
     return {"numero_orden_flete": str(int(float(datos["nroOrdenFlete"])))}
 
 def generar_etiqueta(numero_orden_flete, tipo_salida=TIPO_SALIDA_BASE64_10X10):
-    respuesta = requests.post(
-        settings.STARKEN_ETIQUETA_URL,
+    respuesta = _solicitud(
+        requests.post, settings.STARKEN_ETIQUETA_URL,
         auth=(settings.STARKEN_ETIQUETA_USER, settings.STARKEN_ETIQUETA_PASSWORD),
         params={"ordenFlete": numero_orden_flete, "tipoSalida": tipo_salida},
-        timeout=30,
     )
-    respuesta.raise_for_status()
     datos = respuesta.json()
 
     if datos.get("status") != 200:
@@ -119,3 +140,21 @@ def generar_etiqueta(numero_orden_flete, tipo_salida=TIPO_SALIDA_BASE64_10X10):
 
     #data es un arreglo de strings Base64 (uno por bulto/encargo, ver manual sección "Generación de etiqueta").
     return [base64.b64decode(etiqueta) for etiqueta in datos["data"]]
+
+
+#Agencias con PickUp habilitado (delivery=true), para el selector de "retiro en agencia" del formulario
+#de despacho. code_dls es el código que va en comunaDestino ("@<code_dls>") al emitir la OF.
+def listar_agencias():
+    respuesta = _solicitud(
+        requests.get, settings.STARKEN_AGENCY_URL,
+        headers={"Authorization": settings.STARKEN_AGENCY_TOKEN},
+    )
+    return [a for a in respuesta.json() if a.get("delivery")]
+
+def consultar_estado(orden_flete):
+    respuesta = _solicitud(
+        requests.post, settings.STARKEN_SEGUIMIENTO_URL,
+        headers={"Rut": settings.STARKEN_SEGUIMIENTO_RUT, "Clave": settings.STARKEN_SEGUIMIENTO_CLAVE},
+        json={"ordenFlete": int(orden_flete)},
+    )
+    return respuesta.json().get("estadoFlete") or ""

@@ -68,8 +68,14 @@ class EnvioCourier(models.Model):
           detalle_envio += f" - {self.orden_transporte}"
         return detalle_envio
 
-    #URL de tracking del courier (o None si no tiene). Import local para no acoplar el modelo.
+    #Portal interno donde Logística gestiona el envío (o None si no hay). Import local, ver arriba.
     @property
-    def url_seguimiento(self):
-        from integraciones.seguimiento import url_seguimiento
-        return url_seguimiento(self)
+    def url_portal_courier(self):
+        from integraciones.seguimiento import url_portal_courier
+        return url_portal_courier(self)
+
+    #Link de seguimiento público, el que ve el cliente final (o None si no hay).
+    @property
+    def url_seguimiento_publico(self):
+        from integraciones.seguimiento import url_seguimiento_publico
+        return url_seguimiento_publico(self)

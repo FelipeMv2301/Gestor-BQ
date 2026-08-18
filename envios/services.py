@@ -141,6 +141,7 @@ def _parsear_despacho_moveup(request):
 
 def _parsear_despacho_starken(request):
     bultos = parsear_bultos(request)
+    codigo_agencia_destino = (request.POST.get("codigo_agencia_destino") or "").strip() or None
     destinatario = {
         "nombre": request.POST.get("destinatario_nombre"),
         "rut": request.POST.get("destinatario_rut"),
@@ -152,16 +153,27 @@ def _parsear_despacho_starken(request):
         "email": request.POST.get("destinatario_email"),
     }
 
-    faltantes = [etiqueta for campo, etiqueta in
-                [("nombre", "Nombre"), ("direccion", "Calle"), ("numero", "Número"), ("comuna", "Comuna")]
-                if not (destinatario.get(campo) or "").strip()]
+    # Retiro en agencia: la dirección del destinatario no aplica (se retira en la agencia,
+    # identificada por su código) — solo se exige en modo domicilio.
+    campos_requeridos = [("nombre", "Nombre")]
+    if not codigo_agencia_destino:
+        campos_requeridos += [("direccion", "Calle"), ("numero", "Número"), ("comuna", "Comuna")]
+    faltantes = [etiqueta for campo, etiqueta in campos_requeridos if not (destinatario.get(campo) or "").strip()]
     if faltantes:
         raise ValueError(f"Faltan datos para Starken: {', '.join(faltantes)}.")
+
+    tipos_doc = request.POST.getlist("doc_tipo")
+    numeros_doc = request.POST.getlist("doc_numero")
+    documentos = [{"tipo": t.strip(), "numero": n.strip()}
+                for t, n in zip(tipos_doc, numeros_doc) if t.strip() and n.strip()]
 
     datos_courier = {
         "valor_declarado": request.POST.get("valor_declarado") or 0,
         "servicio": request.POST.get("servicio") or "0",
         "observaciones": request.POST.get("observaciones"),
+        "documentos": documentos,
+        "codigo_agencia_destino": codigo_agencia_destino,
+        "contenido": (request.POST.get("contenido") or "").strip() or None,
     }
 
     return bultos, destinatario, datos_courier

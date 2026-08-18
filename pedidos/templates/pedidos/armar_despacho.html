@@ -27,13 +27,13 @@
     <h2 class="text-sm font-bold text-ink mb-4">Destinatario</h2>
     <div class="grid gap-4 sm:grid-cols-2">
       <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Nombre / Razón social</span>
-        <input type="text" name="destinatario_nombre" value="{{ pedidos.0.razon_social|default:pedidos.0.nombre_contacto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+        <input type="text" name="destinatario_nombre" value="{{ post.destinatario_nombre|default:pedidos.0.razon_social|default:pedidos.0.nombre_contacto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
       <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">RUT</span>
-        <input type="text" name="destinatario_rut" value="{{ pedidos.0.rut }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+        <input type="text" name="destinatario_rut" value="{{ post.destinatario_rut|default:pedidos.0.rut }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
       <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Teléfono</span>
-        <input type="text" name="destinatario_telefono" value="{{ pedidos.0.telefono_contacto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+        <input type="text" name="destinatario_telefono" value="{{ post.destinatario_telefono|default:pedidos.0.telefono_contacto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
       <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Email</span>
-        <input type="email" name="destinatario_email" value="{{ pedidos.0.email_contacto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+        <input type="email" name="destinatario_email" value="{{ post.destinatario_email|default:pedidos.0.email_contacto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     </div>
   </div>
 

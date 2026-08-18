@@ -3,13 +3,13 @@
   <p class="text-xs text-muted mb-3">MoveUP pide calle y número separados. Revisa y ajusta antes de despachar.</p>
   <div class="grid gap-4 sm:grid-cols-2">
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Calle</span>
-      <input type="text" name="moveup_calle" value="{{ pedidos.0.direccion_calle }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="text" name="moveup_calle" value="{{ post.moveup_calle|default:pedidos.0.direccion_calle }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Número</span>
-      <input type="text" name="moveup_numero" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="text" name="moveup_numero" value="{{ post.moveup_numero }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Depto / Casa</span>
-      <input type="text" name="moveup_depto" value="{{ pedidos.0.direccion_depto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="text" name="moveup_depto" value="{{ post.moveup_depto|default:pedidos.0.direccion_depto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Comuna</span>
-      <input type="text" name="destinatario_comuna" data-comuna value="{{ pedidos.0.direccion_comuna }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="text" name="destinatario_comuna" data-comuna value="{{ post.destinatario_comuna|default:pedidos.0.direccion_comuna }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
   </div>
 </div>
 
@@ -18,14 +18,14 @@
   <div class="grid gap-4 sm:grid-cols-2">
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Tamaño</span>
       <select name="package_size" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
-        <option value="2">Caja</option>
-        <option value="1">Sobre</option>
+        <option value="2" {% if post.package_size == "2" or not post.package_size %}selected{% endif %}>Caja</option>
+        <option value="1" {% if post.package_size == "1" %}selected{% endif %}>Sobre</option>
       </select></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Cantidad de paquetes</span>
-      <input type="number" name="cantidad" value="1" min="1" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="number" name="cantidad" value="{{ post.cantidad|default:"1" }}" min="1" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Valor declarado</span>
-      <input type="number" name="valor_declarado" value="0" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="number" name="valor_declarado" value="{{ post.valor_declarado|default:"0" }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Observaciones</span>
-      <textarea name="observaciones" maxlength="255" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">{{ observaciones_sugeridas }}</textarea></label>
+      <textarea name="observaciones" maxlength="255" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">{{ post.observaciones|default:observaciones_sugeridas }}</textarea></label>
   </div>
 </div>

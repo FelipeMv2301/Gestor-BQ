@@ -1,30 +1,40 @@
 <div class="bg-surface border border-line rounded-2xl p-6">
+  <h2 class="text-sm font-bold text-ink mb-4">Tipo de entrega</h2>
+  <div class="inline-flex bg-appbg border border-line p-1 rounded-xl gap-1 text-sm mb-4">
+    <label class="cursor-pointer"><input type="radio" name="starken_tipo_entrega" value="domicilio" class="peer sr-only" {% if post.starken_tipo_entrega != "agencia" %}checked{% endif %} onclick="mostrarTipoEntrega()">
+      <span class="block px-3 py-1 rounded-lg text-muted font-semibold peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Domicilio</span></label>
+    <label class="cursor-pointer"><input type="radio" name="starken_tipo_entrega" value="agencia" class="peer sr-only" {% if post.starken_tipo_entrega == "agencia" %}checked{% endif %} onclick="mostrarTipoEntrega()">
+      <span class="block px-3 py-1 rounded-lg text-muted font-semibold peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Retiro en agencia</span></label>
+  </div>
+  <div id="starken-agencia-codigo" class="{% if post.starken_tipo_entrega != "agencia" %}hidden {% endif %}sm:max-w-xs">
+    {% if agencias_starken %}
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Agencia de destino</span>
+      <select id="starken-select-agencia" name="codigo_agencia_destino" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+        <option value="">Selecciona una agencia</option>
+        {% for agencia in agencias_starken %}
+        <option value="{{ agencia.code_dls }}" {% if agencia.code_dls|stringformat:"s" == post.codigo_agencia_destino %}selected{% endif %}>{{ agencia.code_dls }}-{{ agencia.name }}</option>
+        {% endfor %}
+      </select></label>
+    {% else %}
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Código de agencia Starken</span>
+      <input type="text" name="codigo_agencia_destino" value="{{ post.codigo_agencia_destino }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+    <p class="text-xs text-muted mt-1">No se pudo cargar el listado de agencias — escribe el código manualmente (ej. "1467").</p>
+    {% endif %}
+  </div>
+</div>
+
+<div id="starken-bloque-direccion" class="bg-surface border border-line rounded-2xl p-6{% if post.starken_tipo_entrega == "agencia" %} hidden{% endif %}">
   <h2 class="text-sm font-bold text-ink mb-4">Dirección</h2>
   <p class="text-xs text-muted mb-3">Starken pide calle y número separados. Revisa y ajusta antes de despachar.</p>
   <div class="grid gap-4 sm:grid-cols-2">
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Calle</span>
-      <input type="text" name="starken_calle" value="{{ pedidos.0.direccion_calle }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="text" name="starken_calle" value="{{ post.starken_calle|default:pedidos.0.direccion_calle }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Número</span>
-      <input type="text" name="starken_numero" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="text" name="starken_numero" value="{{ post.starken_numero }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Depto / Casa</span>
-      <input type="text" name="starken_depto" value="{{ pedidos.0.direccion_depto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="text" name="starken_depto" value="{{ post.starken_depto|default:pedidos.0.direccion_depto }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Comuna</span>
-      <input type="text" name="destinatario_comuna" data-comuna value="{{ pedidos.0.direccion_comuna }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
-  </div>
-</div>
-
-<div class="bg-surface border border-line rounded-2xl p-6">
-  <h2 class="text-sm font-bold text-ink mb-4">Tipo de entrega</h2>
-  <div class="inline-flex bg-appbg border border-line p-1 rounded-xl gap-1 text-sm mb-4">
-    <label class="cursor-pointer"><input type="radio" name="starken_tipo_entrega" value="domicilio" class="peer sr-only" checked onclick="mostrarTipoEntrega()">
-      <span class="block px-3 py-1 rounded-lg text-muted font-semibold peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Domicilio</span></label>
-    <label class="cursor-pointer"><input type="radio" name="starken_tipo_entrega" value="agencia" class="peer sr-only" onclick="mostrarTipoEntrega()">
-      <span class="block px-3 py-1 rounded-lg text-muted font-semibold peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm">Retiro en agencia</span></label>
-  </div>
-  <div id="starken-agencia-codigo" class="hidden sm:max-w-xs">
-    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Código de agencia Starken</span>
-      <input type="text" name="codigo_agencia_destino" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
-    <p class="text-xs text-muted mt-1">Todavía no hay selector de agencias en el portal — escribe el código manualmente (ej. "1467").</p>
+      <input type="text" name="destinatario_comuna" data-comuna value="{{ post.destinatario_comuna|default:pedidos.0.direccion_comuna }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
   </div>
 </div>
 
@@ -32,15 +42,22 @@
   <h2 class="text-sm font-bold text-ink mb-4">Datos del courier</h2>
   <div class="grid gap-4 sm:grid-cols-2">
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Servicio</span>
-      <input type="text" name="servicio" value="{{ pedidos.0.servicio_courier_codigo|default:"0" }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
-      <p class="text-xs text-muted mt-1">{% if pedidos.0.servicio_courier_nombre %}Detectado desde SAP: {{ pedidos.0.servicio_courier_nombre }}. {% endif %}"0" = Normal (único código confirmado en el manual de Starken); ajustar si corresponde otro.</p>
+      <select name="servicio" required class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+        <option value="0" {% if post.servicio|default:pedidos.0.servicio_courier_codigo|default:"0" == "0" %}selected{% endif %}>0 - Normal</option>
+        <option value="1" {% if post.servicio|default:pedidos.0.servicio_courier_codigo == "1" %}selected{% endif %}>1 - Express</option>
+      </select>
+      {% if pedidos.0.servicio_courier_nombre %}<p class="text-xs text-muted mt-1">Detectado desde SAP: {{ pedidos.0.servicio_courier_nombre }}. Puedes cambiarlo si hace falta.</p>{% endif %}
     </label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Valor declarado</span>
-      <input type="number" name="valor_declarado" value="0" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
-      <p class="text-xs text-muted mt-1">Junto con una Factura en "Documentos" (abajo), habilita el servicio COD del manual.</p>
+      <input type="number" id="starken-valor-declarado" name="valor_declarado" value="{{ post.valor_declarado|default:"0" }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+      <p class="text-xs text-muted mt-1">Sobre $50.000, Starken exige agregar un documento de referencia (abajo) — si no, rechaza la OF. Con una Factura, además habilita el servicio COD del manual.</p>
+    </label>
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Contenido</span>
+      <input type="text" name="contenido" value="{{ post.contenido|default:"MERCADERIA" }}" maxlength="60" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+      <p class="text-xs text-muted mt-1">Descripción libre del contenido del envío (Starken no exige un catálogo fijo).</p>
     </label>
     <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Observaciones</span>
-      <textarea name="observaciones" maxlength="255" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">{{ observaciones_sugeridas }}</textarea></label>
+      <textarea name="observaciones" maxlength="255" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">{{ post.observaciones|default:observaciones_sugeridas }}</textarea></label>
   </div>
 </div>
 
@@ -51,9 +68,23 @@
   <div class="overflow-x-auto">
     <table class="w-full text-sm min-w-[560px]">
       <thead><tr class="text-xs uppercase tracking-wide text-muted text-left">
-        <th class="py-2 pr-2">Cant.</th><th class="py-2 px-2">Alto (cm)</th><th class="py-2 px-2">Ancho (cm)</th><th class="py-2 px-2">Largo (cm)</th><th class="py-2 px-2">Peso (kg)</th><th class="py-2 pl-2">Contenido</th><th class="py-2 pl-2 w-8"></th>
+        <th class="py-2 pr-2">Cant.</th><th class="py-2 px-2">Alto (cm)</th><th class="py-2 px-2">Ancho (cm)</th><th class="py-2 px-2">Largo (cm)</th><th class="py-2 px-2">Peso (kg)</th><th class="py-2 pl-2 w-8"></th>
       </tr></thead>
       <tbody id="filas-bultos">
+        {% for fila in bultos_previos %}
+        <tr>
+          <td class="py-1 pr-2">
+            <input type="hidden" name="bulto_tipo" value="CAJA">
+            <input type="number" name="bulto_cantidad" value="{{ fila.cantidad|default:"1" }}" min="1" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 px-2"><input type="text" name="bulto_alto" value="{{ fila.alto }}" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 px-2"><input type="text" name="bulto_ancho" value="{{ fila.ancho }}" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 px-2"><input type="text" name="bulto_largo" value="{{ fila.largo }}" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 px-2">
+            <input type="hidden" name="bulto_tipo_contenido" value="">
+            <input type="number" name="bulto_peso" step="0.01" value="{{ fila.peso }}" required class="w-20 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 pl-2 text-center"><button type="button" onclick="quitarFilaBulto(this)" class="text-muted hover:text-rech-ink" title="Quitar">✕</button></td>
+        </tr>
+        {% empty %}
         <tr>
           <td class="py-1 pr-2">
             <input type="hidden" name="bulto_tipo" value="CAJA">
@@ -61,12 +92,12 @@
           <td class="py-1 px-2"><input type="text" name="bulto_alto" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
           <td class="py-1 px-2"><input type="text" name="bulto_ancho" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
           <td class="py-1 px-2"><input type="text" name="bulto_largo" class="w-16 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
-          <td class="py-1 px-2"><input type="number" name="bulto_peso" step="0.01" required class="w-20 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
-          <td class="py-1 pl-2"><select name="bulto_tipo_contenido" class="text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5">
-            <option value="SECO">SECO</option><option value="REFRIGERADO">REFRIGERADO</option><option value="REFRIGERADO CON SENSOR">REFRIGERADO CON SENSOR</option>
-          </select></td>
+          <td class="py-1 px-2">
+            <input type="hidden" name="bulto_tipo_contenido" value="">
+            <input type="number" name="bulto_peso" step="0.01" required class="w-20 text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
           <td class="py-1 pl-2 text-center"><button type="button" onclick="quitarFilaBulto(this)" class="text-muted hover:text-rech-ink" title="Quitar">✕</button></td>
         </tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>
@@ -76,7 +107,7 @@
 <div class="bg-surface border border-line rounded-2xl p-6">
   <div class="flex items-center justify-between mb-1">
     <h2 class="text-sm font-bold text-ink">Documentos de referencia</h2>
-    <button type="button" onclick="agregarFilaDocumento()" class="text-sm font-semibold text-brand-ink hover:underline">+ Agregar documento</button>
+    <button type="button" id="boton-agregar-documento" onclick="agregarFilaDocumento()" class="text-sm font-semibold text-brand-ink hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline">+ Agregar documento</button>
   </div>
   <p class="text-xs text-muted mb-4">Opcional, máximo 5. Habilita los servicios DD (retorno de guía/factura digitalizada) y COD del manual de Starken.</p>
   <div class="overflow-x-auto">
@@ -85,6 +116,18 @@
         <th class="py-2 pr-2 w-1/2">Tipo documento</th><th class="py-2 px-2">N° documento</th><th class="py-2 pl-2 w-8"></th>
       </tr></thead>
       <tbody id="filas-documentos">
+        {% for doc in documentos_previos %}
+        <tr>
+          <td class="py-1 pr-2"><select name="doc_tipo" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5">
+            <option value="" {% if not doc.tipo %}selected{% endif %}>Seleccione tipo</option>
+            <option value="26" {% if doc.tipo == "26" %}selected{% endif %}>Factura</option>
+            <option value="27" {% if doc.tipo == "27" %}selected{% endif %}>Guía de despacho</option>
+            <option value="28" {% if doc.tipo == "28" %}selected{% endif %}>Boleta</option>
+          </select></td>
+          <td class="py-1 px-2"><input type="text" name="doc_numero" value="{{ doc.numero }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
+          <td class="py-1 pl-2 text-center"><button type="button" onclick="quitarFilaDocumento(this)" class="text-muted hover:text-rech-ink" title="Quitar">✕</button></td>
+        </tr>
+        {% empty %}
         <tr>
           <td class="py-1 pr-2"><select name="doc_tipo" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5">
             <option value="">Seleccione tipo</option>
@@ -95,6 +138,7 @@
           <td class="py-1 px-2"><input type="text" name="doc_numero" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1.5"></td>
           <td class="py-1 pl-2 text-center"><button type="button" onclick="quitarFilaDocumento(this)" class="text-muted hover:text-rech-ink" title="Quitar">✕</button></td>
         </tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>
@@ -104,24 +148,70 @@
   function agregarFilaBulto() {
     var filaOriginal = document.querySelector("#filas-bultos tr");
     var filaNueva = filaOriginal.cloneNode(true);
+    filaNueva.querySelectorAll('input[type="number"], input[type="text"]').forEach(function (c) {
+      if (c.name === 'bulto_cantidad') { c.value = '1'; return; }
+      c.value = '';
+    });
     document.getElementById("filas-bultos").appendChild(filaNueva);
   }
   function quitarFilaBulto(boton) {
     if (document.querySelectorAll('#filas-bultos tr').length > 1) boton.closest('tr').remove();
   }
   function agregarFilaDocumento() {
+    // Starken admite máximo 5 documentos de referencia por OF (manual, emisión H2H) — cortar acá
+    // evita que Logística llene una 6ta fila y recién se entere del límite al enviar el formulario.
+    if (document.querySelectorAll('#filas-documentos tr').length >= 5) return;
     var fila = document.querySelector('#filas-documentos tr');
     var nueva = fila.cloneNode(true);
     nueva.querySelectorAll('select, input').forEach(function (c) { c.value = ''; });
     document.getElementById('filas-documentos').appendChild(nueva);
+    document.getElementById('boton-agregar-documento').disabled = document.querySelectorAll('#filas-documentos tr').length >= 5;
   }
   function quitarFilaDocumento(boton) {
     if (document.querySelectorAll('#filas-documentos tr').length > 1) boton.closest('tr').remove();
+    document.getElementById('boton-agregar-documento').disabled = document.querySelectorAll('#filas-documentos tr').length >= 5;
   }
   function mostrarTipoEntrega() {
+    // Retiro en agencia: la dirección del destinatario no aplica (se retira en la agencia,
+    // identificada por su código) — el backend tampoco la exige en ese caso (ver _parsear_despacho_starken).
     var esAgencia = document.querySelector('input[name="starken_tipo_entrega"][value="agencia"]').checked;
     var campoAgencia = document.getElementById('starken-agencia-codigo');
+    var bloqueDireccion = document.getElementById('starken-bloque-direccion');
     campoAgencia.classList.toggle('hidden', !esAgencia);
-    campoAgencia.querySelector('input[name="codigo_agencia_destino"]').required = esAgencia;
+    bloqueDireccion.classList.toggle('hidden', esAgencia);
+    var campoCodigoAgencia = campoAgencia.querySelector('[name="codigo_agencia_destino"]');   // input o select, según si cargó el listado
+    if (campoCodigoAgencia) campoCodigoAgencia.required = esAgencia;
+    // Depto/Casa queda fuera a propósito: es el único campo del bloque que el backend no exige.
+    ['starken_calle', 'starken_numero', 'destinatario_comuna'].forEach(function (nombre) {
+      document.querySelector('[name="' + nombre + '"]').required = !esAgencia;
+    });
   }
+  document.addEventListener('DOMContentLoaded', function () {
+    // Sincroniza required/visibilidad con el radio que haya quedado marcado (relevante al recargar
+    // tras un POST fallido con "agencia" ya seleccionado — sin esto el HTML5 required queda desalineado).
+    mostrarTipoEntrega();
+    // Tom Select sobre el <select> de agencias ya poblado por Django: sin datos aparte, solo lee
+    // las <option> existentes — habilita buscar por código o nombre (ambos van en el texto visible).
+    if (typeof TomSelect !== 'undefined') {
+      var el = document.getElementById('starken-select-agencia');
+      if (el && !el.tomselect) new TomSelect(el, { create: false, maxItems: 1 });
+    }
+
+    // Diccionario H2H de Starken: sobre $50.000 de valor declarado exige un documento de referencia,
+    // si no rechaza la OF — se avisa antes de enviar en vez de esperar la vuelta del servidor.
+    var form = document.getElementById('starken-valor-declarado').closest('form');
+    form.addEventListener('submit', function (e) {
+      var valor = parseInt(document.getElementById('starken-valor-declarado').value || '0', 10);
+      if (valor <= 50000) return;
+      var tieneDocumento = Array.from(document.querySelectorAll('#filas-documentos tr')).some(function (fila) {
+        var tipo = fila.querySelector('[name="doc_tipo"]');
+        var numero = fila.querySelector('[name="doc_numero"]');
+        return tipo && tipo.value && numero && numero.value.trim();
+      });
+      if (!tieneDocumento) {
+        e.preventDefault();
+        showToast({level: 'error', title: 'Falta documento de referencia', body: 'El valor declarado supera $50.000 — agrega al menos un documento (factura, guía o boleta) antes de despachar.'});
+      }
+    });
+  });
 </script>

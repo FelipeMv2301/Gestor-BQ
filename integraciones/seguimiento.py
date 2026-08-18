@@ -2,7 +2,7 @@ from collections import defaultdict
 from django.conf import settings
 from django.utils import timezone
 from utils import Courier
-from integraciones import moveup_client
+from integraciones import moveup_client, starken_client
 
 """
 Seguimiento de envíos por courier (URL de tracking + estado por API).
@@ -12,24 +12,36 @@ degrada con gracia (courier sin entrada → None / "—", no rompe). Sumar un co
 su función solo en las capacidades que tenga.
 
 Ojo: este módulo NO importa envios.models (recibe objetos `envio` y hace envio.save()), para que el
-modelo pueda importar url_seguimiento en una property sin ciclo de imports.
+modelo pueda importar url_portal_courier/url_seguimiento_publico en properties sin ciclo de imports.
 """
 
-# --- URL de tracking por courier (para linkear la Orden de Transporte) ---
-TRACKING_URL = {
-    Courier.CHIBRA: lambda envio: f"{settings.CHIBRA_BASE_URL.rstrip('/')}/gts/priv/expediciones/busqueda_avanzada.seam",   # provisorio; URL real cuando la haya
-    Courier.MOVEUP: lambda envio: "https://moveuplogistica.firebaseapp.com/client/packages/view-packages",   # portal interno, sin deep-link por OT
+# --- Portal interno del courier (donde LOGÍSTICA gestiona/opera los envíos) ---
+PORTAL_COURIER_URL = {
+    Courier.CHIBRA: lambda envio: f"{settings.CHIBRA_BASE_URL.rstrip('/')}/gts/priv/expediciones/busqueda_avanzada.seam",   # panel privado de gestión
+    Courier.MOVEUP: lambda envio: "https://moveuplogistica.firebaseapp.com/client/packages/view-packages",   # panel de gestión de paquetes
+    Courier.STARKEN: lambda envio: "https://starkenpro.cl/dashboard-pro",   # portal STK Pro Empresa
 }
 
+# --- Seguimiento público (el que ve el CLIENTE FINAL para rastrear su pedido) ---
+SEGUIMIENTO_PUBLICO_URL = {
+    Courier.STARKEN: lambda envio: f"https://www.starken.cl/seguimiento?codigo={envio.orden_transporte}",
+    # Chibra/MoveUP: sin seguimiento público documentado todavía.
+}
 
-def url_seguimiento(envio):
-    fn = TRACKING_URL.get(envio.courier)
+def url_portal_courier(envio):
+    fn = PORTAL_COURIER_URL.get(envio.courier)
+    return fn(envio) if fn and envio.orden_transporte else None
+
+
+def url_seguimiento_publico(envio):
+    fn = SEGUIMIENTO_PUBLICO_URL.get(envio.courier)
     return fn(envio) if fn and envio.orden_transporte else None
 
 
 # --- Estado por API: individual (para el botón "refrescar este" del detalle, 1 llamada) ---
 CONSULTAR_ESTADO_COURIER = {
     Courier.MOVEUP: lambda envio: moveup_client.estado_paquete(envio.orden_transporte),
+    Courier.STARKEN: lambda envio: starken_client.consultar_estado(envio.orden_transporte),
     # Chibra: cuando tengan API de estado
 }
 
