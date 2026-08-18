@@ -85,7 +85,7 @@ def emitir_of(pedidos, bultos, destinatario, datos_courier):
         "apellidoMaternoRemitente": ".",
         "direccionRemitente": settings.STARKEN_DIRECCION_REMITENTE,
         "numeracionDireccionRemitente": settings.STARKEN_NUMERACION_DIRECCION_REMITENTE,
-        "departamentoRemitente": settings.STARKEN_DEPARTAMENTO_REMITENTE,
+        "departamentoRemitente": "",
         "emailRemitente": settings.STARKEN_EMAIL_REMITENTE,
         "telefonoRemitente": settings.STARKEN_TELEFONO_REMITENTE,
         "comunaRemitente": settings.STARKEN_COMUNA_REMITENTE,

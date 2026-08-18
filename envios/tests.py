@@ -91,17 +91,20 @@ class EmitirOfStarkenMultibultosTest(TestCase):
 
         self.assertEqual(capturado["payload"]["dvRutDestinatario"], "K")
 
-    def test_departamento_remitente_viaja_desde_settings(self):
-        # Antes iba fijo en "" — el diccionario de parámetros de Starken confirma que es un campo
-        # real (se hace eco en la respuesta como departamentoDireccionRemitente).
+    def test_departamento_remitente_siempre_vacio(self):
+        # Bug real detectado 2026-08-18: un departamentoRemitente no vacío ("Sección 4 S-2", 13
+        # caracteres) rompió el servidor de Starken con un HTTP 500 sin manejar — a diferencia de su
+        # gemelo del destinatario, no tiene largo máximo documentado. Ese dato interno (sección de
+        # bodega) no le sirve al courier para retirar (Til Til 2756 es un único andén) — se decidió
+        # no mandarlo en absoluto, no buscarle otro campo dónde meterlo.
         bultos = [{"cantidad": 1, "peso": 1.0, "alto": "1", "ancho": "1", "largo": "1", "tipo_contenido": ""}]
         capturado, fake_post = self._post_capturado({"codigoError": 0, "nroOrdenFlete": 222000004})
 
-        with patch("integraciones.starken_client.requests.post", side_effect=fake_post), \
-             patch.object(settings, "STARKEN_DEPARTAMENTO_REMITENTE", "Sección 4 S-2"):
+        with patch("integraciones.starken_client.requests.post", side_effect=fake_post):
             starken_client.emitir_of([], bultos, self._destinatario(), {"servicio": "0"})
 
-        self.assertEqual(capturado["payload"]["departamentoRemitente"], "Sección 4 S-2")
+        self.assertEqual(capturado["payload"]["departamentoRemitente"], "")
+        self.assertEqual(capturado["payload"]["direccionRemitente"], settings.STARKEN_DIRECCION_REMITENTE)
 
     def test_valor_declarado_alto_sin_documento_lanza_error_claro(self):
         # Diccionario de Entrada: "If the value exceeds 50000, it must be accompanied by a reference
