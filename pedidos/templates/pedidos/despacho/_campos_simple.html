@@ -3,11 +3,11 @@
   <p class="text-xs text-muted mb-4">Courier sin integración: no se genera etiqueta ni se llama a ninguna API. Todos los campos son opcionales.</p>
   <div class="grid gap-4 sm:grid-cols-2">
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Orden de transporte (OT)</span>
-      <input type="text" name="orden_transporte" placeholder="Opcional" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="text" name="orden_transporte" value="{{ post.orden_transporte }}" placeholder="Opcional" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Valor declarado</span>
-      <input type="number" name="valor_declarado" placeholder="Opcional" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="number" name="valor_declarado" value="{{ post.valor_declarado }}" placeholder="Opcional" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Observaciones</span>
-      <textarea name="observaciones" maxlength="255" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">{{ observaciones_sugeridas }}</textarea></label>
+      <textarea name="observaciones" maxlength="255" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">{{ post.observaciones|default:observaciones_sugeridas }}</textarea></label>
   </div>
 </div>
 
@@ -16,8 +16,8 @@
   <p class="text-xs text-muted mb-4">Opcional. Si dejas ambos en blanco, el envío queda sin bultos registrados.</p>
   <div class="grid gap-4 sm:grid-cols-2">
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Cantidad de bultos</span>
-      <input type="number" name="simple_cantidad" min="1" placeholder="Opcional" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="number" name="simple_cantidad" value="{{ post.simple_cantidad }}" min="1" placeholder="Opcional" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Peso total (kg)</span>
-      <input type="number" name="simple_peso_total" step="0.01" placeholder="Opcional" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="number" name="simple_peso_total" step="0.01" value="{{ post.simple_peso_total }}" placeholder="Opcional" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
   </div>
 </div>

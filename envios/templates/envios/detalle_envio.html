@@ -77,10 +77,13 @@
       {% endif %}
       <div class="flex flex-wrap gap-2.5 mt-3">
         {% for tipo, etiqueta in documentos %}
-        <a href="{% url 'envios:descargar_documento' envio.pk tipo %}" class="inline-flex items-center text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Descargar {{ etiqueta|lower }} ⬇</a>
+        <a href="{% url 'envios:descargar_documento' envio.pk tipo %}" target="_blank" rel="noopener" class="inline-flex items-center text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Ver / Imprimir {{ etiqueta|lower }} 🖨</a>
         {% endfor %}
-        {% if envio.url_seguimiento %}
-        <a href="{{ envio.url_seguimiento }}" target="_blank" rel="noopener" class="inline-flex items-center text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Ir a portal courier ↗</a>
+        {% if envio.url_portal_courier %}
+        <a href="{{ envio.url_portal_courier }}" target="_blank" rel="noopener" class="inline-flex items-center text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Ir a portal courier ↗</a>
+        {% endif %}
+        {% if envio.url_seguimiento_publico %}
+        <a href="{{ envio.url_seguimiento_publico }}" target="_blank" rel="noopener" class="inline-flex items-center text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Ver seguimiento público ↗</a>
         {% endif %}
         {% if puede_refrescar %}
         <form method="post" action="{% url 'envios:refrescar_estado' envio.pk %}">

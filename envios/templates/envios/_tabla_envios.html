@@ -19,7 +19,7 @@
           <td class="px-4 py-3 font-mono text-sm font-semibold text-ink whitespace-nowrap tabular-nums">#{{ envio.id }}</td>
           <td class="px-4 py-3 text-body">{{ envio.get_courier_display }}</td>
           <td class="px-4 py-3 font-mono text-xs whitespace-nowrap">
-            {% if envio.url_seguimiento %}<a href="{{ envio.url_seguimiento }}" target="_blank" rel="noopener" class="text-brand-ink hover:underline">{{ envio.orden_transporte|default:"—" }}</a>{% else %}<span class="text-muted">{{ envio.orden_transporte|default:"—" }}</span>{% endif %}
+            {% if envio.url_portal_courier %}<a href="{{ envio.url_portal_courier }}" target="_blank" rel="noopener" class="text-brand-ink hover:underline">{{ envio.orden_transporte|default:"—" }}</a>{% else %}<span class="text-muted">{{ envio.orden_transporte|default:"—" }}</span>{% endif %}
           </td>
           <td class="px-4 py-3">
             <div class="flex flex-wrap gap-1">

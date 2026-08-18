@@ -1,5 +1,6 @@
-import base64
+import base64, io
 from unittest.mock import patch
+from pypdf import PdfWriter, PdfReader
 from django.test import TestCase, RequestFactory, Client
 from django.conf import settings
 from cuentas.models import PerfilUsuario
@@ -7,10 +8,166 @@ from pedidos.models import Pedido
 from pedidos.tests.factories import crear_pedido, crear_usuario, crear_ejecutivo
 from utils import Courier
 from integraciones import starken_client
-from .services import parsear_bultos, validar_pedidos_para_despacho, despachar_pedidos
+from .services import parsear_bultos, validar_pedidos_para_despacho, despachar_pedidos, _parsear_despacho_starken
 from .models import EnvioCourier
 
 Rol = PerfilUsuario.Rol
+
+
+class EmitirOfStarkenMultibultosTest(TestCase):
+    """emitir_of nunca se prueba directo en el resto de la suite (todos los tests de despacho
+    mockean la función completa) — nadie ejercitaba la matemática real de multibultos hasta ahora.
+    Bug real encontrado 2026-08-18: 'largo' sumaba una vez por FILA del formulario, no una vez por
+    BULTO FÍSICO — una fila con cantidad=3 solo aportaba su largo una vez, subestimando el volumen
+    declarado a Starken frente a la regla del manual ("sumar el total de una de las dimensiones de
+    TODOS LOS BULTOS")."""
+
+    def _destinatario(self):
+        return {"nombre": "Cliente Test", "rut": "11111111-1", "direccion": "Calle 1",
+                "numero": "100", "depto": "", "comuna": "Providencia",
+                "telefono": "+56911112222", "email": "cliente@x.cl"}
+
+    def _post_capturado(self, respuesta_json):
+        capturado = {}
+
+        def fake_post(url, json=None, timeout=None):
+            capturado["url"] = url
+            capturado["payload"] = json
+
+            class FakeResponse:
+                def raise_for_status(self):
+                    pass
+                def json(self):
+                    return respuesta_json
+
+            return FakeResponse()
+
+        return capturado, fake_post
+
+    def test_una_fila_con_varios_bultos_multiplica_largo_por_cantidad(self):
+        # Una sola fila: 3 cajas idénticas de 10x5x4 cm, 2 kg cada una.
+        bultos = [{"cantidad": 3, "peso": 2.0, "alto": "4", "ancho": "5", "largo": "10", "tipo_contenido": ""}]
+        capturado, fake_post = self._post_capturado({"codigoError": 0, "nroOrdenFlete": 222000001})
+
+        with patch("integraciones.starken_client.requests.post", side_effect=fake_post):
+            starken_client.emitir_of([], bultos, self._destinatario(), {"servicio": "0"})
+
+        payload = capturado["payload"]
+        self.assertEqual(payload["largo"], "30.0")   # 10 cm x 3 bultos, NO "10.0" (el bug)
+        self.assertEqual(payload["ancho"], "5.0")     # max no depende de la cantidad
+        self.assertEqual(payload["alto"], "4.0")
+        self.assertEqual(payload["kilosTotal"], "6.0")   # 2 kg x 3 bultos
+        self.assertEqual(payload["cantidadEncargo1"], "3")
+
+    def test_varias_filas_distintas_combina_suma_y_maximo_correctamente(self):
+        # Fila 1: 2 bultos de 10x20x5 cm. Fila 2: 1 bulto de 5x8x15 cm.
+        bultos = [
+            {"cantidad": 2, "peso": 1.0, "alto": "5", "ancho": "20", "largo": "10", "tipo_contenido": ""},
+            {"cantidad": 1, "peso": 3.0, "alto": "15", "ancho": "8", "largo": "5", "tipo_contenido": ""},
+        ]
+        capturado, fake_post = self._post_capturado({"codigoError": 0, "nroOrdenFlete": 222000002})
+
+        with patch("integraciones.starken_client.requests.post", side_effect=fake_post):
+            starken_client.emitir_of([], bultos, self._destinatario(), {"servicio": "0"})
+
+        payload = capturado["payload"]
+        self.assertEqual(payload["largo"], "25.0")   # (10x2) + (5x1) = 25 — suma por bulto físico
+        self.assertEqual(payload["ancho"], "20.0")    # max(20, 8) = 20, invariante a la cantidad
+        self.assertEqual(payload["alto"], "15.0")     # max(5, 15) = 15
+        self.assertEqual(payload["kilosTotal"], "5.0")   # (1x2) + (3x1) = 5
+        self.assertEqual(payload["cantidadEncargo1"], "3")   # 2 + 1 bultos físicos
+
+    def test_dv_destinatario_se_normaliza_a_mayuscula(self):
+        # Bug real encontrado 2026-08-18: dvRutDestinatario se mandaba tal cual lo tipeara Logística
+        # (ej. "k" minúscula) — validar_rut() lo acepta igual, pero el manual siempre lo muestra en
+        # mayúscula ("K").
+        destinatario = self._destinatario()
+        destinatario["rut"] = "8765432-k"
+        bultos = [{"cantidad": 1, "peso": 1.0, "alto": "1", "ancho": "1", "largo": "1", "tipo_contenido": ""}]
+        capturado, fake_post = self._post_capturado({"codigoError": 0, "nroOrdenFlete": 222000003})
+
+        with patch("integraciones.starken_client.requests.post", side_effect=fake_post):
+            starken_client.emitir_of([], bultos, destinatario, {"servicio": "0"})
+
+        self.assertEqual(capturado["payload"]["dvRutDestinatario"], "K")
+
+    def test_departamento_remitente_siempre_vacio(self):
+        # Bug real detectado 2026-08-18: un departamentoRemitente no vacío ("Sección 4 S-2", 13
+        # caracteres) rompió el servidor de Starken con un HTTP 500 sin manejar — a diferencia de su
+        # gemelo del destinatario, no tiene largo máximo documentado. Ese dato interno (sección de
+        # bodega) no le sirve al courier para retirar (Til Til 2756 es un único andén) — se decidió
+        # no mandarlo en absoluto, no buscarle otro campo dónde meterlo.
+        bultos = [{"cantidad": 1, "peso": 1.0, "alto": "1", "ancho": "1", "largo": "1", "tipo_contenido": ""}]
+        capturado, fake_post = self._post_capturado({"codigoError": 0, "nroOrdenFlete": 222000004})
+
+        with patch("integraciones.starken_client.requests.post", side_effect=fake_post):
+            starken_client.emitir_of([], bultos, self._destinatario(), {"servicio": "0"})
+
+        self.assertEqual(capturado["payload"]["departamentoRemitente"], "")
+        self.assertEqual(capturado["payload"]["direccionRemitente"], settings.STARKEN_DIRECCION_REMITENTE)
+
+    def test_valor_declarado_alto_sin_documento_lanza_error_claro(self):
+        # Diccionario de Entrada: "If the value exceeds 50000, it must be accompanied by a reference
+        # document." — lo validamos nosotros antes de llamar a Starken, con un mensaje en español.
+        bultos = [{"cantidad": 1, "peso": 1.0, "alto": "1", "ancho": "1", "largo": "1", "tipo_contenido": ""}]
+
+        with self.assertRaises(ValueError) as ctx:
+            starken_client.emitir_of([], bultos, self._destinatario(),
+                                    {"servicio": "0", "valor_declarado": 60000, "documentos": []})
+        self.assertIn("50.000", str(ctx.exception))
+        self.assertIn("documento de referencia", str(ctx.exception))
+
+    def test_valor_declarado_alto_con_documento_no_lanza_error(self):
+        bultos = [{"cantidad": 1, "peso": 1.0, "alto": "1", "ancho": "1", "largo": "1", "tipo_contenido": ""}]
+        capturado, fake_post = self._post_capturado({"codigoError": 0, "nroOrdenFlete": 222000005})
+        documentos = [{"tipo": "26", "numero": "12345"}]
+
+        with patch("integraciones.starken_client.requests.post", side_effect=fake_post):
+            starken_client.emitir_of([], bultos, self._destinatario(),
+                                    {"servicio": "0", "valor_declarado": 60000, "documentos": documentos})
+
+        self.assertEqual(capturado["payload"]["valorDeclarado"], "60000")
+
+    def test_error_de_red_se_traduce_a_mensaje_claro(self):
+        import requests
+
+        def fake_post_caido(url, json=None, timeout=None):
+            raise requests.exceptions.ConnectionError("Max retries exceeded with url: ...")
+
+        bultos = [{"cantidad": 1, "peso": 1.0, "alto": "1", "ancho": "1", "largo": "1", "tipo_contenido": ""}]
+        with patch("integraciones.starken_client.requests.post", side_effect=fake_post_caido):
+            with self.assertRaises(ValueError) as ctx:
+                starken_client.emitir_of([], bultos, self._destinatario(), {"servicio": "0"})
+
+        mensaje = str(ctx.exception)
+        self.assertNotIn("ConnectionError", mensaje)
+        self.assertNotIn("Max retries", mensaje)
+        self.assertIn("Starken", mensaje)
+
+    def test_error_http_de_starken_muestra_status_y_detalle_no_generico(self):
+        # Bug real detectado 2026-08-18: un HTTP 400/403/500 (la conexión SÍ llegó a Starken, pero
+        # Starken respondió con un error) se mostraba con el mismo mensaje genérico de "no se pudo
+        # conectar" que una falla de red real — escondiendo justo el detalle que hacía falta para
+        # depurar (confirmado con curl/shell en el servidor: la conexión funcionaba perfecto).
+        import requests
+
+        def fake_post_400(url, json=None, timeout=None):
+            class FakeResponse400:
+                status_code = 400
+                text = '{"code":400,"message":"Metodo no permitido"}'
+                def raise_for_status(self):
+                    raise requests.exceptions.HTTPError(response=self)
+            return FakeResponse400()
+
+        bultos = [{"cantidad": 1, "peso": 1.0, "alto": "1", "ancho": "1", "largo": "1", "tipo_contenido": ""}]
+        with patch("integraciones.starken_client.requests.post", side_effect=fake_post_400):
+            with self.assertRaises(ValueError) as ctx:
+                starken_client.emitir_of([], bultos, self._destinatario(), {"servicio": "0"})
+
+        mensaje = str(ctx.exception)
+        self.assertIn("400", mensaje)
+        self.assertIn("Metodo no permitido", mensaje)
+        self.assertNotIn("no se pudo conectar", mensaje)
 
 
 class ParsearBultosTest(TestCase):
@@ -53,6 +210,54 @@ class ParsearBultosTest(TestCase):
             "tipo": "PALLET", "cantidad": 3, "alto": "10", "ancho": "20", "largo": "30",
             "peso": 4.0, "tipo_contenido": "REFRIGERADO",
         })
+
+
+def _post_starken(rf, extra=None):
+    datos = {
+        "modo_bultos": "detallado",
+        "bulto_tipo": ["CAJA"], "bulto_cantidad": ["1"],
+        "bulto_alto": ["5"], "bulto_ancho": ["25"], "bulto_largo": ["11"],
+        "bulto_peso": ["2.0"], "bulto_tipo_contenido": [""],
+        "destinatario_nombre": "Juan Pérez", "destinatario_rut": "11111111-1",
+        "destinatario_telefono": "+56911112222", "destinatario_email": "juan@cliente.cl",
+    }
+    datos.update(extra or {})
+    return rf.post("/x", datos)
+
+
+class ParsearDespachoStarkenTest(TestCase):
+    def setUp(self):
+        self.rf = RequestFactory()
+
+    def test_domicilio_sin_direccion_falla(self):
+        r = _post_starken(self.rf, {"starken_calle": "", "starken_numero": "", "destinatario_comuna": ""})
+        with self.assertRaises(ValueError):
+            _parsear_despacho_starken(r)
+
+    def test_domicilio_con_direccion_completa_pasa(self):
+        r = _post_starken(self.rf, {
+            "starken_calle": "Av. Providencia", "starken_numero": "123", "destinatario_comuna": "Providencia",
+        })
+        bultos, destinatario, datos_courier = _parsear_despacho_starken(r)
+        self.assertEqual(destinatario["direccion"], "Av. Providencia")
+        self.assertIsNone(datos_courier["codigo_agencia_destino"])
+
+    def test_agencia_sin_direccion_pasa(self):
+        r = _post_starken(self.rf, {
+            "codigo_agencia_destino": "1467",
+            "starken_calle": "", "starken_numero": "", "destinatario_comuna": "",
+        })
+        bultos, destinatario, datos_courier = _parsear_despacho_starken(r)
+        self.assertEqual(datos_courier["codigo_agencia_destino"], "1467")
+        self.assertEqual(destinatario["direccion"], "")
+
+    def test_agencia_sin_nombre_sigue_fallando(self):
+        r = _post_starken(self.rf, {
+            "codigo_agencia_destino": "1467", "destinatario_nombre": "",
+            "starken_calle": "", "starken_numero": "", "destinatario_comuna": "",
+        })
+        with self.assertRaises(ValueError):
+            _parsear_despacho_starken(r)
 
 
 class ValidarPedidosParaDespachoTest(TestCase):
@@ -316,20 +521,37 @@ class DescargarDocumentoViewTest(TestCase):
         self.envio_chibra = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-1")
 
     def test_descarga_un_solo_archivo_como_pdf(self):
+        # inline (no attachment): el PDF se abre en el visor nativo del navegador para poder
+        # imprimirlo directo, en vez de forzar la descarga a disco.
         self.client.force_login(self.logi)
         with patch("envios.views.generar_documento", return_value=[b"%PDF-fake"]):
             resp = self.client.get(f"/envios/{self.envio_starken.pk}/documento/etiqueta/")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Content-Type"], "application/pdf")
-        self.assertIn("attachment", resp["Content-Disposition"])
+        self.assertIn("inline", resp["Content-Disposition"])
         self.assertEqual(resp.content, b"%PDF-fake")
 
-    def test_varios_archivos_se_empaquetan_en_zip(self):
+    def _pdf_de_una_pagina(self):
+        # PDF mínimo pero real (no bytes fake): pypdf.PdfWriter.append exige poder parsear cada
+        # archivo, así que un placeholder tipo b"a" revienta con PdfStreamError.
+        writer = PdfWriter()
+        writer.add_blank_page(width=200, height=200)
+        buffer = io.BytesIO()
+        writer.write(buffer)
+        return buffer.getvalue()
+
+    def test_varios_archivos_se_fusionan_en_un_solo_pdf(self):
+        # Multibultos (ej. Starken con 3 bultos → 3 etiquetas): se fusionan en un PDF de N páginas
+        # en vez de un .zip, para poder verlo/imprimirlo igual que el caso de un solo archivo.
         self.client.force_login(self.logi)
-        with patch("envios.views.generar_documento", return_value=[b"a", b"b"]):
+        archivos = [self._pdf_de_una_pagina(), self._pdf_de_una_pagina()]
+        with patch("envios.views.generar_documento", return_value=archivos):
             resp = self.client.get(f"/envios/{self.envio_starken.pk}/documento/etiqueta/")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp["Content-Type"], "application/zip")
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertIn("inline", resp["Content-Disposition"])
+        fusionado = PdfReader(io.BytesIO(resp.content))
+        self.assertEqual(len(fusionado.pages), 2)
 
     # No mockea generar_documento: ejercita el ValueError real de integraciones.documentos cuando
     # el courier no tiene ese tipo registrado (Chibra no está en DOCUMENTOS_COURIER).
