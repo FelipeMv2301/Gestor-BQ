@@ -1,4 +1,4 @@
-import requests
+import requests, base64
 from django.conf import settings
 from utils import validar_rut, quitar_tildes
 
@@ -109,4 +109,36 @@ def documentar_envio(pedidos, bultos, destinatario, datos_courier):
         raise ValueError(f"[!] Error de Chibra: {resultado.get('mensaje', 'sin detalle')}")
 
     return {"numero_envio": str(resultado.get("numero_envio", ""))}
+
+#Chibra ya devuelve la etiqueta dentro de documentar_envio (IMPRIMIR_ETIQUETA="S"), pero esa llamada
+#no se puede repetir (crea el envío de nuevo). Para volver a obtenerla después se usa etiquetarService
+#con ETIQUETAR="R" (reetiquetar) — mismo courier, servicio distinto, ver ws_chibra_05_etiquetar.md.
+def obtener_etiqueta(centro, expedicion):
+    payload = {
+        "ETIQUETAS": {
+            "VERSION": "5",
+            "ETIQUETA": [{
+                "CLIENTE": settings.CHIBRA_CLIENTE_REMITENTE,
+                "CENTRO": centro,
+                "EXPEDICION": expedicion,
+                "ETIQUETAR": "R",
+                "FORMATO": "PDF",
+            }]
+        }
+    }
+
+    respuesta = requests.post(
+        f"{settings.CHIBRA_BASE_URL}/gts/seam/resource/restv1/auth/etiquetarService/etiquetar",
+        auth=(settings.CHIBRA_USER, settings.CHIBRA_PASSWORD),
+        json=payload,
+        timeout=30,
+    )
+    respuesta.raise_for_status()
+    datos_respuesta = respuesta.json()
+    resultado = (datos_respuesta[0] if isinstance(datos_respuesta, list) and datos_respuesta else {}).get("respuestaEtiquetar", {})
+
+    if resultado.get("resultado") != "OK":
+        raise ValueError(f"[!] Error de Chibra al generar etiqueta: {resultado.get('mensaje', 'sin detalle')}")
+
+    return base64.b64decode(resultado["etiqueta"])
 

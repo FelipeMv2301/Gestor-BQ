@@ -7,7 +7,7 @@ from cuentas.models import PerfilUsuario
 from pedidos.models import Pedido
 from pedidos.tests.factories import crear_pedido, crear_usuario, crear_ejecutivo
 from utils import Courier
-from integraciones import starken_client
+from integraciones import chibra_client, starken_client
 from .services import parsear_bultos, validar_pedidos_para_despacho, despachar_pedidos, _parsear_despacho_starken
 from .models import EnvioCourier
 
@@ -512,6 +512,54 @@ class GenerarEtiquetaTest(TestCase):
                 starken_client.generar_etiqueta(999)
 
 
+# Chibra ya devuelve la etiqueta en documentar_envio, pero esa llamada no se puede repetir (crea el
+# envío de nuevo) — obtener_etiqueta usa etiquetarService con ETIQUETAR="R" para volver a pedirla.
+class ObtenerEtiquetaChibraTest(TestCase):
+    def _fake_response(self, resultado="OK", etiqueta_b64=None, mensaje="Etiqueta creada con éxito"):
+        cuerpo = {"resultado": resultado, "mensaje": mensaje}
+        if etiqueta_b64:
+            cuerpo["etiqueta"] = etiqueta_b64
+
+        class FakeResponse:
+            def raise_for_status(self):
+                pass
+            def json(self):
+                return [{"respuestaEtiquetar": cuerpo}]
+        return FakeResponse()
+
+    def test_decodifica_la_etiqueta_en_base64(self):
+        etiqueta_b64 = base64.b64encode(b"%PDF-fake").decode()
+        with patch("integraciones.chibra_client.requests.post",
+                    return_value=self._fake_response(etiqueta_b64=etiqueta_b64)) as mock_post:
+            resultado = chibra_client.obtener_etiqueta("02", "999903204829")
+
+        self.assertEqual(resultado, b"%PDF-fake")
+        mock_post.assert_called_once_with(
+            f"{settings.CHIBRA_BASE_URL}/gts/seam/resource/restv1/auth/etiquetarService/etiquetar",
+            auth=(settings.CHIBRA_USER, settings.CHIBRA_PASSWORD),
+            json={
+                "ETIQUETAS": {
+                    "VERSION": "5",
+                    "ETIQUETA": [{
+                        "CLIENTE": settings.CHIBRA_CLIENTE_REMITENTE,
+                        "CENTRO": "02",
+                        "EXPEDICION": "999903204829",
+                        "ETIQUETAR": "R",
+                        "FORMATO": "PDF",
+                    }]
+                }
+            },
+            timeout=30,
+        )
+
+    def test_resultado_error_lanza_excepcion(self):
+        with patch("integraciones.chibra_client.requests.post",
+                    return_value=self._fake_response(
+                        resultado="ERROR", mensaje="La expedición que ha intentado etiquetar no existe")):
+            with self.assertRaises(ValueError):
+                chibra_client.obtener_etiqueta("02", "000000000000")
+
+
 class DescargarDocumentoViewTest(TestCase):
     def setUp(self):
         self.client = Client()
@@ -554,11 +602,25 @@ class DescargarDocumentoViewTest(TestCase):
         self.assertEqual(len(fusionado.pages), 2)
 
     # No mockea generar_documento: ejercita el ValueError real de integraciones.documentos cuando
-    # el courier no tiene ese tipo registrado (Chibra no está en DOCUMENTOS_COURIER).
+    # el courier no tiene ese tipo registrado. "evidencia_entrega" hoy no está registrado para
+    # ningún courier (Starken la deja comentada a la espera de HU-ST4.3).
     def test_courier_sin_ese_documento_muestra_error(self):
         self.client.force_login(self.logi)
-        resp = self.client.get(f"/envios/{self.envio_chibra.pk}/documento/etiqueta/")
+        resp = self.client.get(f"/envios/{self.envio_chibra.pk}/documento/evidencia_entrega/")
         self.assertRedirects(resp, f"/envios/{self.envio_chibra.pk}/")
+
+    # Chibra usa etiquetarService (obtener_etiqueta), que además del orden_transporte necesita el
+    # centro con el que se despachó — vive en datos_courier, no en un campo propio de EnvioCourier.
+    def test_descarga_etiqueta_chibra_usa_centro_de_datos_courier(self):
+        self.envio_chibra.datos_courier = {"centro": "02"}
+        self.envio_chibra.save(update_fields=["datos_courier"])
+        self.client.force_login(self.logi)
+        with patch("integraciones.documentos.chibra_client.obtener_etiqueta",
+                    return_value=b"%PDF-fake") as mock_obtener:
+            resp = self.client.get(f"/envios/{self.envio_chibra.pk}/documento/etiqueta/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.content, b"%PDF-fake")
+        mock_obtener.assert_called_once_with("02", "OT-1")
 
     def test_sin_orden_transporte_no_intenta_generar(self):
         self.client.force_login(self.logi)
@@ -581,11 +643,11 @@ class DescargarDocumentoViewTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.context["documentos"], [("etiqueta", "Etiqueta de envío")])
 
-    def test_detalle_envio_chibra_sin_documentos(self):
+    def test_detalle_envio_chibra_muestra_documentos_disponibles(self):
         self.client.force_login(self.logi)
         resp = self.client.get(f"/envios/{self.envio_chibra.pk}/")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.context["documentos"], [])
+        self.assertEqual(resp.context["documentos"], [("etiqueta", "Etiqueta de envío")])
 
 
 class CambiarEstadoEnvioViewTest(TestCase):
