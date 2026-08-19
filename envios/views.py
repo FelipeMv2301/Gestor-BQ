@@ -244,7 +244,7 @@ def descargar_documento(request, pk, tipo):
         return redirect("envios:detalle", pk=pk)
 
     try:
-        archivos = generar_documento(envio.courier, tipo, envio.orden_transporte)
+        archivos = generar_documento(envio, tipo)
     except Exception as exc:
         messages.error(request, f"No se pudo generar el documento: {str(exc).replace('[!] Error: ', '')}")
         return redirect("envios:detalle", pk=pk)
