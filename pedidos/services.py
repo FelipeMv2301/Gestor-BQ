@@ -147,6 +147,10 @@ def _mapear_orden_sap(orden, cache_bp, cookies, mapa_sku=None, mapa_ejecutivos=N
     addr_ext = orden.get("AddressExtension") or {}
     nombre, telefono, email = obtener_datos_contacto_sap(orden, cache_bp, cookies)
     deteccion = detectar_courier_sap(orden, mapa_sku)
+
+    comentarios = orden.get("Comments") or ""
+    obs_entrega = orden.get("U_BQ_ObsEntrega") or ""
+    observaciones = f"{comentarios}\n\nObs. entrega: {obs_entrega}".strip() if obs_entrega else comentarios
     return{
         "estado_comercial": Pedido.EstadoComercial.APROBADO,  # mismo trato que Woo (_mapear_pedido_woo): pasa directo a Logística
         "tipo_entrega": definir_tipo_entrega_sap(orden),
@@ -169,7 +173,7 @@ def _mapear_orden_sap(orden, cache_bp, cookies, mapa_sku=None, mapa_ejecutivos=N
         "direccion_comuna": addr_ext.get("ShipToCounty") or "",
         "direccion_ciudad": addr_ext.get("ShipToCity") or "",
         "ejecutivo": mapa_ejecutivos.get(orden.get("SalesPersonCode")),
-        "observaciones": orden.get("Comments") or "",
+         "observaciones": observaciones,
     }
 
 
@@ -252,7 +256,7 @@ def guardar_pedidos_sap(after=None, before=None):
 
         f"{settings.SAP_URL}/Orders",
         {
-            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,ContactPersonCode,DocumentLines",
+            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,ContactPersonCode,DocumentLines,U_BQ_ObsEntrega",
             "$filter": filtro,
         },
         cookies,
@@ -298,7 +302,7 @@ def guardar_un_pedido_sap(num_pedido, ignorar_rechazado=False):
     orden = sap_client.obtener_un_resultado(
         f"{settings.SAP_URL}/Orders",
         {
-            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,ContactPersonCode,DocumentLines",
+            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,ContactPersonCode,DocumentLines,U_BQ_ObsEntrega",
             "$filter": f"DocNum eq {num_pedido}",
         },
         cookies,
