@@ -7,8 +7,8 @@ from cuentas.models import PerfilUsuario
 from pedidos.models import Pedido
 from pedidos.tests.factories import crear_pedido, crear_usuario, crear_ejecutivo
 from utils import Courier
-from integraciones import chibra_client, starken_client
-from .services import parsear_bultos, validar_pedidos_para_despacho, despachar_pedidos, _parsear_despacho_starken
+from integraciones import chibra_client, seguimiento, starken_client
+from .services import parsear_bultos, validar_pedidos_para_despacho, despachar_pedidos, _parsear_despacho_starken, anular_envio_courier
 from .models import EnvioCourier
 
 Rol = PerfilUsuario.Rol
@@ -473,6 +473,42 @@ class DespacharStarkenTest(TestCase):
         self.assertEqual(EnvioCourier.objects.count(), 0)
 
 
+class AnularEnvioCourierTest(TestCase):
+    def test_starken_ok_marca_envio_anulado(self):
+        envio = EnvioCourier.objects.create(courier=Courier.STARKEN, orden_transporte="245256402",
+                                             estado=EnvioCourier.Estado.DESPACHADO)
+        with patch("envios.services.starken_client.anular_of") as mock_anular:
+            anular_envio_courier(envio)
+
+        mock_anular.assert_called_once_with("245256402")
+        envio.refresh_from_db()
+        self.assertEqual(envio.estado, EnvioCourier.Estado.ANULADO)
+
+    def test_courier_sin_soporte_no_llama_a_nadie_y_no_cambia_estado(self):
+        envio = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-1",
+                                             estado=EnvioCourier.Estado.DESPACHADO)
+        with self.assertRaises(ValueError):
+            anular_envio_courier(envio)
+        envio.refresh_from_db()
+        self.assertEqual(envio.estado, EnvioCourier.Estado.DESPACHADO)
+
+    def test_sin_orden_transporte_falla_antes_de_llamar_a_starken(self):
+        envio = EnvioCourier.objects.create(courier=Courier.STARKEN)
+        with patch("envios.services.starken_client.anular_of") as mock_anular:
+            with self.assertRaises(ValueError):
+                anular_envio_courier(envio)
+        self.assertFalse(mock_anular.called)
+
+    def test_error_de_starken_no_marca_como_anulado(self):
+        envio = EnvioCourier.objects.create(courier=Courier.STARKEN, orden_transporte="245256402",
+                                             estado=EnvioCourier.Estado.DESPACHADO)
+        with patch("envios.services.starken_client.anular_of", side_effect=ValueError("[!] Error: no se pudo")):
+            with self.assertRaises(ValueError):
+                anular_envio_courier(envio)
+        envio.refresh_from_db()
+        self.assertEqual(envio.estado, EnvioCourier.Estado.DESPACHADO)
+
+
 # No hay wrapper en envios/services.py que llame a esto todavía (no está conectado a ningún view) —
 # se testea el cliente directo, mockeando requests.post, mismo criterio que los dry-run manuales.
 class GenerarEtiquetaTest(TestCase):
@@ -558,6 +594,131 @@ class ObtenerEtiquetaChibraTest(TestCase):
                         resultado="ERROR", mensaje="La expedición que ha intentado etiquetar no existe")):
             with self.assertRaises(ValueError):
                 chibra_client.obtener_etiqueta("02", "000000000000")
+
+
+# Etracking: seguimiento MASIVO de Starken (1 sola llamada para varias OF), para el botón
+# "Actualizar estados" en lote. Esquema de auth propio (api-key/cli-rut/password).
+class ConsultarEstadosBatchStarkenTest(TestCase):
+    def _fake_response(self, filas):
+        class FakeResponse:
+            def raise_for_status(self):
+                pass
+            def json(self):
+                return {"listaResumenRedestinacion": {"ordenFlete": filas}}
+        return FakeResponse()
+
+    def test_devuelve_solo_las_ofs_con_codigo_salida_1(self):
+        filas = [
+            {"codigoSalida": 1, "numeroOrdenFlete": 222582312, "estadoOrdenFlete": "DEVUELTO AL CLIENTE"},
+            {"codigoSalida": 0, "numeroOrdenFlete": 999999999, "estadoOrdenFlete": "NO DEBERIA APARECER"},
+        ]
+        with patch("integraciones.starken_client.requests.post",
+                    return_value=self._fake_response(filas)) as mock_post:
+            resultado = starken_client.consultar_estados_batch(["222582312", "999999999"])
+
+        self.assertEqual(resultado, {"222582312": "DEVUELTO AL CLIENTE"})
+        mock_post.assert_called_once_with(
+            settings.STARKEN_ETRACKING_URL,
+            headers={
+                "api-key": settings.STARKEN_ETRACKING_API_KEY,
+                "cli-rut": settings.STARKEN_ETRACKING_CLI_RUT,
+                "password": settings.STARKEN_ETRACKING_PASSWORD,
+            },
+            json={
+                "tracking": [
+                    {"numeroDocumento": "", "numeroOrdenFlete": "222582312", "tipoDocumento": ""},
+                    {"numeroDocumento": "", "numeroOrdenFlete": "999999999", "tipoDocumento": ""},
+                ],
+                "rutEmpresa": settings.STARKEN_RUT_EMPRESA_EMISORA,
+            },
+            timeout=30,
+        )
+
+    def test_sin_filas_devuelve_diccionario_vacio(self):
+        with patch("integraciones.starken_client.requests.post", return_value=self._fake_response([])):
+            resultado = starken_client.consultar_estados_batch(["222582312"])
+        self.assertEqual(resultado, {})
+
+
+class RefrescarEstadoStarkenBatchTest(TestCase):
+    def test_actualiza_solo_las_ofs_que_starken_devolvio(self):
+        con_estado = EnvioCourier.objects.create(courier=Courier.STARKEN, orden_transporte="111")
+        sin_novedad = EnvioCourier.objects.create(courier=Courier.STARKEN, orden_transporte="222")
+
+        with patch("integraciones.seguimiento.starken_client.consultar_estados_batch",
+                    return_value={"111": "EN TRANSITO"}) as mock_batch:
+            actualizados = seguimiento._refrescar_estado_starken_batch([con_estado, sin_novedad])
+
+        self.assertEqual(actualizados, 1)
+        mock_batch.assert_called_once_with(["111", "222"])
+        con_estado.refresh_from_db()
+        sin_novedad.refresh_from_db()
+        self.assertEqual(con_estado.estado_courier, "EN TRANSITO")
+        self.assertIsNotNone(con_estado.estado_courier_actualizado)
+        self.assertEqual(sin_novedad.estado_courier, "")   # Starken no la devolvió: no se pisa
+        self.assertIsNone(sin_novedad.estado_courier_actualizado)
+
+    def test_envios_sin_orden_transporte_se_excluyen_de_la_llamada(self):
+        sin_ot = EnvioCourier.objects.create(courier=Courier.STARKEN)
+        con_ot = EnvioCourier.objects.create(courier=Courier.STARKEN, orden_transporte="333")
+
+        with patch("integraciones.seguimiento.starken_client.consultar_estados_batch",
+                    return_value={"333": "ENTREGADO"}) as mock_batch:
+            actualizados = seguimiento._refrescar_estado_starken_batch([sin_ot, con_ot])
+
+        self.assertEqual(actualizados, 1)
+        mock_batch.assert_called_once_with(["333"])
+
+    def test_lista_vacia_no_llama_a_la_api(self):
+        with patch("integraciones.seguimiento.starken_client.consultar_estados_batch") as mock_batch:
+            actualizados = seguimiento._refrescar_estado_starken_batch([])
+        self.assertEqual(actualizados, 0)
+        self.assertFalse(mock_batch.called)
+
+
+# Anulación de OF: dos llamadas (login → token JWT, luego anular con ese Bearer). El token no se
+# reusa entre llamadas — cada anulación pide uno nuevo (así lo exige el manual de Starken).
+class AnularOfStarkenTest(TestCase):
+    def _fake_response(self, payload):
+        class FakeResponse:
+            def raise_for_status(self):
+                pass
+            def json(self):
+                return payload
+        return FakeResponse()
+
+    def test_anula_ok(self):
+        respuestas = [
+            self._fake_response({"token": "jwt-falso"}),
+            self._fake_response({"data": [{"numeroOrden": 245256402, "mensaje": "OK", "estado": "OK"}],
+                                  "ordersProcessed": 1, "status": 200}),
+        ]
+        with patch("integraciones.starken_client.requests.post", side_effect=respuestas) as mock_post:
+            starken_client.anular_of(245256402)   # no lanza
+
+        login_call, anular_call = mock_post.call_args_list
+        self.assertEqual(login_call.args[0], settings.STARKEN_ANULACION_LOGIN_URL)
+        self.assertEqual(login_call.kwargs["json"]["run"], settings.STARKEN_ANULACION_RUN)
+        self.assertEqual(anular_call.args[0], settings.STARKEN_ANULACION_URL)
+        self.assertEqual(anular_call.kwargs["headers"], {"Authorization": "Bearer jwt-falso"})
+        self.assertEqual(anular_call.kwargs["json"], {"numerosOrden": [245256402]})
+
+    def test_starken_rechaza_con_estado_no_ok_lanza_con_motivo(self):
+        respuestas = [
+            self._fake_response({"token": "jwt-falso"}),
+            self._fake_response({"data": [{"numeroOrden": 245256402,
+                                            "mensaje": "Orden de flete no corresponde al cliente.",
+                                            "estado": "NO_OK"}]}),
+        ]
+        with patch("integraciones.starken_client.requests.post", side_effect=respuestas):
+            with self.assertRaisesMessage(ValueError, "Orden de flete no corresponde al cliente."):
+                starken_client.anular_of(245256402)
+
+    def test_sin_token_de_login_lanza_error(self):
+        with patch("integraciones.starken_client.requests.post",
+                    return_value=self._fake_response({})):
+            with self.assertRaises(ValueError):
+                starken_client.anular_of(245256402)
 
 
 class DescargarDocumentoViewTest(TestCase):
@@ -731,6 +892,53 @@ class EliminarEnvioViewTest(TestCase):
         self.assertIsNone(self.pedido.envio_id)
 
 
+class AnularEnvioViewTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.logi = crear_usuario("logi@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec = crear_usuario("ejec@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=10)
+        self.envio_starken = EnvioCourier.objects.create(
+            courier=Courier.STARKEN, orden_transporte="245256402", estado=EnvioCourier.Estado.DESPACHADO)
+        self.envio_chibra = EnvioCourier.objects.create(
+            courier=Courier.CHIBRA, orden_transporte="OT-1", estado=EnvioCourier.Estado.DESPACHADO)
+
+    def test_no_logistica_no_puede_anular(self):
+        self.client.force_login(self.ejec)
+        with patch("envios.views.anular_envio_courier") as mock_anular:
+            resp = self.client.post(f"/envios/{self.envio_starken.pk}/anular/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(mock_anular.called)
+
+    def test_logistica_anula_starken_ok(self):
+        self.client.force_login(self.logi)
+        with patch("envios.views.anular_envio_courier") as mock_anular:
+            resp = self.client.post(f"/envios/{self.envio_starken.pk}/anular/")
+        self.assertEqual(resp.status_code, 302)
+        mock_anular.assert_called_once_with(self.envio_starken)
+
+    # No mockea anular_envio_courier: ejercita el ValueError real cuando el courier no está en
+    # ANULAR_COURIER (Chibra) — debe mostrar el error en pantalla, no un 500.
+    def test_courier_sin_soporte_muestra_error_sin_reventar(self):
+        self.client.force_login(self.logi)
+        resp = self.client.post(f"/envios/{self.envio_chibra.pk}/anular/")
+        self.assertRedirects(resp, f"/envios/{self.envio_chibra.pk}/")
+        self.envio_chibra.refresh_from_db()
+        self.assertEqual(self.envio_chibra.estado, EnvioCourier.Estado.DESPACHADO)
+
+    def test_error_de_starken_se_muestra_y_no_crashea(self):
+        self.client.force_login(self.logi)
+        with patch("envios.views.anular_envio_courier", side_effect=ValueError("[!] Error: OF con movimientos")):
+            resp = self.client.post(f"/envios/{self.envio_starken.pk}/anular/")
+        self.assertRedirects(resp, f"/envios/{self.envio_starken.pk}/")
+
+    def test_detalle_envio_starken_ofrece_anular_chibra_no(self):
+        self.client.force_login(self.logi)
+        resp_starken = self.client.get(f"/envios/{self.envio_starken.pk}/")
+        resp_chibra = self.client.get(f"/envios/{self.envio_chibra.pk}/")
+        self.assertTrue(resp_starken.context["puede_anular"])
+        self.assertFalse(resp_chibra.context["puede_anular"])
+
+
 class RefrescarEstadoViewsTest(TestCase):
     """El ejecutivo también puede refrescar el estado-courier: individual de los envíos que ve,
     y el batch acotado a los suyos. Logística/Admin sobre todos."""
@@ -786,3 +994,16 @@ class RefrescarEstadoViewsTest(TestCase):
         pks = set(mock_batch.call_args[0][0].values_list("pk", flat=True))
         self.assertIn(self.envio_a.pk, pks)
         self.assertIn(self.envio_b.pk, pks)
+
+    # El filtro del batch ya no está hardcodeado a MOVEUP — cualquier courier registrado en
+    # REFRESCAR_ESTADO_BATCH entra (hoy MoveUP y Starken). Chibra no está registrado, no debe entrar.
+    @patch("envios.views.refrescar_estados_courier", return_value=3)
+    def test_batch_incluye_starken_pero_no_chibra(self, mock_batch):
+        envio_starken = EnvioCourier.objects.create(courier=Courier.STARKEN)
+        envio_chibra = EnvioCourier.objects.create(courier=Courier.CHIBRA)
+        self.client.force_login(self.logi)
+        resp = self.client.post("/envios/refrescar-estados/")
+        self.assertEqual(resp.status_code, 204)
+        pks = set(mock_batch.call_args[0][0].values_list("pk", flat=True))
+        self.assertIn(envio_starken.pk, pks)
+        self.assertNotIn(envio_chibra.pk, pks)

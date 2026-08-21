@@ -186,6 +186,24 @@ PARSEAR_DESPACHO = {
     Courier.STARKEN: _parsear_despacho_starken
 }
 
+#Registro por capacidad, igual criterio que SELECCIONAR_COURIER: un courier se inscribe solo si su
+#integración admite anular una OF ya emitida. Chibra/MoveUP/CYS/Bioquimica.cl no están — no hay API
+#de anulación documentada para ellos, así que la acción no aparece en el detalle del envío.
+ANULAR_COURIER = {
+    Courier.STARKEN: lambda envio: starken_client.anular_of(envio.orden_transporte),
+}
+
+def anular_envio_courier(envio):
+    fn = ANULAR_COURIER.get(envio.courier)
+    if not fn:
+        raise ValueError(f"[!] Error: {envio.courier} no admite anulación por integración.")
+    if not envio.orden_transporte:
+        raise ValueError("[!] Error: este envío no tiene orden de transporte todavía.")
+
+    fn(envio)
+    envio.estado = EnvioCourier.Estado.ANULADO
+    envio.save(update_fields=["estado", "actualizado_en"])
+
 #Valida que un grupo de pedidos pueda agruparse en un solo despacho. Se usa apenas se selecciona
 #el grupo (para fallar rápido, antes de mostrar el formulario) y de nuevo al confirmar el despacho.
 #Devuelve el courier común (ya validado) para no volver a inferirlo con pedidos[0].
