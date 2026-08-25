@@ -13,7 +13,6 @@
           <th class="text-left font-semibold px-4 py-3">Observaciones</th>
           <th class="text-left font-semibold px-4 py-3">Estado</th>
           <th class="text-left font-semibold px-4 py-3">Actualizado</th>
-          <th class="text-left font-semibold px-4 py-3 w-10"></th>
         </tr>
       </thead>
       <tbody>
@@ -42,17 +41,9 @@
           <td class="px-4 py-3 text-muted max-w-[16rem] truncate" title="{{ pedido.observaciones }}">{{ pedido.observaciones|default:"—" }}</td>
           <td class="px-4 py-3">{% include "partials/_badge_estado.html" with pedido=pedido %}</td>
           <td class="px-4 py-3 text-xs text-muted font-mono tabular-nums whitespace-nowrap">{{ pedido.modificado_en|date:"d/m/y H:i" }}</td>
-          <td class="px-4 py-3 whitespace-nowrap">
-            {% puede_duplicar_pedido user pedido as pedido_duplicable %}
-            {% if pedido_duplicable %}
-            <button hx-get="{% url 'pedidos:duplicar' pedido.pk %}" hx-target="#modal" title="Duplicar pedido"
-                    onclick="event.stopPropagation()"
-                    class="text-xs font-semibold px-2.5 py-1.5 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink whitespace-nowrap">Duplicar</button>
-            {% endif %}
-          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="{% if seleccionable %}10{% else %}9{% endif %}" class="px-4 py-10 text-center text-muted">
+        <tr><td colspan="{% if seleccionable %}9{% else %}8{% endif %}" class="px-4 py-10 text-center text-muted">
           <div class="text-sm">No hay pedidos que coincidan.</div>
           <div class="text-xs mt-1">Prueba a quitar filtros o cambiar la búsqueda.</div>
         </td></tr>

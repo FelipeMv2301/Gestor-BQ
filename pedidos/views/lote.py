@@ -81,3 +81,23 @@ def notificar_lote(request):
     resp = HttpResponse(status=204)
     resp["HX-Redirect"] = reverse("pedidos:despachos")
     return resp
+
+@login_required
+@require_POST
+def duplicar_lote(request):
+    ids = request.POST.getlist("ids")
+    pedidos = permisos.queryset_para_ver(request.user).filter(pk__in=ids)
+
+    duplicados = 0
+    for pedido in pedidos:
+        try:
+            services.duplicar_pedido(pedido, request.user)
+            duplicados += 1
+        except (PermissionError, ValueError) as exc:
+            messages.error(request, f"{pedido.origen}-{pedido.num_pedido}: {str(exc).replace('[!] Error: ', '')}")
+    if duplicados:
+        messages.success(request, f"{duplicados} pedido(s) duplicado(s).")
+
+    resp = HttpResponse(status=204)
+    resp["HX-Redirect"] = reverse("pedidos:despachos")
+    return resp

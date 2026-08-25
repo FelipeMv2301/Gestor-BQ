@@ -32,4 +32,5 @@ urlpatterns = [
     path("panel/skus/crear/", views.crear_sku, name="crear_sku"),
     path("panel/skus/<int:pk>/editar/", views.editar_sku, name="editar_sku"),
     path("panel/skus/<int:pk>/eliminar/", views.eliminar_sku, name="eliminar_sku"),
+    path("lote/duplicar/", views.duplicar_lote, name="duplicar_lote"),
 ]

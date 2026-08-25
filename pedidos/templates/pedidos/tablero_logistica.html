@@ -27,6 +27,8 @@
                   class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Cargar a courier</button>
           <button type="button" data-url="{% url 'pedidos:notificar_lote' %}" onclick="notificarSeleccion(this)"
                   class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Notificar</button>
+          <button type="button" data-url="{% url 'pedidos:duplicar_lote' %}" onclick="duplicarSeleccion(this)"
+                  class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Duplicar</button>
           {% if user.perfil.rol == 'ADMIN' %}
           <button hx-post="{% url 'pedidos:eliminar_lote' %}" hx-include="input[name='ids']:checked"
                   hx-confirm="¿Eliminar los pedidos seleccionados de forma PERMANENTE? No queda registro, no se puede deshacer."
@@ -47,6 +49,8 @@
           class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink">Cargar a courier</button>
   <button hx-post="{% url 'pedidos:notificar_lote' %}" hx-include="input[name='ids']:checked"
           class="text-sm font-semibold px-4 py-2 rounded-full bg-[#00a6d6] text-white hover:bg-[#0090ba]">Notificar Pedido</button>
+  <button type="button" data-url="{% url 'pedidos:duplicar_lote' %}" onclick="duplicarSeleccion(this)"
+          class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:bg-appbg">Duplicar</button>
   {% if user.perfil.rol == 'ADMIN' %}
   <button hx-post="{% url 'pedidos:eliminar_lote' %}" hx-include="input[name='ids']:checked"
           hx-confirm="¿Eliminar los pedidos seleccionados de forma PERMANENTE? No queda registro, no se puede deshacer."

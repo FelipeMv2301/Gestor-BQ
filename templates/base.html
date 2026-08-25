@@ -199,6 +199,12 @@
       if (!ids.length) { showToast({level: 'error', body: 'Selecciona al menos un pedido.'}); return; }
       htmx.ajax('POST', boton.dataset.url, {values: {ids: ids}});
     }
+    // Duplica los pedidos seleccionados (mismo patrón que notificarSeleccion).
+    function duplicarSeleccion(boton) {
+      var ids = Array.from(document.querySelectorAll('input[name="ids"]:checked')).map(function (c) { return c.value; });
+      if (!ids.length) { showToast({level: 'error', body: 'Selecciona al menos un pedido.'}); return; }
+      htmx.ajax('POST', boton.dataset.url, {values: {ids: ids}});
+    }
   </script>
 </body>
 </html>

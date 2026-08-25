@@ -96,7 +96,8 @@ class DuplicarPedidoTest(TestCase):
             services.duplicar_pedido(self.original, self.ejec_user)
         self.assertEqual(Pedido.objects.filter(origen="SAP", num_pedido="2601820-2").count(), 0)
 
-    def test_pedido_sin_envio_no_se_puede_duplicar(self):
+    def test_pedido_sin_envio_tambien_se_puede_duplicar(self):
+        # Sin restricción por estado de envío — Logística decide cuándo corresponde.
         sin_envio = crear_pedido(num="3000001", courier=Courier.CHIBRA)
-        with self.assertRaises(PermissionError):
-            services.duplicar_pedido(sin_envio, self.logi)
+        copia = services.duplicar_pedido(sin_envio, self.logi)
+        self.assertEqual(copia.num_pedido, "3000001-2")

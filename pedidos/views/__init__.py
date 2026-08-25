@@ -26,6 +26,7 @@ from .lote import (
     eliminar_lote,
     rechazar_lote,
     notificar_lote,
+    duplicar_lote,
 )
 from .despacho import (
     armar_despacho,

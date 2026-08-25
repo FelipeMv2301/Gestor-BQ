@@ -132,3 +132,35 @@ class NotificarLoteTest(TestCase):
         self.assertEqual(p1.estado_notificacion, Pedido.EstadoNotificacion.NO_NOTIFICADO)  # el que falló
         self.assertEqual(p2.estado_notificacion, Pedido.EstadoNotificacion.NOTIFICADO)      # no se salta
         self.assertEqual(p3.estado_notificacion, Pedido.EstadoNotificacion.NOTIFICADO)
+
+
+class DuplicarLoteTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.logi = crear_usuario("logi@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec = crear_usuario("ejec@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=10)
+
+    def test_duplica_los_seleccionados_sin_restriccion_de_envio(self):
+        envio = EnvioCourier.objects.create(courier=Courier.CHIBRA)
+        con_envio = crear_pedido("7001", envio=envio, courier=Courier.CHIBRA)
+        sin_envio = crear_pedido("7002", courier=Courier.CHIBRA)
+
+        self.client.force_login(self.logi)
+        resp = self.client.post("/pedidos/lote/duplicar/", {"ids": [con_envio.pk, sin_envio.pk]})
+
+        self.assertEqual(resp.status_code, 204)
+        self.assertTrue(Pedido.objects.filter(num_pedido="7001-2").exists())
+        self.assertTrue(Pedido.objects.filter(num_pedido="7002-2").exists())
+
+    def test_ejecutivo_no_puede_duplicar_por_lote(self):
+        p = crear_pedido("7003", courier=Courier.CHIBRA)
+        self.client.force_login(self.ejec)
+        self.client.post("/pedidos/lote/duplicar/", {"ids": [p.pk]})
+        self.assertFalse(Pedido.objects.filter(num_pedido="7003-2").exists())
+
+    def test_sin_seleccion_no_hace_nada(self):
+        crear_pedido("7004", courier=Courier.CHIBRA)
+        self.client.force_login(self.logi)
+        resp = self.client.post("/pedidos/lote/duplicar/", {"ids": []})
+        self.assertEqual(resp.status_code, 204)
+        self.assertEqual(Pedido.objects.count(), 1)

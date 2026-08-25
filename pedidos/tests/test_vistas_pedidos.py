@@ -42,9 +42,10 @@ class DuplicarVistaTest(TestCase):
         self.assertEqual(resp.status_code, 204)
         self.assertEqual(resp["HX-Trigger"], '{"toast": {"level": "error", "body": "No puedes duplicar este pedido."}}')
 
-    def test_pedido_sin_envio_no_se_puede_duplicar(self):
+    def test_pedido_sin_envio_tambien_se_puede_duplicar(self):
+        # Sin restricción por estado de envío — Logística decide cuándo corresponde.
         self.client.force_login(self.logi)
         resp = self.client.post(f"/pedidos/{self.sin_envio.pk}/duplicar/")
         self.assertEqual(resp.status_code, 204)
-        self.assertNotIn("HX-Redirect", resp.headers)
-        self.assertEqual(Pedido.objects.filter(num_pedido="3000001-2").count(), 0)
+        self.assertEqual(resp["HX-Redirect"], "/pedidos/mis-pedidos/")
+        self.assertTrue(Pedido.objects.filter(num_pedido="3000001-2").exists())
