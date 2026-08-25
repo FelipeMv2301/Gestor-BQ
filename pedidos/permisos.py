@@ -35,6 +35,8 @@ def puede_rechazar(usuario, pedido):
         return True
     if rol == PerfilUsuario.Rol.EJECUTIVO:
         return responsable_del_pedido(usuario, pedido) and pedido.envio_id is None
+    if rol == PerfilUsuario.Rol.LOGISTICA:
+        return pedido.envio_id is None
     return False
 
 #Permiso para reingresar un pedido anulado (solo Admin)
@@ -99,6 +101,9 @@ def puede_despachar(usuario, pedido):
         and pedido.envio_id is None
         and bool(pedido.courier)
     )
+
+def puede_duplicar_pedido(usuario, pedido):
+    return obtener_rol(usuario) in (PerfilUsuario.Rol.LOGISTICA, PerfilUsuario.Rol.ADMIN)
 
 def queryset_para_ver(usuario):
     rol = obtener_rol(usuario)

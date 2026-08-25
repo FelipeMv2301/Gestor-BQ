@@ -1,0 +1,15 @@
+<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4"
+     onclick="if(event.target===this)document.getElementById('modal').innerHTML=''">
+  <div class="bg-surface rounded-2xl shadow-lg max-w-md w-full p-6">
+    <h2 class="text-lg font-bold text-ink">Duplicar pedido {{ pedido.origen }}-{{ pedido.num_pedido }}</h2>
+    <p class="text-sm text-muted mt-1.5 leading-relaxed">Se creará una copia ({{ pedido.origen }}-{{ pedido.num_pedido }}-N) sin envío asignado, lista para seleccionar y despachar. Este pedido no se modifica.</p>
+    <form hx-post="{% url 'pedidos:duplicar' pedido.pk %}" class="mt-4">
+      <div class="flex justify-end gap-2.5">
+        <button type="button" onclick="document.getElementById('modal').innerHTML=''"
+                class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:bg-appbg">Cancelar</button>
+        <button type="submit"
+                class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Duplicar pedido</button>
+      </div>
+    </form>
+  </div>
+</div>

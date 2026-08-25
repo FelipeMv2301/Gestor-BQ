@@ -166,3 +166,56 @@ def consultar_estado(orden_flete):
         json={"ordenFlete": int(orden_flete)},
     )
     return respuesta.json().get("estadoFlete") or ""
+
+#Seguimiento MASIVO (Etracking): una sola llamada para varias OF, para el botón "Actualizar estados"
+#en lote (mismo rol que moveup_client.consultar_envios en el batch de MoveUP). Esquema de auth propio
+#(api-key/cli-rut/password) — distinto del Rut/Clave que usa consultar_estado (individual).
+def consultar_estados_batch(ordenes_flete):
+    respuesta = _solicitud(
+        requests.post, settings.STARKEN_ETRACKING_URL,
+        headers={
+            "api-key": settings.STARKEN_ETRACKING_API_KEY,
+            "cli-rut": settings.STARKEN_ETRACKING_CLI_RUT,
+            "password": settings.STARKEN_ETRACKING_PASSWORD,
+        },
+        json={
+            "tracking": [{"numeroDocumento": "", "numeroOrdenFlete": str(of), "tipoDocumento": ""} for of in ordenes_flete],
+            "rutEmpresa": settings.STARKEN_RUT_EMPRESA_EMISORA,
+        },
+    )
+    filas = respuesta.json().get("listaResumenRedestinacion", {}).get("ordenFlete") or []
+    #codigoSalida distinto de 1 = esa consulta puntual no fue correcta (ej. OF no encontrada) — se
+    #omite esa fila sin tumbar el resto del lote.
+    return {
+        str(fila["numeroOrdenFlete"]): fila.get("estadoOrdenFlete") or ""
+        for fila in filas if fila.get("codigoSalida") == 1
+    }
+
+#Anula una OF. Dos llamadas: login (usuario STK Pro Empresa, token JWT nuevo cada vez — no se
+#reusa ni se cachea) y anulación (Bearer del paso anterior). Solo anula OF sin movimientos
+#operativos y del mismo RUT del usuario — Starken puede rechazar con estado "NO_OK" y motivo.
+def anular_of(numero_of):
+    respuesta_login = _solicitud(
+        requests.post, settings.STARKEN_ANULACION_LOGIN_URL,
+        json={
+            "application": {"code": "PRO"},
+            "run": settings.STARKEN_ANULACION_RUN,
+            "rut_master": settings.STARKEN_ANULACION_RUT_MASTER,
+            "password": settings.STARKEN_ANULACION_PASSWORD,
+        },
+    )
+    token = respuesta_login.json().get("token")
+    if not token:
+        raise ValueError("[!] Error: Starken no devolvió token de sesión para anular la OF.")
+
+    respuesta = _solicitud(
+        requests.post, settings.STARKEN_ANULACION_URL,
+        headers={"Authorization": f"Bearer {token}"},
+        json={"numerosOrden": [int(numero_of)]},
+    )
+    filas = respuesta.json().get("data") or []
+    fila = next((f for f in filas if str(f.get("numeroOrden")) == str(numero_of)), None)
+
+    if not fila or fila.get("estado") != "OK":
+        motivo = fila.get("mensaje") if fila else "sin respuesta de Starken para esa OF"
+        raise ValueError(f"[!] Error de Starken al anular la OF {numero_of}: {motivo}")

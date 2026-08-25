@@ -6,9 +6,9 @@ from pedidos.permisos import es_logistica
 from cuentas.models import PerfilUsuario
 from ejecutivos.models import Ejecutivo
 from .models import EnvioCourier
-from .services import parsear_bultos
+from .services import parsear_bultos, ANULAR_COURIER, anular_envio_courier
 from . import reportes
-from integraciones.seguimiento import refrescar_estados_courier, actualizar_estado_courier
+from integraciones.seguimiento import refrescar_estados_courier, actualizar_estado_courier, REFRESCAR_ESTADO_BATCH
 from utils import Courier
 from pedidos import permisos
 from django.urls import reverse
@@ -78,11 +78,11 @@ def mis_envios(request):
 @require_POST
 def refrescar_estados(request):
     if es_logistica(request.user):
-        envios = EnvioCourier.objects.filter(courier=Courier.MOVEUP)
+        envios = EnvioCourier.objects.filter(courier__in=REFRESCAR_ESTADO_BATCH.keys())
         destino = "envios:lista"
     elif permisos.obtener_rol(request.user) == PerfilUsuario.Rol.EJECUTIVO:
         codigos = permisos.codigos_sap_usuario(request.user)
-        envios = EnvioCourier.objects.de_ejecutivo(codigos).filter(courier=Courier.MOVEUP)
+        envios = EnvioCourier.objects.de_ejecutivo(codigos).filter(courier__in=REFRESCAR_ESTADO_BATCH.keys())
         destino = "envios:mis_envios"
     else:
         return redirect("inicio")
@@ -127,6 +127,23 @@ def cambiar_estado_envio(request, pk):
     envio.estado = nuevo_estado
     envio.save(update_fields=["estado", "actualizado_en"])
     messages.success(request, f"Envío #{envio.id} marcado como {envio.get_estado_display()}.")
+    return redirect("envios:detalle", pk=pk)
+
+
+#Anula la OF en el courier (hoy solo Starken, ver ANULAR_COURIER) y marca el envío como ANULADO.
+#No todos los couriers admiten esto por integración — si no está en ANULAR_COURIER, se avisa en
+#pantalla en vez de mostrar un botón que nunca funcionaría.
+@login_required
+@require_POST
+def anular_envio(request, pk):
+    if not es_logistica(request.user):
+        return redirect("inicio")
+    envio = get_object_or_404(EnvioCourier, pk=pk)
+    try:
+        anular_envio_courier(envio)
+        messages.success(request, f"Envío #{envio.id} anulado en {envio.get_courier_display()}.")
+    except Exception as exc:
+        messages.error(request, f"No se pudo anular: {str(exc).replace('[!] Error: ', '')}")
     return redirect("envios:detalle", pk=pk)
 
 @login_required
@@ -231,7 +248,8 @@ def detalle_envio(request, pk):
     documentos = [(tipo, ETIQUETAS_TIPO_DOCUMENTO.get(tipo, tipo)) for tipo in documentos_disponibles(envio.courier)]
     return render(request, "envios/detalle_envio.html",
                 {"envio": envio, "puede_gestionar": es_logistica(request.user),
-                    "puede_refrescar": True, "documentos": documentos})
+                    "puede_refrescar": True, "documentos": documentos,
+                    "puede_anular": envio.courier in ANULAR_COURIER})
 
 @login_required
 def descargar_documento(request, pk, tipo):

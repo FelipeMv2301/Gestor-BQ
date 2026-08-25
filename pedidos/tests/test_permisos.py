@@ -29,16 +29,18 @@ class PermisosTest(TestCase):
         self.assertTrue(permisos.responsable_del_pedido(self.dueno, self.pedido))
         self.assertFalse(permisos.responsable_del_pedido(self.ajeno, self.pedido))
 
-    # --- rechazar: Admin siempre; ejecutivo dueño hasta que se despache a courier ---
-    def test_rechazar_admin_y_dueno_sin_despachar(self):
+    # --- rechazar: Admin siempre; ejecutivo dueño y Logística hasta que se despache a courier ---
+    def test_rechazar_admin_dueno_y_logistica_sin_despachar(self):
         self.assertTrue(permisos.puede_rechazar(self.admin, self.pedido))
         self.assertTrue(permisos.puede_rechazar(self.dueno, self.pedido))
+        self.assertTrue(permisos.puede_rechazar(self.logi, self.pedido))  # sin dueño, gestiona todo
         self.assertFalse(permisos.puede_rechazar(self.ajeno, self.pedido))
-        self.assertFalse(permisos.puede_rechazar(self.logi, self.pedido))
 
-    def test_dueno_no_puede_rechazar_tras_despachar(self):
+    def test_dueno_y_logistica_no_pueden_rechazar_tras_despachar(self):
         self.pedido.envio_id = 999  # simula ya despachado a courier
         self.assertFalse(permisos.puede_rechazar(self.dueno, self.pedido))
+        self.assertFalse(permisos.puede_rechazar(self.logi, self.pedido))
+        self.assertTrue(permisos.puede_rechazar(self.admin, self.pedido))  # Admin sin tope
         self.assertTrue(permisos.puede_rechazar(self.admin, self.pedido))  # Admin sin restricción
 
     # --- reingresar: Admin siempre; Ejecutivo solo los suyos ---
@@ -66,6 +68,15 @@ class PermisosTest(TestCase):
         self.pedido.estado_notificacion = EN.NOTIFICADO
         self.assertFalse(permisos.puede_editar(self.logi, self.pedido))
         self.assertTrue(permisos.puede_editar(self.admin, self.pedido))
+
+    # --- duplicar: Logística/Admin, sin restricción por estado de envío (decide el trabajador) ---
+    def test_puede_duplicar_pedido(self):
+        self.assertTrue(permisos.puede_duplicar_pedido(self.logi, self.pedido))     # sin envío, igual puede
+        self.assertTrue(permisos.puede_duplicar_pedido(self.admin, self.pedido))
+        self.pedido.envio_id = 999  # simula ya despachado a courier — sigue pudiendo
+        self.assertTrue(permisos.puede_duplicar_pedido(self.logi, self.pedido))
+        self.assertTrue(permisos.puede_duplicar_pedido(self.admin, self.pedido))
+        self.assertFalse(permisos.puede_duplicar_pedido(self.dueno, self.pedido))   # ejecutivo nunca
 
     # --- notificar / es_logistica ---
     def test_puede_notificar(self):

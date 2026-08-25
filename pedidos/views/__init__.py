@@ -14,6 +14,7 @@ from .pedidos import (
     editar,
     cambiar_courier,
     rechazar,
+    duplicar,
     anulados,
     reingresar,
     editar_motivo_rechazado,
@@ -25,6 +26,7 @@ from .lote import (
     eliminar_lote,
     rechazar_lote,
     notificar_lote,
+    duplicar_lote,
 )
 from .despacho import (
     armar_despacho,

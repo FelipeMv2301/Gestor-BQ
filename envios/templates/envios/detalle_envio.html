@@ -114,6 +114,17 @@
       {% endif %}
     </div>
     {% endif %}
+
+    {% if puede_gestionar and puede_anular and envio.estado != 'ANULADO' %}
+    <div class="p-5 border-t border-line flex flex-col gap-2.5">
+      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-1">Anular en {{ envio.get_courier_display }}</h3>
+      <p class="text-xs text-muted mb-1">Anula la orden de flete en {{ envio.get_courier_display }} (si no tiene movimientos operativos) y marca este envío como Anulado. No se puede deshacer desde el portal.</p>
+      <form method="post" action="{% url 'envios:anular' envio.pk %}" onsubmit="return confirm('¿Anular la orden de transporte {{ envio.orden_transporte }} en {{ envio.get_courier_display }}? Esta acción no se puede deshacer.');">
+        {% csrf_token %}
+        <button type="submit" class="w-full text-sm font-semibold px-4 py-2 rounded-full border border-[#e0463a] text-[#e0463a] hover:bg-rech-bg">Anular OF</button>
+      </form>
+    </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

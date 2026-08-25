@@ -19,6 +19,11 @@
             class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Notificar al cliente</button>
     {% endif %}
 
+    {% if puede_duplicar %}
+    <button hx-get="{% url 'pedidos:duplicar' pedido.pk %}" hx-target="#modal"
+            class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Duplicar pedido</button>
+    {% endif %}
+
     {% if puede_rechazar %}
     <button hx-get="{% url 'pedidos:rechazar' pedido.pk %}" hx-target="#modal"
             class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong text-rech-ink hover:bg-rech-bg">Anular</button>

@@ -10,6 +10,7 @@ urlpatterns = [
     path("<int:pk>/editar/", views.editar, name="editar"),
     path("<int:pk>/courier/", views.cambiar_courier, name="cambiar_courier"),
     path("<int:pk>/rechazar/", views.rechazar, name="rechazar"),
+    path("<int:pk>/duplicar/", views.duplicar, name="duplicar"),
     path("anulados/", views.anulados, name="anulados"),
     path("anulados/<int:pk>/reingresar/", views.reingresar, name="reingresar"),
     path("anulados/<int:pk>/motivo/", views.editar_motivo_rechazado, name="editar_motivo_rechazado"),
@@ -31,4 +32,5 @@ urlpatterns = [
     path("panel/skus/crear/", views.crear_sku, name="crear_sku"),
     path("panel/skus/<int:pk>/editar/", views.editar_sku, name="editar_sku"),
     path("panel/skus/<int:pk>/eliminar/", views.eliminar_sku, name="eliminar_sku"),
+    path("lote/duplicar/", views.duplicar_lote, name="duplicar_lote"),
 ]

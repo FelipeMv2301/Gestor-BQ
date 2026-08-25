@@ -40,7 +40,8 @@ def eliminar_lote(request):
     resp["HX-Redirect"] = destino
     return resp
 
-#Anular por lote (Admin, o el ejecutivo dueño hasta que se despache a courier — permisos.puede_rechazar).
+#Anular por lote (Admin, Logística, o el ejecutivo dueño — todos hasta que se despache a courier,
+#salvo Admin sin tope — ver permisos.puede_rechazar).
 @login_required
 @require_POST
 def rechazar_lote(request):
@@ -57,8 +58,13 @@ def rechazar_lote(request):
     if anulados:
         messages.success(request, f"{anulados} pedido(s) anulado(s).")
 
+    referer = request.headers.get("Referer", "")
+    if referer and url_has_allowed_host_and_scheme(referer, allowed_hosts={request.get_host()}):
+        destino = referer
+    else:
+        destino = reverse("pedidos:mis_pedidos")
     resp = HttpResponse(status=204)
-    resp["HX-Redirect"] = reverse("pedidos:mis_pedidos")
+    resp["HX-Redirect"] = destino
     return resp
 
 @login_required
@@ -77,6 +83,26 @@ def notificar_lote(request):
             messages.error(request, f"{pedido.origen}-{pedido.num_pedido}: {str(exc).replace('[!] Error: ', '')}")
     if notificados:
         messages.success(request, f"{notificados} cliente(s) notificado(s).")
+
+    resp = HttpResponse(status=204)
+    resp["HX-Redirect"] = reverse("pedidos:despachos")
+    return resp
+
+@login_required
+@require_POST
+def duplicar_lote(request):
+    ids = request.POST.getlist("ids")
+    pedidos = permisos.queryset_para_ver(request.user).filter(pk__in=ids)
+
+    duplicados = 0
+    for pedido in pedidos:
+        try:
+            services.duplicar_pedido(pedido, request.user)
+            duplicados += 1
+        except (PermissionError, ValueError) as exc:
+            messages.error(request, f"{pedido.origen}-{pedido.num_pedido}: {str(exc).replace('[!] Error: ', '')}")
+    if duplicados:
+        messages.success(request, f"{duplicados} pedido(s) duplicado(s).")
 
     resp = HttpResponse(status=204)
     resp["HX-Redirect"] = reverse("pedidos:despachos")

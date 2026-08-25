@@ -221,6 +221,24 @@ def tablero_logistica(request):
     plantilla = "pedidos/_tabla_pedidos.html" if request.headers.get("HX-Request") else "pedidos/tablero_logistica.html"
     return render(request, plantilla, contexto)
 
+@login_required
+def duplicar(request, pk):
+    pedido = get_object_or_404(permisos.queryset_para_ver(request.user), pk=pk)
+
+    if not permisos.puede_duplicar_pedido(request.user, pedido):
+        resp = HttpResponse(status=204)
+        resp["HX-Trigger"] = json.dumps({"toast": {"level": "error",
+            "body": "No puedes duplicar este pedido."}})
+        return resp
+
+    if request.method == "POST":
+        copia = services.duplicar_pedido(pedido, request.user)
+        messages.success(request, f"Pedido {copia.origen}-{copia.num_pedido} creado, listo para despachar.")
+        resp = HttpResponse(status=204)
+        resp["HX-Redirect"] = reverse("pedidos:mis_pedidos")
+        return resp
+
+    return render(request, "pedidos/_modal_duplicar.html", {"pedido": pedido})
 
 """
 Helpers
@@ -232,4 +250,5 @@ def _ctx_cuerpo(request, pedido):
         "puede_rechazar": permisos.puede_rechazar(request.user, pedido),
         "puede_notificar": permisos.puede_notificar(request.user, pedido),
         "puede_despachar": permisos.puede_despachar(request.user, pedido),
+        "puede_duplicar": permisos.puede_duplicar_pedido(request.user, pedido),
     }

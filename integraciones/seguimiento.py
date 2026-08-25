@@ -78,8 +78,28 @@ def _refrescar_estado_moveup_batch(envios):
     return actualizados
 
 
+#Starken: 1 sola llamada a Etracking para todas las OF del lote (mismo criterio que MoveUP).
+def _refrescar_estado_starken_batch(envios):
+    envios = [e for e in envios if e.orden_transporte]
+    if not envios:
+        return 0
+
+    estados = starken_client.consultar_estados_batch([e.orden_transporte for e in envios])
+
+    actualizados = 0
+    for envio in envios:
+        estado = estados.get(str(envio.orden_transporte))
+        if estado is not None:   # solo si Starken devolvió esa OF (codigoSalida == 1), no pisar si no
+            envio.estado_courier = estado
+            envio.estado_courier_actualizado = timezone.now()
+            envio.save(update_fields=["estado_courier", "estado_courier_actualizado"])
+            actualizados += 1
+    return actualizados
+
+
 REFRESCAR_ESTADO_BATCH = {
     Courier.MOVEUP: _refrescar_estado_moveup_batch,
+    Courier.STARKEN: _refrescar_estado_starken_batch,
 }
 
 
