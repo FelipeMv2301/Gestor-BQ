@@ -79,6 +79,37 @@ class RechazarLoteTest(TestCase):
         self.client.post("/pedidos/lote/rechazar/", {"ids": [p.pk]})
         self.assertTrue(Pedido.objects.filter(pk=p.pk).exists())
 
+    def test_logistica_anula_sin_ser_dueno(self):
+        logi = crear_usuario("logi_rl@bioquimica.cl", Rol.LOGISTICA)
+        p = crear_pedido("6006", ejecutivo=self.ejec_obj)  # logi no es su dueño, igual puede
+        self.client.force_login(logi)
+        resp = self.client.post("/pedidos/lote/rechazar/", {"ids": [p.pk]})
+        self.assertEqual(resp.status_code, 204)
+        self.assertFalse(Pedido.objects.filter(pk=p.pk).exists())
+
+    def test_logistica_no_puede_anular_ya_despachado(self):
+        logi = crear_usuario("logi_rl2@bioquimica.cl", Rol.LOGISTICA)
+        envio = EnvioCourier.objects.create(courier=Courier.CHIBRA)
+        despachado = crear_pedido("6007", ejecutivo=self.ejec_obj, envio=envio)
+        self.client.force_login(logi)
+        self.client.post("/pedidos/lote/rechazar/", {"ids": [despachado.pk]})
+        self.assertTrue(Pedido.objects.filter(pk=despachado.pk).exists())
+
+    def test_redirige_al_referer_no_siempre_a_mis_pedidos(self):
+        p = crear_pedido("6008", ejecutivo=self.ejec_obj)
+        self.client.force_login(self.dueno)
+        resp = self.client.post(
+            "/pedidos/lote/rechazar/", {"ids": [p.pk]},
+            HTTP_REFERER="http://testserver/pedidos/despachos/",
+        )
+        self.assertEqual(resp["HX-Redirect"], "http://testserver/pedidos/despachos/")
+
+    def test_sin_referer_cae_a_mis_pedidos(self):
+        p = crear_pedido("6009", ejecutivo=self.ejec_obj)
+        self.client.force_login(self.dueno)
+        resp = self.client.post("/pedidos/lote/rechazar/", {"ids": [p.pk]})
+        self.assertEqual(resp["HX-Redirect"], "/pedidos/mis-pedidos/")
+
 
 class NotificarLoteTest(TestCase):
     def setUp(self):

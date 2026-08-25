@@ -35,6 +35,8 @@ def puede_rechazar(usuario, pedido):
         return True
     if rol == PerfilUsuario.Rol.EJECUTIVO:
         return responsable_del_pedido(usuario, pedido) and pedido.envio_id is None
+    if rol == PerfilUsuario.Rol.LOGISTICA:
+        return pedido.envio_id is None
     return False
 
 #Permiso para reingresar un pedido anulado (solo Admin)
