@@ -17,4 +17,5 @@ urlpatterns = [
     path("<int:pk>/editar/", views.editar_envio, name="editar"),
     path("<int:pk>/eliminar/", views.eliminar_envio, name="eliminar"),
     path("<int:pk>/documento/<str:tipo>/", views.descargar_documento, name="descargar_documento"),
+    path("webhooks/chibra/estado/", views.webhook_estado_chibra, name="webhook_chibra_estado"),
 ]

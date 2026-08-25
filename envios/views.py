@@ -18,6 +18,12 @@ import datetime
 import io
 from pypdf import PdfWriter
 from integraciones.documentos import generar_documento, documentos_disponibles, ETIQUETAS_TIPO_DOCUMENTO
+import hmac
+import json
+from django.conf import settings
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 
 
 @login_required
@@ -283,3 +289,28 @@ def descargar_documento(request, pk, tipo):
     respuesta = HttpResponse(contenido, content_type="application/pdf")
     respuesta["Content-Disposition"] = f'inline; filename="{tipo}_{envio.orden_transporte}.pdf"'
     return respuesta
+
+@csrf_exempt
+@require_POST
+def webhook_estado_chibra(request):
+    key_recibida = request.headers.get("X-API-KEY", "")
+    if not hmac.compare_digest(key_recibida, settings.CHIBRA_WEBHOOK_API_KEY):
+        return JsonResponse({"error": "no autorizado"}, status=401)
+
+    try:
+        datos = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    orden_transporte = datos.get("orden_transporte")
+    envio = EnvioCourier.objects.filter(courier=Courier.CHIBRA,
+orden_transporte=orden_transporte).first()
+    if not envio:
+        return JsonResponse({"error": "envío no encontrado"}, status=404)
+
+    estado = (datos.get("estado") or {}).get("descripcion") or ""
+    envio.estado_courier = estado
+    envio.estado_courier_actualizado = timezone.now()
+    envio.save(update_fields=["estado_courier", "estado_courier_actualizado"])
+
+    return JsonResponse({"ok": True})
