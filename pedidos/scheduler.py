@@ -7,6 +7,7 @@ from django.utils import timezone
 from .models import LockTarea
 from .services import sincronizar_sap_reciente, sincronizar_woo_reciente
 from django.conf import settings
+from envios.services import refrescar_estados_recientes
 
 logger = logging.getLogger("pedidos.scheduler")
 NOMBRE_LOCK = "sincronizar_pedidos"
@@ -25,11 +26,19 @@ NOMBRE_LOCK = "sincronizar_pedidos"
 INTERVALO_SUPERVISION = 1
 UMBRAL_INACTIVIDAD = datetime.timedelta(minutes=INTERVALO_SUPERVISION * 3)
 
-ID_JOBS_SINCRONIZACION = ("sincronizar_sap", "sincronizar_woo")
+ID_JOBS_SINCRONIZACION = ("sincronizar_sap", "sincronizar_woo", "refrescar_estados")
 
 _scheduler = None
 _soy_dueno = False
 
+
+def _job_refrescar_estados():
+    logger.info("Cron estados: refrescando estado de couriers con consulta por API...")
+    try:
+        total = refrescar_estados_recientes()
+        logger.info("Cron estados: %s envío(s) actualizado(s).", total)
+    except Exception:
+        logger.exception("Cron estados: falló el refresco.")
 
 def _tomar_lock():
     """Intenta quedarse con el lock. El único criterio es el reloj: si el dueño no dio señales de
@@ -87,8 +96,12 @@ def _agregar_jobs_de_sincronizacion():
     if settings.CRON_WOO_ACTIVO:
         _scheduler.add_job(_job_sincronizar_woo, "interval", minutes=settings.INTERVALO_SYNC_PEDIDOS,
                            id="sincronizar_woo", next_run_time=ahora, replace_existing=True)
-    logger.info("Cron pedidos: tomé el lock, sincronizo yo (cada %s minutos, SAP=%s, WEB=%s).",
-                settings.INTERVALO_SYNC_PEDIDOS, settings.CRON_SAP_ACTIVO, settings.CRON_WOO_ACTIVO)
+    if settings.CRON_REFRESCAR_ESTADOS_ACTIVO:
+        _scheduler.add_job(_job_refrescar_estados, "interval", minutes=settings.INTERVALO_REFRESCAR_ESTADOS,
+                           id="refrescar_estados", next_run_time=ahora, replace_existing=True)
+    logger.info("Cron pedidos: tomé el lock, sincronizo yo (cada %s minutos, SAP=%s, WEB=%s, estados=%s).",
+                settings.INTERVALO_SYNC_PEDIDOS, settings.CRON_SAP_ACTIVO, settings.CRON_WOO_ACTIVO,
+                settings.CRON_REFRESCAR_ESTADOS_ACTIVO)
 
 
 def _quitar_jobs_de_sincronizacion():

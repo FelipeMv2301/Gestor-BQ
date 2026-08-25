@@ -105,6 +105,10 @@ DATABASE_VERSION = os.getenv('DATABASE_VERSION')
 INTERVALO_SYNC_PEDIDOS = int(os.getenv('INTERVALO_SYNC_PEDIDOS', '10'))
 CRON_SAP_ACTIVO = os.getenv('CRON_SAP_ACTIVO', 'True').strip().lower() == 'true'
 CRON_WOO_ACTIVO = os.getenv('CRON_WOO_ACTIVO', 'True').strip().lower() == 'true'
+INTERVALO_REFRESCAR_ESTADOS = int(os.getenv('INTERVALO_REFRESCAR_ESTADOS', '30'))
+CRON_REFRESCAR_ESTADOS_ACTIVO = os.getenv('CRON_REFRESCAR_ESTADOS_ACTIVO',
+'True').strip().lower() == 'true'
+DIAS_REFRESCAR_ESTADOS = int(os.getenv('DIAS_REFRESCAR_ESTADOS', '15'))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY')

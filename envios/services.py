@@ -4,6 +4,10 @@ from pedidos.models import Pedido
 from pedidos.services  import notificar_pedido
 from django.db import transaction
 from utils import Courier, normalizar_telefono_cl, es_movil_cl
+import datetime
+from django.conf import settings
+from django.utils import timezone
+from integraciones.seguimiento import refrescar_estados_courier, REFRESCAR_ESTADO_BATCH
 
 
 """
@@ -237,6 +241,13 @@ def validar_pedidos_para_despacho(pedidos):
             raise ValueError(f"Pedido N° {pedido.origen}-{pedido.num_pedido} no tiene datos de contacto o dirección válidos (puedes editarlo).")
 
     return courier
+
+def refrescar_estados_recientes():
+    desde = timezone.now() - datetime.timedelta(days=settings.DIAS_REFRESCAR_ESTADOS)
+    envios = EnvioCourier.objects.filter(
+        courier__in=REFRESCAR_ESTADO_BATCH.keys(), creado_en__gte=desde,
+    ).exclude(estado__in=[EnvioCourier.Estado.ANULADO, EnvioCourier.Estado.ENTREGADO])
+    return refrescar_estados_courier(envios)
 
 def despachar_pedidos(pedidos, courier, bultos, destinatario, datos_courier, usuario):
     validar_pedidos_para_despacho(pedidos)   # re-valida por seguridad, aunque la vista ya haya chequeado

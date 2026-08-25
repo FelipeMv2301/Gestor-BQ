@@ -1,0 +1,54 @@
+// Estructura propuesta para el webhook de estado que Chibra mandaría a
+// POST https://gestor.bioquimica.cl/envios/webhooks/chibra/estado/ (header X-API-KEY)
+// Extensión .jsonc (JSON con comentarios) — no es JSON estricto, es documento de referencia.
+//
+// Aplica a envíos Chibra Express y Terrestre (mismo endpoint, el campo "servicio" distingue cuál es).
+//
+// Preguntas abiertas para Chibra antes de darlo por cerrado:
+//   1. ¿La orden_transporte es única a nivel de toda la cuenta, o depende del centro? Si depende,
+//      "centro" pasa de opcional a obligatorio para nosotros.
+//   2. Catálogo completo de estado.codigo posibles (con su significado) — sin esto no podemos
+//      mapear "estado.codigo" a nada interno, solo mostramos "estado.descripcion" tal cual llega.
+//   3. ¿Mandan un POST por cada cambio de estado, o solo el estado final? Define si nuestro
+//      endpoint necesita lógica de "no pisar un estado más nuevo con uno más viejo llegado tarde".
+//   4. Confirmar esquema de auth que ellos pueden implementar del lado de su sistema (hoy pedimos
+//      header X-API-KEY fijo — si solo soportan Basic Auth o nada, hay que ajustar el endpoint).
+//
+{
+  "orden_transporte": "999903204829",   //obligatorio — sin esto no encontramos el EnvioCourier (404)
+  "centro": "02",                       //nulo — hoy no se guarda, solo se recibe
+  "referencia": "2601820",              //nulo — hoy no se guarda, solo se recibe
+
+  "servicio": {
+    "codigo": "10",                     //nulo — hoy no se guarda
+    "nombre": "Express"                 //nulo — hoy no se guarda
+  },
+
+  "estado": {
+    "codigo": "ENT",                    //nulo — hoy no se guarda (falta catálogo de Chibra para mapear)
+    "descripcion": "Entregado conforme" //obligatorio — es lo único que hoy se persiste (estado_courier)
+  },
+
+  "fecha_hora_evento": "2026-08-25T14:32:00-04:00",  //nulo — hoy no se lee, usamos la hora de llegada del POST
+
+  "evidencia_entrega": {                //nulo — objeto completo, solo aplica si el estado es "entregado"
+    "recibido_por": "Juan Pérez",       //nulo — hoy no se guarda
+    "rut_receptor": "11111111-1",       //nulo — hoy no se guarda
+    "foto_url": "https://...",          //nulo — hoy no se guarda
+    "firma_url": null                   //nulo — hoy no se guarda
+  },
+
+  "motivo_no_entrega": null,            //nulo — solo aplica si el envío falló/se devolvió
+  "intento_numero": 1,                  //nulo — hoy no se lee
+  "eta": "2026-08-26"                   //nulo — hoy no se lee
+}
+
+// Notas adicionales:
+// - "fecha_hora_evento" en ISO 8601 con offset de zona horaria explícito (ej. "-04:00"), no un
+//   formato ambiguo — Starken usa "DD-MM-YYYY HH:mm:ss" en su webhook y generó dudas de timezone.
+// - Los campos marcados //nulo son recibidos por el endpoint pero descartados hoy (no hay columna
+//   donde guardarlos) — pedirlos igual sirve para no tener que renegociar el contrato con Chibra
+//   cuando se amplíe. Ampliar el guardado (evidencia de entrega, motivo, etc.) es trabajo aparte,
+//   no bloquea que el webhook entre en funcionamiento con solo estado.descripcion.
+// - Si el volumen de eventos es alto, evaluar si "evidencia_entrega.foto_url"/"firma_url" conviene
+//   que sea un link (como está) en vez de Base64 embebido — mantiene el payload liviano.
