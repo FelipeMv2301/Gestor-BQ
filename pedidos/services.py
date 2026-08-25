@@ -11,6 +11,7 @@ from django.db import transaction
 from django.db.models import Q
 from cuentas.models import PerfilUsuario
 from utils import Courier
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -422,4 +423,40 @@ def _nota_despacho_woo(pedido_woo):
         or meta.get("_wc_billing/bioquimicacl/shipping_note")
         or pedido_woo.get("customer_note")
         or ""
+    )
+
+def duplicar_pedido(pedido_original, usuario):
+    if not permisos.puede_duplicar_pedido(usuario, pedido_original):
+        raise PermissionError("[!] Error: No puedes duplicar este pedido.")
+
+    raiz = re.sub(r"-\d+$", "", pedido_original.num_pedido)
+    patron = rf"^{re.escape(raiz)}-\d+$"
+    existentes = Pedido.objects.filter(
+        Q(origen=pedido_original.origen) &
+        (Q(num_pedido=raiz) | Q(num_pedido__regex=patron))
+    ).count()
+    nuevo_num_pedido = f"{raiz}-{existentes + 1}"
+
+    return Pedido.objects.create(
+        origen=pedido_original.origen,
+        num_pedido=nuevo_num_pedido,
+        estado_comercial=Pedido.EstadoComercial.APROBADO,
+        estado_notificacion=Pedido.EstadoNotificacion.NO_NOTIFICADO,
+        envio=None,
+        tipo_entrega=pedido_original.tipo_entrega,
+        retirar_en=pedido_original.retirar_en,
+        courier=pedido_original.courier,
+        servicio_courier_codigo=pedido_original.servicio_courier_codigo,
+        servicio_courier_nombre=pedido_original.servicio_courier_nombre,
+        rut=pedido_original.rut,
+        razon_social=pedido_original.razon_social,
+        nombre_contacto=pedido_original.nombre_contacto,
+        telefono_contacto=pedido_original.telefono_contacto,
+        email_contacto=pedido_original.email_contacto,
+        direccion_calle=pedido_original.direccion_calle,
+        direccion_depto=pedido_original.direccion_depto,
+        direccion_comuna=pedido_original.direccion_comuna,
+        direccion_ciudad=pedido_original.direccion_ciudad,
+        ejecutivo=pedido_original.ejecutivo,
+        observaciones=pedido_original.observaciones,
     )

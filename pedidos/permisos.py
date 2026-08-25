@@ -100,6 +100,11 @@ def puede_despachar(usuario, pedido):
         and bool(pedido.courier)
     )
 
+def puede_duplicar_pedido(usuario, pedido):
+    if obtener_rol(usuario) not in (PerfilUsuario.Rol.LOGISTICA, PerfilUsuario.Rol.ADMIN):
+        return False
+    return pedido.envio_id is not None
+
 def queryset_para_ver(usuario):
     rol = obtener_rol(usuario)
     if rol == PerfilUsuario.Rol.ADMIN:

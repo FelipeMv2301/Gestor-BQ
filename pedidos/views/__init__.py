@@ -14,6 +14,7 @@ from .pedidos import (
     editar,
     cambiar_courier,
     rechazar,
+    duplicar,
     anulados,
     reingresar,
     editar_motivo_rechazado,

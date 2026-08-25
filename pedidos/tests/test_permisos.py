@@ -67,6 +67,15 @@ class PermisosTest(TestCase):
         self.assertFalse(permisos.puede_editar(self.logi, self.pedido))
         self.assertTrue(permisos.puede_editar(self.admin, self.pedido))
 
+    # --- duplicar: Logística/Admin, solo si ya se despachó al menos una vez (envio_id) ---
+    def test_puede_duplicar_pedido(self):
+        self.assertFalse(permisos.puede_duplicar_pedido(self.logi, self.pedido))    # sin envío todavía
+        self.assertFalse(permisos.puede_duplicar_pedido(self.admin, self.pedido))
+        self.pedido.envio_id = 999  # simula ya despachado a courier
+        self.assertTrue(permisos.puede_duplicar_pedido(self.logi, self.pedido))
+        self.assertTrue(permisos.puede_duplicar_pedido(self.admin, self.pedido))
+        self.assertFalse(permisos.puede_duplicar_pedido(self.dueno, self.pedido))   # ejecutivo nunca
+
     # --- notificar / es_logistica ---
     def test_puede_notificar(self):
         self.pedido.estado_comercial = EC.APROBADO

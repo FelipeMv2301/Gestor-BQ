@@ -10,6 +10,7 @@ urlpatterns = [
     path("<int:pk>/editar/", views.editar, name="editar"),
     path("<int:pk>/courier/", views.cambiar_courier, name="cambiar_courier"),
     path("<int:pk>/rechazar/", views.rechazar, name="rechazar"),
+    path("<int:pk>/duplicar/", views.duplicar, name="duplicar"),
     path("anulados/", views.anulados, name="anulados"),
     path("anulados/<int:pk>/reingresar/", views.reingresar, name="reingresar"),
     path("anulados/<int:pk>/motivo/", views.editar_motivo_rechazado, name="editar_motivo_rechazado"),
