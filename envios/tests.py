@@ -8,8 +8,9 @@ from pedidos.models import Pedido
 from pedidos.tests.factories import crear_pedido, crear_usuario, crear_ejecutivo
 from utils import Courier
 from integraciones import chibra_client, seguimiento, starken_client
-from .services import parsear_bultos, validar_pedidos_para_despacho, despachar_pedidos, _parsear_despacho_starken, anular_envio_courier
+from .services import parsear_bultos, validar_pedidos_para_despacho, despachar_pedidos, _parsear_despacho_starken, anular_envio_courier, marcar_incidencia_envio
 from .models import EnvioCourier
+from enviosIncidencias.models import EnvioIncidencia
 
 Rol = PerfilUsuario.Rol
 
@@ -811,33 +812,6 @@ class DescargarDocumentoViewTest(TestCase):
         self.assertEqual(resp.context["documentos"], [("etiqueta", "Etiqueta de envío")])
 
 
-class CambiarEstadoEnvioViewTest(TestCase):
-    def setUp(self):
-        self.client = Client()
-        self.logi = crear_usuario("logi@bioquimica.cl", Rol.LOGISTICA)
-        self.ejec = crear_usuario("ejec@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=10)
-        self.envio = EnvioCourier.objects.create(courier=Courier.CHIBRA, estado=EnvioCourier.Estado.DESPACHADO)
-
-    def test_no_logistica_no_puede_cambiar_estado(self):
-        self.client.force_login(self.ejec)
-        self.client.post(f"/envios/{self.envio.pk}/estado/", {"estado": "ENTREGADO"})
-        self.envio.refresh_from_db()
-        self.assertEqual(self.envio.estado, EnvioCourier.Estado.DESPACHADO)
-
-    def test_logistica_marca_entregado(self):
-        self.client.force_login(self.logi)
-        resp = self.client.post(f"/envios/{self.envio.pk}/estado/", {"estado": "ENTREGADO"})
-        self.assertEqual(resp.status_code, 302)
-        self.envio.refresh_from_db()
-        self.assertEqual(self.envio.estado, EnvioCourier.Estado.ENTREGADO)
-
-    def test_estado_invalido_no_cambia_nada(self):
-        self.client.force_login(self.logi)
-        self.client.post(f"/envios/{self.envio.pk}/estado/", {"estado": "LO_QUE_SEA"})
-        self.envio.refresh_from_db()
-        self.assertEqual(self.envio.estado, EnvioCourier.Estado.DESPACHADO)
-
-
 class EditarEnvioViewTest(TestCase):
     def setUp(self):
         self.client = Client()
@@ -1007,3 +981,105 @@ class RefrescarEstadoViewsTest(TestCase):
         pks = set(mock_batch.call_args[0][0].values_list("pk", flat=True))
         self.assertIn(envio_starken.pk, pks)
         self.assertNotIn(envio_chibra.pk, pks)
+
+
+class MarcarIncidenciaEnvioTest(TestCase):
+    """envios/services.py::marcar_incidencia_envio — archiva el envío (EnvioIncidencia) y libera los
+    pedidos asociados vía el SET_NULL de Pedido.envio."""
+
+    def setUp(self):
+        self.logi = crear_usuario("logi_inc@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec = crear_usuario("ejec_inc@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=10)
+        self.envio = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-INC-1")
+        self.p1 = crear_pedido("8001", envio=self.envio, rut="76563320-6", razon_social="Bioquimica CL",
+                                estado_notificacion=Pedido.EstadoNotificacion.NOTIFICADO)
+        self.p2 = crear_pedido("8002", envio=self.envio, rut="76563320-6",
+                                estado_notificacion=Pedido.EstadoNotificacion.NOTIFICADO)
+
+    def test_archiva_libera_pedidos_y_resetea_notificacion(self):
+        incidencia = marcar_incidencia_envio(self.envio, "Paquete extraviado", self.logi)
+
+        self.assertFalse(EnvioCourier.objects.filter(pk=self.envio.pk).exists())
+        self.assertEqual(incidencia.courier, Courier.CHIBRA)
+        self.assertEqual(incidencia.orden_transporte, "OT-INC-1")
+        self.assertEqual(incidencia.motivo, "Paquete extraviado")
+        self.assertEqual(incidencia.registrado_por, self.logi)
+        self.assertEqual(len(incidencia.pedidos_incluidos), 2)
+        self.assertEqual({p["num_pedido"] for p in incidencia.pedidos_incluidos}, {"8001", "8002"})
+
+        self.p1.refresh_from_db(); self.p2.refresh_from_db()
+        self.assertIsNone(self.p1.envio_id)
+        self.assertIsNone(self.p2.envio_id)
+        self.assertEqual(self.p1.estado_notificacion, Pedido.EstadoNotificacion.NO_NOTIFICADO)
+        self.assertEqual(self.p1.estado_seguimiento[0], "Recién Ingresado")
+
+    def test_snapshot_incluye_datos_del_envio(self):
+        envio = EnvioCourier.objects.create(
+            courier=Courier.CHIBRA, orden_transporte="OT-INC-2",
+            datos_courier={"centro": "02", "servicio": "10"},
+        )
+        incidencia = marcar_incidencia_envio(envio, "x", self.logi)
+        self.assertEqual(incidencia.snapshot["datos_courier"], {"centro": "02", "servicio": "10"})
+        self.assertEqual(incidencia.snapshot["orden_transporte"], "OT-INC-2")
+
+    def test_ejecutivo_no_puede(self):
+        with self.assertRaises(PermissionError):
+            marcar_incidencia_envio(self.envio, "x", self.ejec)
+        self.assertTrue(EnvioCourier.objects.filter(pk=self.envio.pk).exists())
+        self.assertEqual(EnvioIncidencia.objects.count(), 0)
+
+    def test_envio_sin_pedidos_igual_se_puede_archivar(self):
+        envio_vacio = EnvioCourier.objects.create(courier=Courier.MOVEUP)
+        incidencia = marcar_incidencia_envio(envio_vacio, "x", self.logi)
+        self.assertEqual(incidencia.pedidos_incluidos, [])
+        self.assertFalse(EnvioCourier.objects.filter(pk=envio_vacio.pk).exists())
+
+
+class MarcarIncidenciaVistaTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.logi = crear_usuario("logi_inc2@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec = crear_usuario("ejec_inc2@bioquimica.cl", Rol.EJECUTIVO)
+        self.envio = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-INC-3")
+        self.pedido = crear_pedido("8003", envio=self.envio)
+
+    def test_logistica_reporta_incidencia_y_redirige_al_listado(self):
+        self.client.force_login(self.logi)
+        resp = self.client.post(f"/envios/{self.envio.pk}/incidencia/", {"motivo": "Paquete dañado"})
+        self.assertRedirects(resp, "/envios/")
+        self.assertFalse(EnvioCourier.objects.filter(pk=self.envio.pk).exists())
+        self.assertEqual(EnvioIncidencia.objects.count(), 1)
+        self.pedido.refresh_from_db()
+        self.assertIsNone(self.pedido.envio_id)
+
+    def test_sin_motivo_no_hace_nada_y_vuelve_al_detalle(self):
+        self.client.force_login(self.logi)
+        resp = self.client.post(f"/envios/{self.envio.pk}/incidencia/", {"motivo": "   "})
+        self.assertRedirects(resp, f"/envios/{self.envio.pk}/")
+        self.assertTrue(EnvioCourier.objects.filter(pk=self.envio.pk).exists())
+        self.assertEqual(EnvioIncidencia.objects.count(), 0)
+
+    def test_ejecutivo_no_puede(self):
+        self.client.force_login(self.ejec)
+        resp = self.client.post(f"/envios/{self.envio.pk}/incidencia/", {"motivo": "x"})
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(EnvioCourier.objects.filter(pk=self.envio.pk).exists())
+        self.assertEqual(EnvioIncidencia.objects.count(), 0)
+
+    def test_get_no_permitido(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get(f"/envios/{self.envio.pk}/incidencia/")
+        self.assertEqual(resp.status_code, 405)
+
+    def test_boton_visible_en_detalle_para_cualquier_courier(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get(f"/envios/{self.envio.pk}/")
+        contenido = resp.content.decode()
+        self.assertIn("Reportar incidencia", contenido)
+        self.assertNotIn("Marcar Entregado", contenido)
+        self.assertNotIn("Marcar Error", contenido)
+
+    def test_ejecutivo_no_ve_el_boton(self):
+        self.client.force_login(self.ejec)
+        resp = self.client.get(f"/envios/{self.envio.pk}/")
+        self.assertNotIn("Reportar incidencia", resp.content.decode())

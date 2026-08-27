@@ -2,6 +2,8 @@ from django.test import TestCase
 from cuentas.models import PerfilUsuario
 from pedidos.models import Pedido
 from pedidos import permisos
+from envios.models import EnvioCourier
+from utils import Courier
 from .factories import crear_usuario, crear_ejecutivo, crear_pedido
 
 Rol = PerfilUsuario.Rol
@@ -77,6 +79,14 @@ class PermisosTest(TestCase):
         self.assertTrue(permisos.puede_duplicar_pedido(self.logi, self.pedido))
         self.assertTrue(permisos.puede_duplicar_pedido(self.admin, self.pedido))
         self.assertFalse(permisos.puede_duplicar_pedido(self.dueno, self.pedido))   # ejecutivo nunca
+
+    # --- marcar incidencia: Logística/Admin, cualquier courier (sin FK a envío en el permiso) ---
+    def test_puede_marcar_incidencia(self):
+        envio = EnvioCourier.objects.create(courier=Courier.CHIBRA)
+        self.assertTrue(permisos.puede_marcar_incidencia(self.logi, envio))
+        self.assertTrue(permisos.puede_marcar_incidencia(self.admin, envio))
+        self.assertFalse(permisos.puede_marcar_incidencia(self.dueno, envio))
+        self.assertFalse(permisos.puede_marcar_incidencia(self.ajeno, envio))
 
     # --- notificar / es_logistica ---
     def test_puede_notificar(self):

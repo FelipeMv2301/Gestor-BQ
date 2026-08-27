@@ -62,6 +62,9 @@ def puede_editar(usuario, pedido):
         return True
     return False
 
+def puede_marcar_incidencia(usuario, envio):
+    return es_logistica(usuario)
+
 def queryset_visible(usuario, queryset):
     rol = obtener_rol(usuario)
     if rol == PerfilUsuario.Rol.ADMIN:

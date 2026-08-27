@@ -6,7 +6,7 @@ from pedidos.permisos import es_logistica
 from cuentas.models import PerfilUsuario
 from ejecutivos.models import Ejecutivo
 from .models import EnvioCourier
-from .services import parsear_bultos, ANULAR_COURIER, anular_envio_courier
+from .services import parsear_bultos, ANULAR_COURIER, anular_envio_courier, marcar_incidencia_envio
 from . import reportes
 from integraciones.seguimiento import refrescar_estados_courier, actualizar_estado_courier, REFRESCAR_ESTADO_BATCH
 from utils import Courier
@@ -115,24 +115,6 @@ def refrescar_estado_envio(request, pk):
             messages.info(request, "Este courier no tiene consulta de estado por API.")
     except Exception as exc:
         messages.error(request, f"No se pudo consultar el estado: {str(exc).replace('[!] Error: ', '')}")
-    return redirect("envios:detalle", pk=pk)
-
-
-#Solo ENTREGADO/ERROR: nada del flujo automático los setea hoy (despachar_pedidos deja DESPACHADO).
-@login_required
-@require_POST
-def cambiar_estado_envio(request, pk):
-    if not es_logistica(request.user):
-        return redirect("inicio")
-    envio = get_object_or_404(EnvioCourier, pk=pk)
-    nuevo_estado = request.POST.get("estado")
-    if nuevo_estado not in (EnvioCourier.Estado.ENTREGADO, EnvioCourier.Estado.ERROR):
-        messages.error(request, "Estado inválido.")
-        return redirect("envios:detalle", pk=pk)
-
-    envio.estado = nuevo_estado
-    envio.save(update_fields=["estado", "actualizado_en"])
-    messages.success(request, f"Envío #{envio.id} marcado como {envio.get_estado_display()}.")
     return redirect("envios:detalle", pk=pk)
 
 
@@ -255,7 +237,8 @@ def detalle_envio(request, pk):
     return render(request, "envios/detalle_envio.html",
                 {"envio": envio, "puede_gestionar": es_logistica(request.user),
                     "puede_refrescar": True, "documentos": documentos,
-                    "puede_anular": envio.courier in ANULAR_COURIER})
+                    "puede_anular": envio.courier in ANULAR_COURIER,
+                    "puede_marcar_incidencia": permisos.puede_marcar_incidencia(request.user, envio)})
 
 @login_required
 def descargar_documento(request, pk, tipo):
@@ -314,3 +297,19 @@ orden_transporte=orden_transporte).first()
     envio.save(update_fields=["estado_courier", "estado_courier_actualizado"])
 
     return JsonResponse({"ok": True})
+
+@login_required
+@require_POST
+def marcar_incidencia(request, pk):
+    envio = get_object_or_404(EnvioCourier, pk=pk)
+    if not permisos.puede_marcar_incidencia(request.user, envio):
+        return redirect("inicio")
+
+    motivo = request.POST.get("motivo", "").strip()
+    if not motivo:
+        messages.error(request, "Tenés que indicar un motivo para reportar la incidencia.")
+        return redirect("envios:detalle", pk=pk)
+
+    marcar_incidencia_envio(envio, motivo, request.user)
+    messages.success(request, "Incidencia reportada — los pedidos quedaron liberados para un nuevo despacho.")
+    return redirect("envios:lista")

@@ -1,4 +1,5 @@
 from .models import EnvioCourier
+from enviosIncidencias.models import EnvioIncidencia
 from integraciones import chibra_client, moveup_client, starken_client
 from pedidos.models import Pedido
 from pedidos.services  import notificar_pedido
@@ -8,7 +9,8 @@ import datetime
 from django.conf import settings
 from django.utils import timezone
 from integraciones.seguimiento import refrescar_estados_courier, REFRESCAR_ESTADO_BATCH
-
+from pedidos import permisos
+from django.forms.models import model_to_dict
 
 """
 Helpers
@@ -246,7 +248,7 @@ def refrescar_estados_recientes():
     desde = timezone.now() - datetime.timedelta(days=settings.DIAS_REFRESCAR_ESTADOS)
     envios = EnvioCourier.objects.filter(
         courier__in=REFRESCAR_ESTADO_BATCH.keys(), creado_en__gte=desde,
-    ).exclude(estado__in=[EnvioCourier.Estado.ANULADO, EnvioCourier.Estado.ENTREGADO])
+    ).exclude(estado=EnvioCourier.Estado.ANULADO)
     return refrescar_estados_courier(envios)
 
 def despachar_pedidos(pedidos, courier, bultos, destinatario, datos_courier, usuario):
@@ -317,3 +319,25 @@ def parsear_bultos(request):
             "tipo_contenido": contenidos[i],
         })
     return bultos
+
+def marcar_incidencia_envio(envio, motivo, usuario):
+    if not permisos.puede_marcar_incidencia(usuario, envio):
+        raise PermissionError("[!] Error: No puedes reportar una incidencia sobre este envío.")
+
+    snapshot = model_to_dict(envio)
+    pedidos_incluidos = list(envio.pedidos.values("origen", "num_pedido", "rut",
+"razon_social"))
+
+    with transaction.atomic():
+        incidencia = EnvioIncidencia.objects.create(
+            courier=envio.courier,
+            orden_transporte=envio.orden_transporte,
+            snapshot=snapshot,
+            pedidos_incluidos=pedidos_incluidos,
+            motivo=motivo,
+            registrado_por=usuario,
+        )
+        envio.pedidos.update(estado_notificacion=Pedido.EstadoNotificacion.NO_NOTIFICADO)
+        envio.delete()
+
+    return incidencia
