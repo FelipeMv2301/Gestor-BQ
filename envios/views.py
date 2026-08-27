@@ -177,14 +177,14 @@ def eliminar_envio(request, pk):
 Reporte de envíos (por fecha / courier / ejecutivo) — descargable en Excel o imprimible a PDF.
 """
 
-#Ejecutivos que el usuario puede elegir en el filtro: Logística/Admin ven todos; el Ejecutivo solo
-#los suyos (mismos códigos SAP de su perfil).
+#Ejecutivos que el usuario puede elegir en el filtro: Logística/Admin ven todos los ACTIVOS; el
+#Ejecutivo solo los suyos (mismos códigos SAP de su perfil), también acotado a activos.
 def _ejecutivos_para(usuario):
     if es_logistica(usuario):
-        return Ejecutivo.objects.order_by("nombre")
+        return Ejecutivo.objects.filter(activo=True).order_by("nombre")
     if permisos.obtener_rol(usuario) == PerfilUsuario.Rol.EJECUTIVO:
         return Ejecutivo.objects.filter(
-            codigo_sap__in=permisos.codigos_sap_usuario(usuario)).order_by("nombre")
+            activo=True, codigo_sap__in=permisos.codigos_sap_usuario(usuario)).order_by("nombre")
     return Ejecutivo.objects.none()
 
 
@@ -199,7 +199,8 @@ def _parametros_reporte(request):
 
     couriers = request.GET.getlist("courier")
     ejecutivo_ids = [int(x) for x in request.GET.getlist("ejecutivo") if x.isdigit()]
-    return _fecha("desde"), _fecha("hasta"), couriers, ejecutivo_ids
+    incluir_incidencias = "incidencias" in request.GET
+    return _fecha("desde"), _fecha("hasta"), couriers, ejecutivo_ids, incluir_incidencias
 
 
 @login_required
@@ -212,8 +213,8 @@ def reporte_form(request):
 
 @login_required
 def reporte_ver(request):
-    desde, hasta, couriers, ejecutivo_ids = _parametros_reporte(request)
-    filas = reportes.filas_reporte(desde, hasta, couriers, ejecutivo_ids, request.user)
+    desde, hasta, couriers, ejecutivo_ids, incluir_incidencias = _parametros_reporte(request)
+    filas = reportes.filas_reporte(desde, hasta, couriers, ejecutivo_ids, request.user, incluir_incidencias)
     return render(request, "envios/reporte_ver.html", {
         "filas": filas,
         "desde": desde, "hasta": hasta,
@@ -224,8 +225,8 @@ def reporte_ver(request):
 
 @login_required
 def reporte_xlsx(request):
-    desde, hasta, couriers, ejecutivo_ids = _parametros_reporte(request)
-    filas = reportes.filas_reporte(desde, hasta, couriers, ejecutivo_ids, request.user)
+    desde, hasta, couriers, ejecutivo_ids, incluir_incidencias = _parametros_reporte(request)
+    filas = reportes.filas_reporte(desde, hasta, couriers, ejecutivo_ids, request.user, incluir_incidencias)
     return reportes.exportar_xlsx(filas)
 
 @login_required

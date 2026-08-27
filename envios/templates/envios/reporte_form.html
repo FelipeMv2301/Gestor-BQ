@@ -48,6 +48,11 @@
     {% endif %}
   </div>
 
+  {# --- Incidencias --- #}
+  <div class="flex flex-col gap-1.5 border-t border-line pt-3">
+    <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="incidencias" class="accent-brand w-4 h-4"> Incluir incidencias (envíos archivados)</label>
+  </div>
+
   {# --- Acciones: Ver PDF (nueva pestaña) / Descargar Excel --- #}
   <div class="flex flex-wrap gap-3 border-t border-line pt-3">
     <button type="submit" formaction="{% url 'envios:reporte_ver' %}" formtarget="_blank"

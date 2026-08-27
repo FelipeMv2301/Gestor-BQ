@@ -10,6 +10,7 @@ from utils import Courier
 from integraciones import chibra_client, seguimiento, starken_client
 from .services import parsear_bultos, validar_pedidos_para_despacho, despachar_pedidos, _parsear_despacho_starken, anular_envio_courier, marcar_incidencia_envio
 from .models import EnvioCourier
+from .reportes import filas_reporte
 from enviosIncidencias.models import EnvioIncidencia
 
 Rol = PerfilUsuario.Rol
@@ -1143,3 +1144,73 @@ class ListadoIncidenciasTest(TestCase):
         self.client.force_login(self.logi)
         resp = self.client.get("/envios/incidencias/")
         self.assertIn("No hay incidencias registradas.", resp.content.decode())
+
+
+class ReporteEjecutivosActivosTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.logi = crear_usuario("logi_rep@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec_activo = crear_ejecutivo(codigo_sap=50, nombre="Activo", email="activo_rep@bioquimica.cl", activo=True)
+        self.ejec_inactivo = crear_ejecutivo(codigo_sap=51, nombre="Inactivo", email="inactivo_rep@bioquimica.cl", activo=False)
+
+    def test_form_solo_lista_ejecutivos_activos(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get("/envios/reporte/")
+        contenido = resp.content.decode()
+        self.assertIn("Activo", contenido)
+        self.assertNotIn("Inactivo", contenido)
+
+
+class ReporteIncidenciasTest(TestCase):
+    """envios/reportes.py::filas_reporte con incluir_incidencias — suma filas armadas desde
+    EnvioIncidencia (envío ya borrado, todo sale del snapshot)."""
+
+    def setUp(self):
+        self.client = Client()
+        self.logi = crear_usuario("logi_repinc@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec = crear_ejecutivo(codigo_sap=60, nombre="Repinc", email="repinc@bioquimica.cl")
+
+    def test_checkbox_incidencias_presente_en_form(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get("/envios/reporte/")
+        self.assertIn('name="incidencias"', resp.content.decode())
+
+    def test_sin_incidencias_por_defecto(self):
+        envio = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-NORMAL")
+        crear_pedido("6001", envio=envio, ejecutivo=self.ejec)
+        envio_incidencia = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-INC")
+        crear_pedido("6002", envio=envio_incidencia, ejecutivo=self.ejec)
+        marcar_incidencia_envio(envio_incidencia, "Extraviado", self.logi)
+
+        filas = filas_reporte(None, None, [], [], self.logi, incluir_incidencias=False)
+        self.assertEqual(len(filas), 1)
+        self.assertEqual(filas[0]["ot"], "OT-NORMAL")
+
+    def test_con_incidencias_suma_la_fila_con_datos_del_snapshot(self):
+        envio_incidencia = EnvioCourier.objects.create(
+            courier=Courier.STARKEN, orden_transporte="OT-INC2",
+            datos_courier={"bultos": [{"cantidad": 3}], "valor_declarado": "7000"},
+        )
+        crear_pedido("6004", envio=envio_incidencia, ejecutivo=self.ejec)
+        marcar_incidencia_envio(envio_incidencia, "Dañado en tránsito", self.logi)
+
+        filas = filas_reporte(None, None, [], [], self.logi, incluir_incidencias=True)
+        self.assertEqual(len(filas), 1)
+        fila = filas[0]
+        self.assertEqual(fila["estado_courier"], "INCIDENCIA: Dañado en tránsito")
+        self.assertEqual(fila["n_bultos"], 3)
+        self.assertEqual(fila["valor_declarado"], 7000)
+        self.assertIn("6004", fila["pedidos"])
+        self.assertIn("Repinc", fila["ejecutivo"])
+
+    def test_reporte_ver_respeta_el_checkbox(self):
+        envio_incidencia = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-INC3")
+        crear_pedido("6005", envio=envio_incidencia, ejecutivo=self.ejec)
+        marcar_incidencia_envio(envio_incidencia, "x", self.logi)
+
+        self.client.force_login(self.logi)
+        resp_sin = self.client.get("/envios/reporte/ver/")
+        self.assertNotIn("OT-INC3", resp_sin.content.decode())
+
+        resp_con = self.client.get("/envios/reporte/ver/?incidencias=on")
+        self.assertIn("OT-INC3", resp_con.content.decode())
