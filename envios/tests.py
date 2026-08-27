@@ -1083,3 +1083,63 @@ class MarcarIncidenciaVistaTest(TestCase):
         self.client.force_login(self.ejec)
         resp = self.client.get(f"/envios/{self.envio.pk}/")
         self.assertNotIn("Reportar incidencia", resp.content.decode())
+
+
+class ListadoIncidenciasTest(TestCase):
+    """envios/views.py::lista_incidencias / mis_incidencias — pedidos_incluidos guarda ejecutivo_id
+    (snapshot, no FK) para que el Ejecutivo pueda filtrar las suyas incluso después de que el pedido
+    original haya sido liberado/reasignado."""
+
+    def setUp(self):
+        self.client = Client()
+        self.logi = crear_usuario("logi_li@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec_obj = crear_ejecutivo(codigo_sap=30)
+        self.dueno = crear_usuario("dueno_li@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=30)
+        self.ajeno_obj = crear_ejecutivo(codigo_sap=40, nombre="Otro", email="otro_li@bioquimica.cl")
+        self.ajeno = crear_usuario("ajeno_li@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=40)
+
+        envio_dueno = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-DUENO")
+        crear_pedido("9101", envio=envio_dueno, ejecutivo=self.ejec_obj)
+        self.incidencia_dueno = marcar_incidencia_envio(envio_dueno, "Extraviado", self.logi)
+
+        envio_ajeno = EnvioCourier.objects.create(courier=Courier.STARKEN, orden_transporte="OT-AJENO")
+        crear_pedido("9102", envio=envio_ajeno, ejecutivo=self.ajeno_obj)
+        self.incidencia_ajeno = marcar_incidencia_envio(envio_ajeno, "Dañado", self.logi)
+
+    def test_logistica_ve_listado_completo(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get("/envios/incidencias/")
+        self.assertEqual(resp.status_code, 200)
+        contenido = resp.content.decode()
+        self.assertIn("OT-DUENO", contenido)
+        self.assertIn("OT-AJENO", contenido)
+
+    def test_ejecutivo_ve_solo_las_que_incluyen_pedidos_suyos(self):
+        self.client.force_login(self.dueno)
+        resp = self.client.get("/envios/mis-incidencias/")
+        contenido = resp.content.decode()
+        self.assertIn("OT-DUENO", contenido)
+        self.assertNotIn("OT-AJENO", contenido)
+
+    def test_ejecutivo_ajeno_no_ve_la_de_otro(self):
+        self.client.force_login(self.ajeno)
+        resp = self.client.get("/envios/mis-incidencias/")
+        contenido = resp.content.decode()
+        self.assertIn("OT-AJENO", contenido)
+        self.assertNotIn("OT-DUENO", contenido)
+
+    def test_ejecutivo_no_puede_ver_listado_completo(self):
+        self.client.force_login(self.dueno)
+        resp = self.client.get("/envios/incidencias/")
+        self.assertEqual(resp.status_code, 302)
+
+    def test_logistica_no_tiene_mis_incidencias(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get("/envios/mis-incidencias/")
+        self.assertEqual(resp.status_code, 302)
+
+    def test_sin_incidencias_muestra_mensaje_vacio(self):
+        EnvioIncidencia.objects.all().delete()
+        self.client.force_login(self.logi)
+        resp = self.client.get("/envios/incidencias/")
+        self.assertIn("No hay incidencias registradas.", resp.content.decode())

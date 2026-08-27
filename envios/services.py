@@ -325,8 +325,7 @@ def marcar_incidencia_envio(envio, motivo, usuario):
         raise PermissionError("[!] Error: No puedes reportar una incidencia sobre este envío.")
 
     snapshot = model_to_dict(envio)
-    pedidos_incluidos = list(envio.pedidos.values("origen", "num_pedido", "rut",
-"razon_social"))
+    pedidos_incluidos = list(envio.pedidos.values("origen", "num_pedido", "rut", "razon_social", "ejecutivo_id"))
 
     with transaction.atomic():
         incidencia = EnvioIncidencia.objects.create(

@@ -313,3 +313,27 @@ def marcar_incidencia(request, pk):
     marcar_incidencia_envio(envio, motivo, request.user)
     messages.success(request, "Incidencia reportada — los pedidos quedaron liberados para un nuevo despacho.")
     return redirect("envios:lista")
+
+
+#Listado completo de incidencias — Logística/Admin.
+@login_required
+def lista_incidencias(request):
+    if not es_logistica(request.user):
+        return redirect("inicio")
+    incidencias = permisos.incidencias_visibles(request.user)
+    paginador = Paginator(incidencias, 20)
+    incidencias = paginador.get_page(request.GET.get("page"))
+    plantilla = "envios/_tabla_incidencias.html" if request.headers.get("HX-Request") else "envios/lista_incidencias.html"
+    return render(request, plantilla, {"incidencias": incidencias})
+
+
+#Incidencias que incluyen algún pedido del Ejecutivo dueño.
+@login_required
+def mis_incidencias(request):
+    if permisos.obtener_rol(request.user) != PerfilUsuario.Rol.EJECUTIVO:
+        return redirect("inicio")
+    incidencias = permisos.incidencias_visibles(request.user)
+    paginador = Paginator(incidencias, 20)
+    incidencias = paginador.get_page(request.GET.get("page"))
+    plantilla = "envios/_tabla_incidencias.html" if request.headers.get("HX-Request") else "envios/mis_incidencias.html"
+    return render(request, plantilla, {"incidencias": incidencias})

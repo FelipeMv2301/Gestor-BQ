@@ -153,6 +153,21 @@ def queryset_rechazados(usuario):
         return PedidoRechazado.objects.filter(snapshot__ejecutivo__in=pks) if pks else PedidoRechazado.objects.none()
     return PedidoRechazado.objects.none()
 
+#Quién puede ver qué incidencias: Admin/Logística todas, Ejecutivo solo las que incluyen un pedido
+#suyo. pedidos_incluidos es una LISTA de dicts (snapshot, no FK) — filtrar "algún elemento de la
+#lista cumple X" no es práctico en SQL sobre un JSONField genérico, se hace en Python.
+def incidencias_visibles(usuario):
+    from enviosIncidencias.models import EnvioIncidencia
+    rol = obtener_rol(usuario)
+    if rol in (PerfilUsuario.Rol.ADMIN, PerfilUsuario.Rol.LOGISTICA):
+        return EnvioIncidencia.objects.all().order_by("-registrado_en")
+    if rol == PerfilUsuario.Rol.EJECUTIVO:
+        pks = set(_ejecutivo_pks(usuario))
+        ids = [i.pk for i in EnvioIncidencia.objects.all()
+               if any(p.get("ejecutivo_id") in pks for p in i.pedidos_incluidos)]
+        return EnvioIncidencia.objects.filter(pk__in=ids).order_by("-registrado_en")
+    return EnvioIncidencia.objects.none()
+
 """
 Campos que los usuarios podran editar en el proyecto
 """

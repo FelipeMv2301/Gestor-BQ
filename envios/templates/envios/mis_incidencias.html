@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block titulo %}Mis Incidencias — Portal Bioquímica{% endblock %}
+{% block content %}
+<div class="mb-5">
+  <h1 class="text-2xl font-bold text-ink">Mis Incidencias</h1>
+  <p class="text-sm text-muted mt-1">Envíos de tus pedidos que sufrieron una incidencia — quedaron liberados para un nuevo despacho.</p>
+</div>
+<div id="tabla-incidencias">
+  {% include "envios/_tabla_incidencias.html" %}
+</div>
+{% endblock %}

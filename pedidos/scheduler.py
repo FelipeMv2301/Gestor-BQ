@@ -2,7 +2,7 @@ import logging
 import os
 import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, transaction, close_old_connections
 from django.utils import timezone
 from .models import LockTarea
 from .services import sincronizar_sap_reciente, sincronizar_woo_reciente
@@ -35,6 +35,7 @@ _soy_dueno = False
 def _job_refrescar_estados():
     logger.info("Cron estados: refrescando estado de couriers con consulta por API...")
     try:
+        close_old_connections()
         total = refrescar_estados_recientes()
         logger.info("Cron estados: %s envío(s) actualizado(s).", total)
     except Exception:
@@ -116,6 +117,11 @@ def _supervisar():
     """Corre en TODOS los procesos, cada minuto. El dueño late; los demás reintentan el relevo."""
     global _soy_dueno
     try:
+        #APScheduler corre en un hilo de fondo — Django no le refresca la conexión a Postgres como
+        #sí hace por cada request. Sin esto, una conexión que Postgres cierra por inactividad queda
+        #muerta para siempre en este hilo (psycopg2.InterfaceError: connection already closed),
+        #detectado en producción 2026-08-27 (860 ocurrencias en 6h, tumbando también SAP/WOO).
+        close_old_connections()
         if _soy_dueno:
             if not _refrescar_lock():
                 logger.warning("Cron pedidos: perdí el lock, otro proceso tomó el relevo. Dejo de sincronizar.")
@@ -135,6 +141,7 @@ def _supervisar():
 def _job_sincronizar_sap():
     logger.info("Cron SAP: iniciando sincronización (ayer + hoy)...")
     try:
+        close_old_connections()
         resultado = sincronizar_sap_reciente()
         logger.info("Cron SAP: %s creados, %s omitidos, %s con error.",
                     resultado["creados"], resultado["omitidos"], resultado.get("fallidos", 0))
@@ -145,6 +152,7 @@ def _job_sincronizar_sap():
 def _job_sincronizar_woo():
     logger.info("Cron WEB: iniciando sincronización (ayer + hoy)...")
     try:
+        close_old_connections()
         resultado = sincronizar_woo_reciente()
         logger.info("Cron WEB: %s creados, %s omitidos.", resultado["creados"], resultado["omitidos"])
     except Exception:
