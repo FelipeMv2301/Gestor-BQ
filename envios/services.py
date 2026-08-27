@@ -2,7 +2,7 @@ from .models import EnvioCourier
 from enviosIncidencias.models import EnvioIncidencia
 from integraciones import chibra_client, moveup_client, starken_client
 from pedidos.models import Pedido
-from pedidos.services  import notificar_pedido
+from pedidos.services import notificar_pedido, notificar_pedidos_despacho
 from django.db import transaction
 from utils import Courier, normalizar_telefono_cl, es_movil_cl
 import datetime
@@ -275,11 +275,18 @@ def despachar_pedidos(pedidos, courier, bultos, destinatario, datos_courier, usu
             pedido.save(update_fields=["envio"])
 
     notificaciones_fallidas = []
-    for pedido in pedidos:
+    if len(pedidos) > 1:
         try:
-            notificar_pedido(pedido, usuario)
-        except Exception as exc:  # incluye errores de SMTP (no solo PermissionError/ValueError) — que uno falle no bloquea al resto del lote
-            notificaciones_fallidas.append((pedido, str(exc)))
+            notificar_pedidos_despacho(pedidos, usuario)
+        except Exception as exc:
+            for pedido in pedidos:
+                notificaciones_fallidas.append((pedido, str(exc)))
+    else:
+        for pedido in pedidos:
+            try:
+                notificar_pedido(pedido, usuario)
+            except Exception as exc:
+                notificaciones_fallidas.append((pedido, str(exc)))
 
     return envio, notificaciones_fallidas
 

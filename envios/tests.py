@@ -343,7 +343,7 @@ class DespacharPedidosTest(TestCase):
         p1 = crear_pedido("2001", **self.aprobado)
         p2 = crear_pedido("2002", **self.aprobado)
         with patch("envios.services.chibra_client.documentar_envio", return_value={"numero_envio": "OT-123"}), \
-             patch("envios.services.notificar_pedido") as mock_notificar:
+             patch("envios.services.notificar_pedidos_despacho") as mock_notificar:
             envio, fallidas = despachar_pedidos([p1, p2], Courier.CHIBRA, _bultos(), _destinatario(), _datos_courier(), self.usuario)
 
         self.assertEqual(envio.orden_transporte, "OT-123")
@@ -353,7 +353,7 @@ class DespacharPedidosTest(TestCase):
         p1.refresh_from_db(); p2.refresh_from_db()
         self.assertEqual(p1.envio_id, envio.id)
         self.assertEqual(p2.envio_id, envio.id)
-        self.assertEqual(mock_notificar.call_count, 2)
+        self.assertEqual(mock_notificar.call_count, 1)  # un solo correo agrupado, no uno por pedido
 
     def test_courier_sin_integracion_falla_y_no_crea_envio(self):
         p1 = crear_pedido("2003", **{**self.aprobado, "courier": "OTRO_COURIER"})
@@ -372,6 +372,21 @@ class DespacharPedidosTest(TestCase):
         self.assertEqual(p1.envio_id, envio.id)  # el despacho quedó igual, solo falló el email
         self.assertEqual(len(fallidas), 1)
         self.assertEqual(fallidas[0][0], p1)
+
+    def test_notificacion_grupal_fallida_reporta_todos_los_pedidos(self):
+        p1 = crear_pedido("2006", **self.aprobado)
+        p2 = crear_pedido("2007", **self.aprobado)
+        with patch("envios.services.chibra_client.documentar_envio", return_value={"numero_envio": "OT-789"}), \
+             patch("envios.services.notificar_pedidos_despacho", side_effect=ValueError("SMTP caído")):
+            envio, fallidas = despachar_pedidos([p1, p2], Courier.CHIBRA, _bultos(), _destinatario(), _datos_courier(), self.usuario)
+
+        self.assertIsNotNone(envio.pk)
+        p1.refresh_from_db(); p2.refresh_from_db()
+        self.assertEqual(p1.envio_id, envio.id)  # el despacho quedó igual, solo falló el email
+        self.assertEqual(p2.envio_id, envio.id)
+        self.assertEqual(len(fallidas), 2)  # una tupla por pedido, mismo error, no una sola tupla para el grupo
+        self.assertEqual({p for p, _ in fallidas}, {p1, p2})
+        self.assertTrue(all("SMTP caído" in error for _, error in fallidas))
 
     # No mockea chibra_client.documentar_envio a propósito: ejercita la validación real de
     # utils.validar_rut que chibra_client.py ya usa (sin test hasta ahora, agregado en paridad con Starken).
@@ -396,7 +411,7 @@ class DespacharMoveupTest(TestCase):
         p2 = crear_pedido("6002", **self.aprobado)
         destinatario = {**_destinatario(), "numero": "123", "depto": ""}
         with patch("envios.services.moveup_client.crear_paquetes", return_value=[{"id": 555}]), \
-             patch("envios.services.notificar_pedido") as mock_notificar:
+             patch("envios.services.notificar_pedidos_despacho") as mock_notificar:
             envio, fallidas = despachar_pedidos([p1, p2], Courier.MOVEUP, [], destinatario, _datos_courier(), self.usuario)
 
         self.assertEqual(envio.orden_transporte, "555")
@@ -405,7 +420,7 @@ class DespacharMoveupTest(TestCase):
         p1.refresh_from_db(); p2.refresh_from_db()
         self.assertEqual(p1.envio_id, envio.id)
         self.assertEqual(p2.envio_id, envio.id)
-        self.assertEqual(mock_notificar.call_count, 2)
+        self.assertEqual(mock_notificar.call_count, 1)  # un solo correo agrupado, no uno por pedido
 
     def test_notificacion_fallida_no_impide_el_despacho(self):
         p1 = crear_pedido("6003", **self.aprobado)
@@ -441,7 +456,7 @@ class DespacharStarkenTest(TestCase):
         p1 = crear_pedido("5001", **self.aprobado)
         p2 = crear_pedido("5002", **self.aprobado)
         with patch("envios.services.starken_client.emitir_of", return_value={"numero_orden_flete": "222607751"}), \
-             patch("envios.services.notificar_pedido") as mock_notificar:
+             patch("envios.services.notificar_pedidos_despacho") as mock_notificar:
             envio, fallidas = despachar_pedidos([p1, p2], Courier.STARKEN, _bultos(), _destinatario(), _datos_courier(), self.usuario)
 
         self.assertEqual(envio.orden_transporte, "222607751")
@@ -451,7 +466,7 @@ class DespacharStarkenTest(TestCase):
         p1.refresh_from_db(); p2.refresh_from_db()
         self.assertEqual(p1.envio_id, envio.id)
         self.assertEqual(p2.envio_id, envio.id)
-        self.assertEqual(mock_notificar.call_count, 2)
+        self.assertEqual(mock_notificar.call_count, 1)  # un solo correo agrupado, no uno por pedido
 
     def test_notificacion_fallida_no_impide_el_despacho(self):
         p1 = crear_pedido("5003", **self.aprobado)
