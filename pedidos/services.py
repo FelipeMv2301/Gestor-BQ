@@ -377,6 +377,23 @@ def notificar_pedido(pedido, usuario):
     _avisar_ejecutivo(pedido, Aviso.Tipo.NOTIFICADO, mensaje)
     return pedido
 
+def notificar_pedidos_despacho(pedidos, usuario):
+    for pedido in pedidos:
+        if not permisos.puede_notificar(usuario, pedido):
+            raise PermissionError(f"[!] Error: Solo Logística o Admin pueden notificar, y solo sobre un pedido APROBADO ({pedido.origen}-{pedido.num_pedido}).")
+        if pedido.estado_notificacion == Pedido.EstadoNotificacion.NOTIFICADO:
+            raise ValueError(f"[!] Error: Pedido N° {pedido.origen}-{pedido.num_pedido} ya fue notificado")
+
+    email_client.enviar_notificacion_despacho_grupal(pedidos)
+
+    for pedido in pedidos:
+        pedido.estado_notificacion = Pedido.EstadoNotificacion.NOTIFICADO
+        pedido.save(update_fields=["estado_notificacion", "modificado_en"])
+        referencia = f"{pedido.origen}-{pedido.num_pedido}"
+        mensaje = f"Tu pedido {referencia} fue despachado a courier (envío conjunto) y el cliente notificado."
+        _avisar_ejecutivo(pedido, Aviso.Tipo.NOTIFICADO, mensaje)
+    return pedidos
+
 """
 Funciones reutilizables
 """
