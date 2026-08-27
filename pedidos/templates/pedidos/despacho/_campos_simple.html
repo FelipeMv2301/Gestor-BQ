@@ -5,7 +5,7 @@
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Orden de transporte (OT)</span>
       <input type="text" name="orden_transporte" value="{{ post.orden_transporte }}" placeholder="Opcional" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Valor declarado</span>
-      <input type="number" name="valor_declarado" value="{{ post.valor_declarado }}" placeholder="Opcional" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
+      <input type="number" name="valor_declarado" value="{{ post.valor_declarado }}" required min="1" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
     <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Observaciones</span>
       <textarea name="observaciones" maxlength="255" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">{{ post.observaciones|default:observaciones_sugeridas }}</textarea></label>
   </div>

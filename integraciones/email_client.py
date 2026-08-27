@@ -179,7 +179,7 @@ def _template_despacho_grupal(pedidos, folio, track_url):
       <div style="padding: 35px; color: #333; line-height: 1.6;">
         <h1 style="color: #00b0ca; font-size: 26px; margin-top: 0; margin-bottom: 20px;">¡Tus pedidos van en camino! 🚚</h1>
         <p style="font-size: 16px; margin-bottom: 15px;">Hola <strong>{referencia.nombre_contacto}</strong>,</p>
-        <p style="font-size: 16px; margin-bottom: 15px;">Te informamos que los siguientes pedidos ya fueron procesados y entregados a nuestro servicio de transporte, en un mismo envío:</p>
+        <p style="font-size: 16px; margin-bottom: 15px;">Te informamos que los siguientes pedidos ya fueron procesados y entregados a nuestro servicio de transporte:</p>
         <ul style="margin: 0 0 25px 0; padding-left: 20px;">
           {pedidos_html}
         </ul>

@@ -49,7 +49,7 @@
       {% if pedidos.0.servicio_courier_nombre %}<p class="text-xs text-muted mt-1">Detectado desde SAP: {{ pedidos.0.servicio_courier_nombre }}. Puedes cambiarlo si hace falta.</p>{% endif %}
     </label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Valor declarado</span>
-      <input type="number" id="starken-valor-declarado" name="valor_declarado" value="{{ post.valor_declarado|default:"0" }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
+      <input type="number" id="starken-valor-declarado" name="valor_declarado" value="{{ post.valor_declarado }}" required min="1" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none">
       <p class="text-xs text-muted mt-1">Sobre $50.000, Starken exige agregar un documento de referencia (abajo) — si no, rechaza la OF. Con una Factura, además habilita el servicio COD del manual.</p>
     </label>
     <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Contenido</span>

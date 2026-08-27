@@ -258,7 +258,13 @@ def despachar_pedidos(pedidos, courier, bultos, destinatario, datos_courier, usu
 
     if not courier_despacho:
         raise ValueError(f"[!] Error: No existe integración disponible para el courier {courier}.")
-    
+
+    #Obligatorio para todos los couriers (antes cada uno lo validaba a su manera, o no lo validaba
+    #— Starken lo rechaza igual con un 400 poco claro si llega en 0). Un solo chequeo acá cubre
+    #portal y admin, ya que ambos convergen en despachar_pedidos.
+    if int(datos_courier.get("valor_declarado") or 0) <= 0:
+        raise ValueError("[!] Error: El valor declarado es obligatorio y debe ser mayor a 0.")
+
     datos_courier_completo = {**datos_courier, "bultos": bultos}
     resultado = courier_despacho(pedidos, destinatario, datos_courier_completo)
    
@@ -272,7 +278,13 @@ def despachar_pedidos(pedidos, courier, bultos, destinatario, datos_courier, usu
 
         for pedido in pedidos:
             pedido.envio = envio
-            pedido.save(update_fields=["envio"])
+            campos_actualizados = ["envio"]
+            #Si el pedido no traía correo, se completa con el tipeado en el formulario de despacho
+            #(el mismo que ya se le manda al courier) — así la notificación no le llega a un correo vacío.
+            if not pedido.email_contacto and destinatario.get("email"):
+                pedido.email_contacto = destinatario["email"]
+                campos_actualizados.append("email_contacto")
+            pedido.save(update_fields=campos_actualizados)
 
     notificaciones_fallidas = []
     if len(pedidos) > 1:

@@ -324,7 +324,7 @@ def _destinatario():
 
 
 def _datos_courier():
-    return {"centro": "02", "servicio": "10", "valor_declarado": 0, "volumen_total": "", "observaciones": ""}
+    return {"centro": "02", "servicio": "10", "valor_declarado": 1000, "volumen_total": "", "observaciones": ""}
 
 
 def _bultos():
@@ -388,6 +388,24 @@ class DespacharPedidosTest(TestCase):
         self.assertEqual({p for p, _ in fallidas}, {p1, p2})
         self.assertTrue(all("SMTP caído" in error for _, error in fallidas))
 
+    def test_pedido_sin_correo_se_completa_con_el_del_formulario(self):
+        p1 = crear_pedido("2008", **{**self.aprobado, "email_contacto": ""})
+        with patch("envios.services.chibra_client.documentar_envio", return_value={"numero_envio": "OT-999"}), \
+             patch("envios.services.notificar_pedido"):
+            despachar_pedidos([p1], Courier.CHIBRA, _bultos(), _destinatario(), _datos_courier(), self.usuario)
+
+        p1.refresh_from_db()
+        self.assertEqual(p1.email_contacto, "juan@cliente.cl")  # el email de _destinatario()
+
+    def test_pedido_con_correo_no_se_pisa_con_el_del_formulario(self):
+        p1 = crear_pedido("2009", **{**self.aprobado, "email_contacto": "original@cliente.cl"})
+        with patch("envios.services.chibra_client.documentar_envio", return_value={"numero_envio": "OT-998"}), \
+             patch("envios.services.notificar_pedido"):
+            despachar_pedidos([p1], Courier.CHIBRA, _bultos(), _destinatario(), _datos_courier(), self.usuario)
+
+        p1.refresh_from_db()
+        self.assertEqual(p1.email_contacto, "original@cliente.cl")  # no lo reemplaza el "juan@cliente.cl" del form
+
     # No mockea chibra_client.documentar_envio a propósito: ejercita la validación real de
     # utils.validar_rut que chibra_client.py ya usa (sin test hasta ahora, agregado en paridad con Starken).
     def test_rut_invalido_falla_y_no_crea_envio(self):
@@ -395,6 +413,20 @@ class DespacharPedidosTest(TestCase):
         destinatario = {**_destinatario(), "rut": "11111111-9"}  # dígito verificador incorrecto
         with self.assertRaises(ValueError):
             despachar_pedidos([p1], Courier.CHIBRA, _bultos(), destinatario, _datos_courier(), self.usuario)
+        self.assertEqual(EnvioCourier.objects.count(), 0)
+
+    def test_valor_declarado_en_cero_falla_y_no_crea_envio(self):
+        p1 = crear_pedido("2010", **self.aprobado)
+        datos_courier = {**_datos_courier(), "valor_declarado": 0}
+        with self.assertRaisesMessage(ValueError, "El valor declarado es obligatorio"):
+            despachar_pedidos([p1], Courier.CHIBRA, _bultos(), _destinatario(), datos_courier, self.usuario)
+        self.assertEqual(EnvioCourier.objects.count(), 0)
+
+    def test_valor_declarado_ausente_falla_y_no_crea_envio(self):
+        p1 = crear_pedido("2011", **self.aprobado)
+        datos_courier = {k: v for k, v in _datos_courier().items() if k != "valor_declarado"}
+        with self.assertRaisesMessage(ValueError, "El valor declarado es obligatorio"):
+            despachar_pedidos([p1], Courier.CHIBRA, _bultos(), _destinatario(), datos_courier, self.usuario)
         self.assertEqual(EnvioCourier.objects.count(), 0)
 
 
