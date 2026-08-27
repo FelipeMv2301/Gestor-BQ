@@ -10,10 +10,12 @@ links y sus permisos vivan en un solo lugar.
 {% endif %}
 {% if user.perfil.rol == 'EJECUTIVO' %}
   <a href="{% url 'envios:mis_envios' %}" class="{{ clase }}">Mis envíos</a>
+  <a href="{% url 'envios:mis_incidencias' %}" class="{{ clase }}">Mis incidencias</a>
 {% endif %}
 {% if user.perfil.rol == 'LOGISTICA' or user.perfil.rol == 'ADMIN' %}
   <a href="{% url 'pedidos:despachos' %}" class="{{ clase }}">Pedidos a Despachar</a>
   <a href="{% url 'envios:lista' %}" class="{{ clase }}">Envíos Realizados</a>
+  <a href="{% url 'envios:lista_incidencias' %}" class="{{ clase }}">Incidencias</a>
 {% endif %}
 {% if user.perfil.rol == 'EJECUTIVO' or user.perfil.rol == 'ADMIN' %}
   <a href="{% url 'pedidos:anulados' %}" class="{{ clase }}">Anulados</a>

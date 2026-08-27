@@ -94,24 +94,16 @@
       </div>
     </div>
 
-    {% if puede_gestionar %}
+    {% if puede_gestionar and puede_marcar_incidencia %}
     <div class="p-5 border-t border-line flex flex-col gap-2.5">
-      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-1">Marcar estado</h3>
-      <p class="text-xs text-muted mb-1">Nada del flujo automático marca Entregado ni Error — es manual, según lo que confirme el courier.</p>
-      {% if envio.estado != 'ENTREGADO' %}
-      <form method="post" action="{% url 'envios:cambiar_estado' envio.pk %}">
+      <h3 class="text-xs uppercase tracking-wide text-muted font-bold mb-1">Reportar incidencia</h3>
+      <p class="text-xs text-muted mb-1">Archiva este envío (extravío, daño, rechazo del cliente) y libera los pedidos para un nuevo despacho. No se puede deshacer.</p>
+      <form method="post" action="{% url 'envios:marcar_incidencia' envio.pk %}" onsubmit="return confirm('¿Reportar incidencia en este envío? Se archiva y los pedidos vuelven a la cola de despacho. Esta acción no se puede deshacer.');">
         {% csrf_token %}
-        <input type="hidden" name="estado" value="ENTREGADO">
-        <button type="submit" class="w-full text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Marcar Entregado</button>
+        <textarea name="motivo" rows="2" required placeholder="Motivo (obligatorio)…"
+                  class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none mb-2"></textarea>
+        <button type="submit" class="w-full text-sm font-semibold px-4 py-2 rounded-full border border-linestrong text-rech-ink hover:bg-rech-bg">Reportar incidencia</button>
       </form>
-      {% endif %}
-      {% if envio.estado != 'ERROR' %}
-      <form method="post" action="{% url 'envios:cambiar_estado' envio.pk %}">
-        {% csrf_token %}
-        <input type="hidden" name="estado" value="ERROR">
-        <button type="submit" class="w-full text-sm font-semibold px-4 py-2 rounded-full border border-linestrong text-rech-ink hover:bg-rech-bg">Marcar Error</button>
-      </form>
-      {% endif %}
     </div>
     {% endif %}
 

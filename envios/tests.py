@@ -8,8 +8,10 @@ from pedidos.models import Pedido
 from pedidos.tests.factories import crear_pedido, crear_usuario, crear_ejecutivo
 from utils import Courier
 from integraciones import chibra_client, seguimiento, starken_client
-from .services import parsear_bultos, validar_pedidos_para_despacho, despachar_pedidos, _parsear_despacho_starken, anular_envio_courier
+from .services import parsear_bultos, validar_pedidos_para_despacho, despachar_pedidos, _parsear_despacho_starken, anular_envio_courier, marcar_incidencia_envio
 from .models import EnvioCourier
+from .reportes import filas_reporte
+from enviosIncidencias.models import EnvioIncidencia
 
 Rol = PerfilUsuario.Rol
 
@@ -811,33 +813,6 @@ class DescargarDocumentoViewTest(TestCase):
         self.assertEqual(resp.context["documentos"], [("etiqueta", "Etiqueta de envío")])
 
 
-class CambiarEstadoEnvioViewTest(TestCase):
-    def setUp(self):
-        self.client = Client()
-        self.logi = crear_usuario("logi@bioquimica.cl", Rol.LOGISTICA)
-        self.ejec = crear_usuario("ejec@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=10)
-        self.envio = EnvioCourier.objects.create(courier=Courier.CHIBRA, estado=EnvioCourier.Estado.DESPACHADO)
-
-    def test_no_logistica_no_puede_cambiar_estado(self):
-        self.client.force_login(self.ejec)
-        self.client.post(f"/envios/{self.envio.pk}/estado/", {"estado": "ENTREGADO"})
-        self.envio.refresh_from_db()
-        self.assertEqual(self.envio.estado, EnvioCourier.Estado.DESPACHADO)
-
-    def test_logistica_marca_entregado(self):
-        self.client.force_login(self.logi)
-        resp = self.client.post(f"/envios/{self.envio.pk}/estado/", {"estado": "ENTREGADO"})
-        self.assertEqual(resp.status_code, 302)
-        self.envio.refresh_from_db()
-        self.assertEqual(self.envio.estado, EnvioCourier.Estado.ENTREGADO)
-
-    def test_estado_invalido_no_cambia_nada(self):
-        self.client.force_login(self.logi)
-        self.client.post(f"/envios/{self.envio.pk}/estado/", {"estado": "LO_QUE_SEA"})
-        self.envio.refresh_from_db()
-        self.assertEqual(self.envio.estado, EnvioCourier.Estado.DESPACHADO)
-
-
 class EditarEnvioViewTest(TestCase):
     def setUp(self):
         self.client = Client()
@@ -1007,3 +982,235 @@ class RefrescarEstadoViewsTest(TestCase):
         pks = set(mock_batch.call_args[0][0].values_list("pk", flat=True))
         self.assertIn(envio_starken.pk, pks)
         self.assertNotIn(envio_chibra.pk, pks)
+
+
+class MarcarIncidenciaEnvioTest(TestCase):
+    """envios/services.py::marcar_incidencia_envio — archiva el envío (EnvioIncidencia) y libera los
+    pedidos asociados vía el SET_NULL de Pedido.envio."""
+
+    def setUp(self):
+        self.logi = crear_usuario("logi_inc@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec = crear_usuario("ejec_inc@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=10)
+        self.envio = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-INC-1")
+        self.p1 = crear_pedido("8001", envio=self.envio, rut="76563320-6", razon_social="Bioquimica CL",
+                                estado_notificacion=Pedido.EstadoNotificacion.NOTIFICADO)
+        self.p2 = crear_pedido("8002", envio=self.envio, rut="76563320-6",
+                                estado_notificacion=Pedido.EstadoNotificacion.NOTIFICADO)
+
+    def test_archiva_libera_pedidos_y_resetea_notificacion(self):
+        incidencia = marcar_incidencia_envio(self.envio, "Paquete extraviado", self.logi)
+
+        self.assertFalse(EnvioCourier.objects.filter(pk=self.envio.pk).exists())
+        self.assertEqual(incidencia.courier, Courier.CHIBRA)
+        self.assertEqual(incidencia.orden_transporte, "OT-INC-1")
+        self.assertEqual(incidencia.motivo, "Paquete extraviado")
+        self.assertEqual(incidencia.registrado_por, self.logi)
+        self.assertEqual(len(incidencia.pedidos_incluidos), 2)
+        self.assertEqual({p["num_pedido"] for p in incidencia.pedidos_incluidos}, {"8001", "8002"})
+
+        self.p1.refresh_from_db(); self.p2.refresh_from_db()
+        self.assertIsNone(self.p1.envio_id)
+        self.assertIsNone(self.p2.envio_id)
+        self.assertEqual(self.p1.estado_notificacion, Pedido.EstadoNotificacion.NO_NOTIFICADO)
+        self.assertEqual(self.p1.estado_seguimiento[0], "Recién Ingresado")
+
+    def test_snapshot_incluye_datos_del_envio(self):
+        envio = EnvioCourier.objects.create(
+            courier=Courier.CHIBRA, orden_transporte="OT-INC-2",
+            datos_courier={"centro": "02", "servicio": "10"},
+        )
+        incidencia = marcar_incidencia_envio(envio, "x", self.logi)
+        self.assertEqual(incidencia.snapshot["datos_courier"], {"centro": "02", "servicio": "10"})
+        self.assertEqual(incidencia.snapshot["orden_transporte"], "OT-INC-2")
+
+    def test_ejecutivo_no_puede(self):
+        with self.assertRaises(PermissionError):
+            marcar_incidencia_envio(self.envio, "x", self.ejec)
+        self.assertTrue(EnvioCourier.objects.filter(pk=self.envio.pk).exists())
+        self.assertEqual(EnvioIncidencia.objects.count(), 0)
+
+    def test_envio_sin_pedidos_igual_se_puede_archivar(self):
+        envio_vacio = EnvioCourier.objects.create(courier=Courier.MOVEUP)
+        incidencia = marcar_incidencia_envio(envio_vacio, "x", self.logi)
+        self.assertEqual(incidencia.pedidos_incluidos, [])
+        self.assertFalse(EnvioCourier.objects.filter(pk=envio_vacio.pk).exists())
+
+
+class MarcarIncidenciaVistaTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.logi = crear_usuario("logi_inc2@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec = crear_usuario("ejec_inc2@bioquimica.cl", Rol.EJECUTIVO)
+        self.envio = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-INC-3")
+        self.pedido = crear_pedido("8003", envio=self.envio)
+
+    def test_logistica_reporta_incidencia_y_redirige_al_listado(self):
+        self.client.force_login(self.logi)
+        resp = self.client.post(f"/envios/{self.envio.pk}/incidencia/", {"motivo": "Paquete dañado"})
+        self.assertRedirects(resp, "/envios/")
+        self.assertFalse(EnvioCourier.objects.filter(pk=self.envio.pk).exists())
+        self.assertEqual(EnvioIncidencia.objects.count(), 1)
+        self.pedido.refresh_from_db()
+        self.assertIsNone(self.pedido.envio_id)
+
+    def test_sin_motivo_no_hace_nada_y_vuelve_al_detalle(self):
+        self.client.force_login(self.logi)
+        resp = self.client.post(f"/envios/{self.envio.pk}/incidencia/", {"motivo": "   "})
+        self.assertRedirects(resp, f"/envios/{self.envio.pk}/")
+        self.assertTrue(EnvioCourier.objects.filter(pk=self.envio.pk).exists())
+        self.assertEqual(EnvioIncidencia.objects.count(), 0)
+
+    def test_ejecutivo_no_puede(self):
+        self.client.force_login(self.ejec)
+        resp = self.client.post(f"/envios/{self.envio.pk}/incidencia/", {"motivo": "x"})
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(EnvioCourier.objects.filter(pk=self.envio.pk).exists())
+        self.assertEqual(EnvioIncidencia.objects.count(), 0)
+
+    def test_get_no_permitido(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get(f"/envios/{self.envio.pk}/incidencia/")
+        self.assertEqual(resp.status_code, 405)
+
+    def test_boton_visible_en_detalle_para_cualquier_courier(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get(f"/envios/{self.envio.pk}/")
+        contenido = resp.content.decode()
+        self.assertIn("Reportar incidencia", contenido)
+        self.assertNotIn("Marcar Entregado", contenido)
+        self.assertNotIn("Marcar Error", contenido)
+
+    def test_ejecutivo_no_ve_el_boton(self):
+        self.client.force_login(self.ejec)
+        resp = self.client.get(f"/envios/{self.envio.pk}/")
+        self.assertNotIn("Reportar incidencia", resp.content.decode())
+
+
+class ListadoIncidenciasTest(TestCase):
+    """envios/views.py::lista_incidencias / mis_incidencias — pedidos_incluidos guarda ejecutivo_id
+    (snapshot, no FK) para que el Ejecutivo pueda filtrar las suyas incluso después de que el pedido
+    original haya sido liberado/reasignado."""
+
+    def setUp(self):
+        self.client = Client()
+        self.logi = crear_usuario("logi_li@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec_obj = crear_ejecutivo(codigo_sap=30)
+        self.dueno = crear_usuario("dueno_li@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=30)
+        self.ajeno_obj = crear_ejecutivo(codigo_sap=40, nombre="Otro", email="otro_li@bioquimica.cl")
+        self.ajeno = crear_usuario("ajeno_li@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=40)
+
+        envio_dueno = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-DUENO")
+        crear_pedido("9101", envio=envio_dueno, ejecutivo=self.ejec_obj)
+        self.incidencia_dueno = marcar_incidencia_envio(envio_dueno, "Extraviado", self.logi)
+
+        envio_ajeno = EnvioCourier.objects.create(courier=Courier.STARKEN, orden_transporte="OT-AJENO")
+        crear_pedido("9102", envio=envio_ajeno, ejecutivo=self.ajeno_obj)
+        self.incidencia_ajeno = marcar_incidencia_envio(envio_ajeno, "Dañado", self.logi)
+
+    def test_logistica_ve_listado_completo(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get("/envios/incidencias/")
+        self.assertEqual(resp.status_code, 200)
+        contenido = resp.content.decode()
+        self.assertIn("OT-DUENO", contenido)
+        self.assertIn("OT-AJENO", contenido)
+
+    def test_ejecutivo_ve_solo_las_que_incluyen_pedidos_suyos(self):
+        self.client.force_login(self.dueno)
+        resp = self.client.get("/envios/mis-incidencias/")
+        contenido = resp.content.decode()
+        self.assertIn("OT-DUENO", contenido)
+        self.assertNotIn("OT-AJENO", contenido)
+
+    def test_ejecutivo_ajeno_no_ve_la_de_otro(self):
+        self.client.force_login(self.ajeno)
+        resp = self.client.get("/envios/mis-incidencias/")
+        contenido = resp.content.decode()
+        self.assertIn("OT-AJENO", contenido)
+        self.assertNotIn("OT-DUENO", contenido)
+
+    def test_ejecutivo_no_puede_ver_listado_completo(self):
+        self.client.force_login(self.dueno)
+        resp = self.client.get("/envios/incidencias/")
+        self.assertEqual(resp.status_code, 302)
+
+    def test_logistica_no_tiene_mis_incidencias(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get("/envios/mis-incidencias/")
+        self.assertEqual(resp.status_code, 302)
+
+    def test_sin_incidencias_muestra_mensaje_vacio(self):
+        EnvioIncidencia.objects.all().delete()
+        self.client.force_login(self.logi)
+        resp = self.client.get("/envios/incidencias/")
+        self.assertIn("No hay incidencias registradas.", resp.content.decode())
+
+
+class ReporteEjecutivosActivosTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.logi = crear_usuario("logi_rep@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec_activo = crear_ejecutivo(codigo_sap=50, nombre="Activo", email="activo_rep@bioquimica.cl", activo=True)
+        self.ejec_inactivo = crear_ejecutivo(codigo_sap=51, nombre="Inactivo", email="inactivo_rep@bioquimica.cl", activo=False)
+
+    def test_form_solo_lista_ejecutivos_activos(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get("/envios/reporte/")
+        contenido = resp.content.decode()
+        self.assertIn("Activo", contenido)
+        self.assertNotIn("Inactivo", contenido)
+
+
+class ReporteIncidenciasTest(TestCase):
+    """envios/reportes.py::filas_reporte con incluir_incidencias — suma filas armadas desde
+    EnvioIncidencia (envío ya borrado, todo sale del snapshot)."""
+
+    def setUp(self):
+        self.client = Client()
+        self.logi = crear_usuario("logi_repinc@bioquimica.cl", Rol.LOGISTICA)
+        self.ejec = crear_ejecutivo(codigo_sap=60, nombre="Repinc", email="repinc@bioquimica.cl")
+
+    def test_checkbox_incidencias_presente_en_form(self):
+        self.client.force_login(self.logi)
+        resp = self.client.get("/envios/reporte/")
+        self.assertIn('name="incidencias"', resp.content.decode())
+
+    def test_sin_incidencias_por_defecto(self):
+        envio = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-NORMAL")
+        crear_pedido("6001", envio=envio, ejecutivo=self.ejec)
+        envio_incidencia = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-INC")
+        crear_pedido("6002", envio=envio_incidencia, ejecutivo=self.ejec)
+        marcar_incidencia_envio(envio_incidencia, "Extraviado", self.logi)
+
+        filas = filas_reporte(None, None, [], [], self.logi, incluir_incidencias=False)
+        self.assertEqual(len(filas), 1)
+        self.assertEqual(filas[0]["ot"], "OT-NORMAL")
+
+    def test_con_incidencias_suma_la_fila_con_datos_del_snapshot(self):
+        envio_incidencia = EnvioCourier.objects.create(
+            courier=Courier.STARKEN, orden_transporte="OT-INC2",
+            datos_courier={"bultos": [{"cantidad": 3}], "valor_declarado": "7000"},
+        )
+        crear_pedido("6004", envio=envio_incidencia, ejecutivo=self.ejec)
+        marcar_incidencia_envio(envio_incidencia, "Dañado en tránsito", self.logi)
+
+        filas = filas_reporte(None, None, [], [], self.logi, incluir_incidencias=True)
+        self.assertEqual(len(filas), 1)
+        fila = filas[0]
+        self.assertEqual(fila["estado_courier"], "INCIDENCIA: Dañado en tránsito")
+        self.assertEqual(fila["n_bultos"], 3)
+        self.assertEqual(fila["valor_declarado"], 7000)
+        self.assertIn("6004", fila["pedidos"])
+        self.assertIn("Repinc", fila["ejecutivo"])
+
+    def test_reporte_ver_respeta_el_checkbox(self):
+        envio_incidencia = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-INC3")
+        crear_pedido("6005", envio=envio_incidencia, ejecutivo=self.ejec)
+        marcar_incidencia_envio(envio_incidencia, "x", self.logi)
+
+        self.client.force_login(self.logi)
+        resp_sin = self.client.get("/envios/reporte/ver/")
+        self.assertNotIn("OT-INC3", resp_sin.content.decode())
+
+        resp_con = self.client.get("/envios/reporte/ver/?incidencias=on")
+        self.assertIn("OT-INC3", resp_con.content.decode())

@@ -6,7 +6,7 @@ from pedidos.permisos import es_logistica
 from cuentas.models import PerfilUsuario
 from ejecutivos.models import Ejecutivo
 from .models import EnvioCourier
-from .services import parsear_bultos, ANULAR_COURIER, anular_envio_courier
+from .services import parsear_bultos, ANULAR_COURIER, anular_envio_courier, marcar_incidencia_envio
 from . import reportes
 from integraciones.seguimiento import refrescar_estados_courier, actualizar_estado_courier, REFRESCAR_ESTADO_BATCH
 from utils import Courier
@@ -18,6 +18,12 @@ import datetime
 import io
 from pypdf import PdfWriter
 from integraciones.documentos import generar_documento, documentos_disponibles, ETIQUETAS_TIPO_DOCUMENTO
+import hmac
+import json
+from django.conf import settings
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 
 
 @login_required
@@ -112,24 +118,6 @@ def refrescar_estado_envio(request, pk):
     return redirect("envios:detalle", pk=pk)
 
 
-#Solo ENTREGADO/ERROR: nada del flujo automático los setea hoy (despachar_pedidos deja DESPACHADO).
-@login_required
-@require_POST
-def cambiar_estado_envio(request, pk):
-    if not es_logistica(request.user):
-        return redirect("inicio")
-    envio = get_object_or_404(EnvioCourier, pk=pk)
-    nuevo_estado = request.POST.get("estado")
-    if nuevo_estado not in (EnvioCourier.Estado.ENTREGADO, EnvioCourier.Estado.ERROR):
-        messages.error(request, "Estado inválido.")
-        return redirect("envios:detalle", pk=pk)
-
-    envio.estado = nuevo_estado
-    envio.save(update_fields=["estado", "actualizado_en"])
-    messages.success(request, f"Envío #{envio.id} marcado como {envio.get_estado_display()}.")
-    return redirect("envios:detalle", pk=pk)
-
-
 #Anula la OF en el courier (hoy solo Starken, ver ANULAR_COURIER) y marca el envío como ANULADO.
 #No todos los couriers admiten esto por integración — si no está en ANULAR_COURIER, se avisa en
 #pantalla en vez de mostrar un botón que nunca funcionaría.
@@ -189,14 +177,14 @@ def eliminar_envio(request, pk):
 Reporte de envíos (por fecha / courier / ejecutivo) — descargable en Excel o imprimible a PDF.
 """
 
-#Ejecutivos que el usuario puede elegir en el filtro: Logística/Admin ven todos; el Ejecutivo solo
-#los suyos (mismos códigos SAP de su perfil).
+#Ejecutivos que el usuario puede elegir en el filtro: Logística/Admin ven todos los ACTIVOS; el
+#Ejecutivo solo los suyos (mismos códigos SAP de su perfil), también acotado a activos.
 def _ejecutivos_para(usuario):
     if es_logistica(usuario):
-        return Ejecutivo.objects.order_by("nombre")
+        return Ejecutivo.objects.filter(activo=True).order_by("nombre")
     if permisos.obtener_rol(usuario) == PerfilUsuario.Rol.EJECUTIVO:
         return Ejecutivo.objects.filter(
-            codigo_sap__in=permisos.codigos_sap_usuario(usuario)).order_by("nombre")
+            activo=True, codigo_sap__in=permisos.codigos_sap_usuario(usuario)).order_by("nombre")
     return Ejecutivo.objects.none()
 
 
@@ -211,7 +199,8 @@ def _parametros_reporte(request):
 
     couriers = request.GET.getlist("courier")
     ejecutivo_ids = [int(x) for x in request.GET.getlist("ejecutivo") if x.isdigit()]
-    return _fecha("desde"), _fecha("hasta"), couriers, ejecutivo_ids
+    incluir_incidencias = "incidencias" in request.GET
+    return _fecha("desde"), _fecha("hasta"), couriers, ejecutivo_ids, incluir_incidencias
 
 
 @login_required
@@ -224,8 +213,8 @@ def reporte_form(request):
 
 @login_required
 def reporte_ver(request):
-    desde, hasta, couriers, ejecutivo_ids = _parametros_reporte(request)
-    filas = reportes.filas_reporte(desde, hasta, couriers, ejecutivo_ids, request.user)
+    desde, hasta, couriers, ejecutivo_ids, incluir_incidencias = _parametros_reporte(request)
+    filas = reportes.filas_reporte(desde, hasta, couriers, ejecutivo_ids, request.user, incluir_incidencias)
     return render(request, "envios/reporte_ver.html", {
         "filas": filas,
         "desde": desde, "hasta": hasta,
@@ -236,8 +225,8 @@ def reporte_ver(request):
 
 @login_required
 def reporte_xlsx(request):
-    desde, hasta, couriers, ejecutivo_ids = _parametros_reporte(request)
-    filas = reportes.filas_reporte(desde, hasta, couriers, ejecutivo_ids, request.user)
+    desde, hasta, couriers, ejecutivo_ids, incluir_incidencias = _parametros_reporte(request)
+    filas = reportes.filas_reporte(desde, hasta, couriers, ejecutivo_ids, request.user, incluir_incidencias)
     return reportes.exportar_xlsx(filas)
 
 @login_required
@@ -249,7 +238,8 @@ def detalle_envio(request, pk):
     return render(request, "envios/detalle_envio.html",
                 {"envio": envio, "puede_gestionar": es_logistica(request.user),
                     "puede_refrescar": True, "documentos": documentos,
-                    "puede_anular": envio.courier in ANULAR_COURIER})
+                    "puede_anular": envio.courier in ANULAR_COURIER,
+                    "puede_marcar_incidencia": permisos.puede_marcar_incidencia(request.user, envio)})
 
 @login_required
 def descargar_documento(request, pk, tipo):
@@ -283,3 +273,68 @@ def descargar_documento(request, pk, tipo):
     respuesta = HttpResponse(contenido, content_type="application/pdf")
     respuesta["Content-Disposition"] = f'inline; filename="{tipo}_{envio.orden_transporte}.pdf"'
     return respuesta
+
+@csrf_exempt
+@require_POST
+def webhook_estado_chibra(request):
+    key_recibida = request.headers.get("X-API-KEY", "")
+    if not hmac.compare_digest(key_recibida, settings.CHIBRA_WEBHOOK_API_KEY):
+        return JsonResponse({"error": "no autorizado"}, status=401)
+
+    try:
+        datos = json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    orden_transporte = datos.get("orden_transporte")
+    envio = EnvioCourier.objects.filter(courier=Courier.CHIBRA,
+orden_transporte=orden_transporte).first()
+    if not envio:
+        return JsonResponse({"error": "envío no encontrado"}, status=404)
+
+    estado = (datos.get("estado") or {}).get("descripcion") or ""
+    envio.estado_courier = estado
+    envio.estado_courier_actualizado = timezone.now()
+    envio.save(update_fields=["estado_courier", "estado_courier_actualizado"])
+
+    return JsonResponse({"ok": True})
+
+@login_required
+@require_POST
+def marcar_incidencia(request, pk):
+    envio = get_object_or_404(EnvioCourier, pk=pk)
+    if not permisos.puede_marcar_incidencia(request.user, envio):
+        return redirect("inicio")
+
+    motivo = request.POST.get("motivo", "").strip()
+    if not motivo:
+        messages.error(request, "Tenés que indicar un motivo para reportar la incidencia.")
+        return redirect("envios:detalle", pk=pk)
+
+    marcar_incidencia_envio(envio, motivo, request.user)
+    messages.success(request, "Incidencia reportada — los pedidos quedaron liberados para un nuevo despacho.")
+    return redirect("envios:lista")
+
+
+#Listado completo de incidencias — Logística/Admin.
+@login_required
+def lista_incidencias(request):
+    if not es_logistica(request.user):
+        return redirect("inicio")
+    incidencias = permisos.incidencias_visibles(request.user)
+    paginador = Paginator(incidencias, 20)
+    incidencias = paginador.get_page(request.GET.get("page"))
+    plantilla = "envios/_tabla_incidencias.html" if request.headers.get("HX-Request") else "envios/lista_incidencias.html"
+    return render(request, plantilla, {"incidencias": incidencias})
+
+
+#Incidencias que incluyen algún pedido del Ejecutivo dueño.
+@login_required
+def mis_incidencias(request):
+    if permisos.obtener_rol(request.user) != PerfilUsuario.Rol.EJECUTIVO:
+        return redirect("inicio")
+    incidencias = permisos.incidencias_visibles(request.user)
+    paginador = Paginator(incidencias, 20)
+    incidencias = paginador.get_page(request.GET.get("page"))
+    plantilla = "envios/_tabla_incidencias.html" if request.headers.get("HX-Request") else "envios/mis_incidencias.html"
+    return render(request, plantilla, {"incidencias": incidencias})

@@ -132,7 +132,8 @@ class SupervisarTest(_EstadoDeModuloLimpio):
     def test_sin_lock_previo_lo_toma_y_registra_los_dos_jobs(self):
         scheduler_falso = self._arrancar_con_scheduler_falso()
         with patch("django.conf.settings.CRON_SAP_ACTIVO", True), \
-             patch("django.conf.settings.CRON_WOO_ACTIVO", True):
+             patch("django.conf.settings.CRON_WOO_ACTIVO", True), \
+             patch("django.conf.settings.CRON_REFRESCAR_ESTADOS_ACTIVO", False):
             _supervisar()
         self.assertTrue(scheduler._soy_dueno)
         self.assertEqual(self._ids_de_sincronizacion(scheduler_falso),
@@ -141,16 +142,26 @@ class SupervisarTest(_EstadoDeModuloLimpio):
     def test_solo_sap_activo_registra_un_job(self):
         scheduler_falso = self._arrancar_con_scheduler_falso()
         with patch("django.conf.settings.CRON_SAP_ACTIVO", True), \
-             patch("django.conf.settings.CRON_WOO_ACTIVO", False):
+             patch("django.conf.settings.CRON_WOO_ACTIVO", False), \
+             patch("django.conf.settings.CRON_REFRESCAR_ESTADOS_ACTIVO", False):
             _supervisar()
         self.assertEqual(self._ids_de_sincronizacion(scheduler_falso), {"sincronizar_sap"})
 
     def test_solo_woo_activo_registra_un_job(self):
         scheduler_falso = self._arrancar_con_scheduler_falso()
         with patch("django.conf.settings.CRON_SAP_ACTIVO", False), \
-             patch("django.conf.settings.CRON_WOO_ACTIVO", True):
+             patch("django.conf.settings.CRON_WOO_ACTIVO", True), \
+             patch("django.conf.settings.CRON_REFRESCAR_ESTADOS_ACTIVO", False):
             _supervisar()
         self.assertEqual(self._ids_de_sincronizacion(scheduler_falso), {"sincronizar_woo"})
+
+    def test_solo_estados_activo_registra_un_job(self):
+        scheduler_falso = self._arrancar_con_scheduler_falso()
+        with patch("django.conf.settings.CRON_SAP_ACTIVO", False), \
+             patch("django.conf.settings.CRON_WOO_ACTIVO", False), \
+             patch("django.conf.settings.CRON_REFRESCAR_ESTADOS_ACTIVO", True):
+            _supervisar()
+        self.assertEqual(self._ids_de_sincronizacion(scheduler_falso), {"refrescar_estados"})
 
     def test_con_el_lock_de_otro_fresco_no_registra_nada(self):
         with patch("pedidos.scheduler.os.getpid", return_value=999):
@@ -170,7 +181,8 @@ class SupervisarTest(_EstadoDeModuloLimpio):
 
         with patch("pedidos.scheduler.os.getpid", return_value=111), \
              patch("django.conf.settings.CRON_SAP_ACTIVO", True), \
-             patch("django.conf.settings.CRON_WOO_ACTIVO", True):
+             patch("django.conf.settings.CRON_WOO_ACTIVO", True), \
+             patch("django.conf.settings.CRON_REFRESCAR_ESTADOS_ACTIVO", False):
             _supervisar()                                    # primer ciclo: el lock está fresco
             self.assertFalse(scheduler._soy_dueno)
 

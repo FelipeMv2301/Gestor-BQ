@@ -1,10 +1,16 @@
 from .models import EnvioCourier
+from enviosIncidencias.models import EnvioIncidencia
 from integraciones import chibra_client, moveup_client, starken_client
 from pedidos.models import Pedido
 from pedidos.services  import notificar_pedido
 from django.db import transaction
 from utils import Courier, normalizar_telefono_cl, es_movil_cl
-
+import datetime
+from django.conf import settings
+from django.utils import timezone
+from integraciones.seguimiento import refrescar_estados_courier, REFRESCAR_ESTADO_BATCH
+from pedidos import permisos
+from django.forms.models import model_to_dict
 
 """
 Helpers
@@ -238,6 +244,13 @@ def validar_pedidos_para_despacho(pedidos):
 
     return courier
 
+def refrescar_estados_recientes():
+    desde = timezone.now() - datetime.timedelta(days=settings.DIAS_REFRESCAR_ESTADOS)
+    envios = EnvioCourier.objects.filter(
+        courier__in=REFRESCAR_ESTADO_BATCH.keys(), creado_en__gte=desde,
+    ).exclude(estado=EnvioCourier.Estado.ANULADO)
+    return refrescar_estados_courier(envios)
+
 def despachar_pedidos(pedidos, courier, bultos, destinatario, datos_courier, usuario):
     validar_pedidos_para_despacho(pedidos)   # re-valida por seguridad, aunque la vista ya haya chequeado
 
@@ -306,3 +319,24 @@ def parsear_bultos(request):
             "tipo_contenido": contenidos[i],
         })
     return bultos
+
+def marcar_incidencia_envio(envio, motivo, usuario):
+    if not permisos.puede_marcar_incidencia(usuario, envio):
+        raise PermissionError("[!] Error: No puedes reportar una incidencia sobre este envío.")
+
+    snapshot = model_to_dict(envio)
+    pedidos_incluidos = list(envio.pedidos.values("origen", "num_pedido", "rut", "razon_social", "ejecutivo_id"))
+
+    with transaction.atomic():
+        incidencia = EnvioIncidencia.objects.create(
+            courier=envio.courier,
+            orden_transporte=envio.orden_transporte,
+            snapshot=snapshot,
+            pedidos_incluidos=pedidos_incluidos,
+            motivo=motivo,
+            registrado_por=usuario,
+        )
+        envio.pedidos.update(estado_notificacion=Pedido.EstadoNotificacion.NO_NOTIFICADO)
+        envio.delete()
+
+    return incidencia

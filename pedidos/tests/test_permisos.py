@@ -2,6 +2,8 @@ from django.test import TestCase
 from cuentas.models import PerfilUsuario
 from pedidos.models import Pedido
 from pedidos import permisos
+from envios.models import EnvioCourier
+from utils import Courier
 from .factories import crear_usuario, crear_ejecutivo, crear_pedido
 
 Rol = PerfilUsuario.Rol
@@ -78,6 +80,14 @@ class PermisosTest(TestCase):
         self.assertTrue(permisos.puede_duplicar_pedido(self.admin, self.pedido))
         self.assertFalse(permisos.puede_duplicar_pedido(self.dueno, self.pedido))   # ejecutivo nunca
 
+    # --- marcar incidencia: Logística/Admin, cualquier courier (sin FK a envío en el permiso) ---
+    def test_puede_marcar_incidencia(self):
+        envio = EnvioCourier.objects.create(courier=Courier.CHIBRA)
+        self.assertTrue(permisos.puede_marcar_incidencia(self.logi, envio))
+        self.assertTrue(permisos.puede_marcar_incidencia(self.admin, envio))
+        self.assertFalse(permisos.puede_marcar_incidencia(self.dueno, envio))
+        self.assertFalse(permisos.puede_marcar_incidencia(self.ajeno, envio))
+
     # --- notificar / es_logistica ---
     def test_puede_notificar(self):
         self.pedido.estado_comercial = EC.APROBADO
@@ -141,3 +151,41 @@ class PermisosMultiCodigoTest(TestCase):
     def test_queryset_ve_pedidos_de_ambos(self):
         self.assertEqual(permisos.queryset_para_ver(self.multi).count(), 2)
         self.assertEqual(permisos.queryset_pedidos_ejecutivo(self.multi).count(), 2)
+
+
+class IncidenciasVisiblesTest(TestCase):
+    """permisos.incidencias_visibles — filtra por ejecutivo_id dentro de pedidos_incluidos (JSON,
+    snapshot capturado por marcar_incidencia_envio), no por FK viva."""
+
+    def setUp(self):
+        from envios.services import marcar_incidencia_envio
+
+        self.logi = crear_usuario("logi_iv@bioquimica.cl", Rol.LOGISTICA)
+        self.admin = crear_usuario("admin_iv@bioquimica.cl", Rol.ADMIN)
+        self.ejec_a = crear_ejecutivo(codigo_sap=10, email="a_iv@bioquimica.cl")
+        self.ejec_b = crear_ejecutivo(codigo_sap=20, nombre="Canal B", email="b_iv@bioquimica.cl")
+        self.dueno_a = crear_usuario("dueno_a_iv@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=10)
+        self.dueno_b = crear_usuario("dueno_b_iv@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=20)
+
+        envio_a = EnvioCourier.objects.create(courier=Courier.CHIBRA, orden_transporte="OT-A")
+        crear_pedido("7001", envio=envio_a, ejecutivo=self.ejec_a)
+        self.incidencia_a = marcar_incidencia_envio(envio_a, "x", self.logi)
+
+        envio_b = EnvioCourier.objects.create(courier=Courier.STARKEN, orden_transporte="OT-B")
+        crear_pedido("7002", envio=envio_b, ejecutivo=self.ejec_b)
+        self.incidencia_b = marcar_incidencia_envio(envio_b, "x", self.logi)
+
+    def test_admin_y_logistica_ven_todas(self):
+        self.assertEqual(permisos.incidencias_visibles(self.admin).count(), 2)
+        self.assertEqual(permisos.incidencias_visibles(self.logi).count(), 2)
+
+    def test_ejecutivo_ve_solo_la_suya(self):
+        visibles_a = permisos.incidencias_visibles(self.dueno_a)
+        self.assertEqual(list(visibles_a), [self.incidencia_a])
+
+        visibles_b = permisos.incidencias_visibles(self.dueno_b)
+        self.assertEqual(list(visibles_b), [self.incidencia_b])
+
+    def test_sin_rol_no_ve_nada(self):
+        sin_rol = crear_usuario("sinrol_iv@bioquimica.cl", None)
+        self.assertEqual(permisos.incidencias_visibles(sin_rol).count(), 0)

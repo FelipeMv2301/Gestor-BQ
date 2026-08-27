@@ -1,0 +1,41 @@
+<div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm min-w-[760px]">
+      <thead>
+        <tr class="bg-appbg text-xs uppercase tracking-wide text-muted">
+          <th class="text-left font-semibold px-4 py-3">Courier</th>
+          <th class="text-left font-semibold px-4 py-3">OT</th>
+          <th class="text-left font-semibold px-4 py-3">Pedidos incluidos</th>
+          <th class="text-left font-semibold px-4 py-3">Motivo</th>
+          <th class="text-left font-semibold px-4 py-3">Registrado por</th>
+          <th class="text-left font-semibold px-4 py-3">Fecha</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for incidencia in incidencias %}
+        <tr class="border-t border-line hover:bg-appbg">
+          <td class="px-4 py-3 text-body whitespace-nowrap">{{ incidencia.get_courier_display }}</td>
+          <td class="px-4 py-3 font-mono text-xs whitespace-nowrap">{{ incidencia.orden_transporte|default:"—" }}</td>
+          <td class="px-4 py-3">
+            <div class="flex flex-wrap gap-1">
+              {% for pedido in incidencia.pedidos_incluidos %}
+              <span class="text-xs font-mono bg-appbg border border-line rounded-full px-2 py-0.5">{{ pedido.origen }}-{{ pedido.num_pedido }}</span>
+              {% empty %}
+              <span class="text-xs text-muted">—</span>
+              {% endfor %}
+            </div>
+          </td>
+          <td class="px-4 py-3 text-body max-w-[16rem] truncate" title="{{ incidencia.motivo }}">{{ incidencia.motivo|default:"—" }}</td>
+          <td class="px-4 py-3 text-body whitespace-nowrap">{{ incidencia.registrado_por.email|default:"—" }}</td>
+          <td class="px-4 py-3 text-xs text-muted font-mono tabular-nums whitespace-nowrap">{{ incidencia.registrado_en|date:"d/m/y H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="px-4 py-10 text-center text-muted">
+          <div class="text-sm">No hay incidencias registradas.</div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% include "partials/_paginacion.html" with page_obj=incidencias hx_target="#tabla-incidencias" %}

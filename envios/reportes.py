@@ -44,9 +44,50 @@ def _formatear_medidas(bultos):
     return " / ".join(partes)
 
 
+#Mismas filas que un envío normal, armadas desde EnvioIncidencia (el envío original ya se borró —
+#todo sale del snapshot). "Estado Courier" se reusa para marcar que es una incidencia, en vez de
+#agregar una columna nueva solo para esto.
+def _filas_incidencias(desde, hasta, couriers, ejecutivo_ids, usuario):
+    from enviosIncidencias.models import EnvioIncidencia
+    from ejecutivos.models import Ejecutivo
+
+    incidencias = permisos.incidencias_visibles(usuario)
+    if desde:
+        incidencias = incidencias.filter(registrado_en__date__gte=desde)
+    if hasta:
+        incidencias = incidencias.filter(registrado_en__date__lte=hasta)
+    if couriers:
+        incidencias = incidencias.filter(courier__in=couriers)
+
+    nombres_ejecutivo = dict(Ejecutivo.objects.values_list("pk", "nombre"))
+
+    filas = []
+    for incidencia in incidencias:
+        pedidos = incidencia.pedidos_incluidos or []
+        if ejecutivo_ids and not any(p.get("ejecutivo_id") in ejecutivo_ids for p in pedidos):
+            continue
+        datos = (incidencia.snapshot or {}).get("datos_courier") or {}
+        bultos = datos.get("bultos") or []
+        filas.append({
+            "fecha": incidencia.registrado_en,
+            "courier": incidencia.get_courier_display(),
+            "ot": incidencia.orden_transporte,
+            "pedidos": ", ".join(f"{p.get('origen')}-{p.get('num_pedido')}" for p in pedidos),
+            "ejecutivo": ", ".join(sorted({
+                nombres_ejecutivo[p["ejecutivo_id"]] for p in pedidos if p.get("ejecutivo_id") in nombres_ejecutivo
+            })),
+            "medidas": _formatear_medidas(bultos),
+            "n_bultos": sum(int(b.get("cantidad") or 0) for b in bultos),
+            "valor_declarado": _a_entero(datos.get("valor_declarado")),
+            "estado_courier": f"INCIDENCIA: {incidencia.motivo}",
+        })
+    return filas
+
+
 #Devuelve la lista de filas del reporte (una por envío/OT). Cada fila es un dict con las columnas que
 #pide el negocio: OT, pedidos agrupados, medidas, N° bultos, valor declarado (+ fecha/courier/ejecutivo).
-def filas_reporte(desde, hasta, couriers, ejecutivo_ids, usuario):
+#incluir_incidencias suma también los envíos archivados por incidencia (checkbox del formulario).
+def filas_reporte(desde, hasta, couriers, ejecutivo_ids, usuario, incluir_incidencias=False):
     envios = (
         _visibles_para(usuario)
         .con_fecha(desde, hasta)
@@ -72,6 +113,11 @@ def filas_reporte(desde, hasta, couriers, ejecutivo_ids, usuario):
             "valor_declarado": _a_entero(datos.get("valor_declarado")),
             "estado_courier": envio.estado_courier,
         })
+
+    if incluir_incidencias:
+        filas += _filas_incidencias(desde, hasta, couriers, ejecutivo_ids, usuario)
+        filas.sort(key=lambda f: f["fecha"], reverse=True)
+
     return filas
 
 

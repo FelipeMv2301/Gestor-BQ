@@ -50,8 +50,6 @@ class EnvioCourier(models.Model):
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente"
         DESPACHADO = "DESPACHADO", "Despachado"
-        ENTREGADO = "ENTREGADO", "Entregado"
-        ERROR = "ERROR", "Error"
         ANULADO = "ANULADO", "Anulado"
 
     courier = models.CharField(max_length=20, choices=Courier.choices)
