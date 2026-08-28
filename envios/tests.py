@@ -3,6 +3,7 @@ from unittest.mock import patch
 from pypdf import PdfWriter, PdfReader
 from django.test import TestCase, RequestFactory, Client
 from django.conf import settings
+from django.utils import timezone
 from cuentas.models import PerfilUsuario
 from pedidos.models import Pedido
 from pedidos.tests.factories import crear_pedido, crear_usuario, crear_ejecutivo
@@ -1069,6 +1070,19 @@ class MarcarIncidenciaEnvioTest(TestCase):
         incidencia = marcar_incidencia_envio(envio, "x", self.logi)
         self.assertEqual(incidencia.snapshot["datos_courier"], {"centro": "02", "servicio": "10"})
         self.assertEqual(incidencia.snapshot["orden_transporte"], "OT-INC-2")
+
+    #Bug real de producción 2026-08-28: envío #190 dio 500 al reportar incidencia. estado_courier_actualizado
+    #es un DateTimeField sin auto_now/auto_now_add, así que model_to_dict() SÍ lo incluye (a diferencia de
+    #creado_en/actualizado_en) como un datetime crudo — y el JSONField de snapshot, sin encoder, no sabe
+    #serializarlo. Nunca se reprodujo en tests porque ningún fixture seteaba este campo; en producción sí,
+    #vía el cron refrescar_estados_recientes (integraciones/seguimiento.py) que corre sobre envíos reales.
+    def test_snapshot_de_envio_con_estado_courier_actualizado_no_revienta(self):
+        envio = EnvioCourier.objects.create(
+            courier=Courier.CHIBRA, orden_transporte="OT-INC-3",
+            estado_courier="Programado", estado_courier_actualizado=timezone.now(),
+        )
+        incidencia = marcar_incidencia_envio(envio, "x", self.logi)
+        self.assertEqual(incidencia.snapshot["estado_courier"], "Programado")
 
     def test_ejecutivo_no_puede(self):
         with self.assertRaises(PermissionError):
