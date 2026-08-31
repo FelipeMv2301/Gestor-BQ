@@ -37,6 +37,8 @@
         {{ form.email }}</label>
       <label class="flex items-center gap-2 cursor-pointer text-sm text-body pb-2">
         {{ form.activo }} Activo</label>
+      <label class="flex items-center gap-2 cursor-pointer text-sm text-body pb-2">
+        {{ form.es_ont }} ONT</label>
       <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Crear</button>
       <span id="spinner-crear-ejec" class="htmx-indicator text-sm text-muted">Creando…</span>
     </form>
@@ -52,6 +54,7 @@
             <th class="text-left font-semibold px-4 py-3">Nombre</th>
             <th class="text-left font-semibold px-4 py-3">Email</th>
             <th class="text-left font-semibold px-4 py-3">Estado</th>
+            <th class="text-left font-semibold px-4 py-3">ONT</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
@@ -70,6 +73,9 @@
                   <span class="w-1.5 h-1.5 rounded-full bg-rech-dot"></span>Inactivo</span>
               {% endif %}
             </td>
+            <td class="px-4 py-3">
+              {% if ejecutivo.es_ont %}<span class="text-xs font-semibold px-2 py-1 rounded-full bg-appbg border border-line">Sí</span>{% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
             <td class="px-4 py-3 text-right whitespace-nowrap">
               <button type="button" onclick="alternarEdicionEjecutivo({{ ejecutivo.pk }})"
                       class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-2.5 py-1.5 rounded-lg">Editar</button>
@@ -79,7 +85,7 @@
             </td>
           </tr>
           <tr class="hidden border-t border-line bg-appbg" id="fila-editar-ejecutivo-{{ ejecutivo.pk }}">
-            <td colspan="5" class="px-4 py-3">
+            <td colspan="6" class="px-4 py-3">
               <form hx-post="{% url 'ejecutivos:editar' ejecutivo.pk %}" class="flex flex-wrap items-end gap-3">
                 <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Código SAP</span>
                   <input type="number" name="codigo_sap" value="{{ ejecutivo.codigo_sap }}" required
@@ -92,6 +98,8 @@
                          class="text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2 focus:border-brand focus:outline-none"></label>
                 <label class="flex items-center gap-2 cursor-pointer text-sm text-body pb-2">
                   <input type="checkbox" name="activo" {% if ejecutivo.activo %}checked{% endif %} class="accent-brand w-4 h-4"> Activo</label>
+                <label class="flex items-center gap-2 cursor-pointer text-sm text-body pb-2">
+                  <input type="checkbox" name="es_ont" {% if ejecutivo.es_ont %}checked{% endif %} class="accent-brand w-4 h-4"> ONT</label>
                 <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Guardar</button>
                 <button type="button" onclick="alternarEdicionEjecutivo({{ ejecutivo.pk }})"
                         class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:bg-appbg">Cancelar</button>
@@ -99,7 +107,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="px-4 py-10 text-center text-muted text-sm">No hay ejecutivos cargados. Sincroniza desde SAP o crea uno manual.</td></tr>
+          <tr><td colspan="6" class="px-4 py-10 text-center text-muted text-sm">No hay ejecutivos cargados. Sincroniza desde SAP o crea uno manual.</td></tr>
           {% endfor %}
         </tbody>
       </table>
