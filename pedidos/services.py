@@ -98,11 +98,12 @@ def guardar_pedidos_woo(after=None, before=None):
             omitidos += 1
             continue
 
-        Pedido.objects.create(
+        pedido = Pedido.objects.create(
             num_pedido=num_pedido,
             origen=Pedido.Origen.WEB,
             **_mapear_pedido_woo(pedido_woo, mapa_comunas, ejecutivo_web),
         )
+        crear_seguimiento_ont_si_corresponde(pedido)
         creados += 1
     
     return {"creados": creados, "omitidos":omitidos}
@@ -124,11 +125,12 @@ def guardar_un_pedido_woo(num_pedido, ignorar_rechazado=False):
     billing = pedido_woo.get("billing" ,{})
     shipping = pedido_woo.get("shipping", {})
 
-    Pedido.objects.create(
+    pedido = Pedido.objects.create(
         num_pedido=str(pedido_woo.get("number")),
         origen=Pedido.Origen.WEB,
         **_mapear_pedido_woo(pedido_woo, mapa_comunas, ejecutivo_web),
     )
+    crear_seguimiento_ont_si_corresponde(pedido)
     return f"Pedido WEB-{num_pedido} creado desde WooCommerce."
     
 
@@ -284,11 +286,12 @@ def guardar_pedidos_sap(after=None, before=None):
         #INSERT fallido deja la transacción abortada y las consultas siguientes también revientan.
         try:
             with transaction.atomic():
-                Pedido.objects.create(
+                pedido = Pedido.objects.create(
                     num_pedido=num_pedido,
                     origen=Pedido.Origen.SAP,
                     **_mapear_orden_sap(orden, cache_bp, cookies, mapa_sku, mapa_ejecutivos),
                 )
+                crear_seguimiento_ont_si_corresponde(pedido)
         except Exception:
             fallidos += 1
             logger.exception("Ingesta SAP: la NV %s falló, se omite y se sigue con el resto.", num_pedido)
@@ -318,11 +321,12 @@ def guardar_un_pedido_sap(num_pedido, ignorar_rechazado=False):
         raise ValueError(f"[!] Error: El pedido SAP-{num_pedido} ya fue rechazado antes, no se puede volver a ingresar.")
 
     cache_bp = {}
-    Pedido.objects.create(
+    pedido = Pedido.objects.create(
         num_pedido=str(orden.get("DocNum")),
         origen=Pedido.Origen.SAP,
         **_mapear_orden_sap(orden, cache_bp, cookies),
     )
+    crear_seguimiento_ont_si_corresponde(pedido)
     return f"Pedido SAP-{num_pedido} creado desde SAP."
 
 
@@ -421,6 +425,16 @@ def _avisar_ejecutivo(pedido, tipo, mensaje):
         for p in perfiles
     ])
 
+#Crea el registro de seguimiento ONT si el pedido pertenece a un ejecutivo marcado es_ont (ver
+#seguimientoOnt.models.DespachoOnt) — se llama justo después de crear cualquier Pedido nuevo (ingesta
+#SAP/Woo, reingreso desde anulados, duplicado). get_or_create por si se llegara a llamar dos veces
+#sobre el mismo pedido (es OneToOne, no debe duplicarse).
+def crear_seguimiento_ont_si_corresponde(pedido):
+    if pedido.ejecutivo_id is None or not pedido.ejecutivo.es_ont:
+        return
+    from seguimientoOnt.models import DespachoOnt
+    DespachoOnt.objects.get_or_create(pedido=pedido)
+
 #Para el cron: trae lo del día anterior + el actual (mismo filtro UpdateDate que ya usa guardar_pedidos_sap).
 def sincronizar_sap_reciente():
     hoy = datetime.date.today()
@@ -454,7 +468,7 @@ def duplicar_pedido(pedido_original, usuario):
     ).count()
     nuevo_num_pedido = f"{raiz}-{existentes + 1}"
 
-    return Pedido.objects.create(
+    pedido = Pedido.objects.create(
         origen=pedido_original.origen,
         num_pedido=nuevo_num_pedido,
         estado_comercial=Pedido.EstadoComercial.APROBADO,
@@ -477,3 +491,5 @@ def duplicar_pedido(pedido_original, usuario):
         ejecutivo=pedido_original.ejecutivo,
         observaciones=pedido_original.observaciones,
     )
+    crear_seguimiento_ont_si_corresponde(pedido)
+    return pedido

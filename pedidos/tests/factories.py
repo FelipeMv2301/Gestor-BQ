@@ -22,8 +22,8 @@ def crear_usuario(email, rol=None, codigo_sap=None):
     return user
 
 
-def crear_ejecutivo(codigo_sap=10, nombre="Elsa Martínez", email="elsa@bioquimica.cl", activo=True):
-    return Ejecutivo.objects.create(codigo_sap=codigo_sap, nombre=nombre, email=email, activo=activo)
+def crear_ejecutivo(codigo_sap=10, nombre="Elsa Martínez", email="elsa@bioquimica.cl", activo=True, es_ont=False):
+    return Ejecutivo.objects.create(codigo_sap=codigo_sap, nombre=nombre, email=email, activo=activo, es_ont=es_ont)
 
 
 def crear_pedido(num="1000", **kwargs):

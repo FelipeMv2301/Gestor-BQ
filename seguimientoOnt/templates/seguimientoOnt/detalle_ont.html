@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block titulo %}ONT {{ seguimiento.pedido.origen }}-{{ seguimiento.pedido.num_pedido }} — Portal Bioquímica{% endblock %}
+{% block ancho %}max-w-4xl{% endblock %}
+{% block content %}
+<a href="{% url 'seguimientoOnt:lista' %}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-body bg-surface border border-linestrong rounded-full px-4 py-2 hover:border-brand hover:text-brand-ink shadow-sm mb-4">← Volver a Pedidos ONT</a>
+
+<div class="flex items-center justify-between gap-3 mb-5">
+  <h1 class="text-2xl font-bold text-ink font-mono tabular-nums">Seguimiento ONT — {{ seguimiento.pedido.origen }}-{{ seguimiento.pedido.num_pedido }}</h1>
+  <a href="{% url 'pedidos:detalle' seguimiento.pedido.pk %}" class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Ver pedido</a>
+</div>
+
+<div class="bg-surface border border-line rounded-2xl shadow-sm p-6 mb-5">
+  <h2 class="text-sm font-bold text-ink mb-3">Datos del pedido (solo editables desde el pedido)</h2>
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+    <div><span class="text-xs text-muted block">Contacto</span>{{ seguimiento.nombre_contacto|default:"—" }}</div>
+    <div><span class="text-xs text-muted block">Teléfono</span>{{ seguimiento.telefono_contacto|default:"—" }}</div>
+    <div><span class="text-xs text-muted block">Ciudad destino</span>{{ seguimiento.ciudad_destino|default:"—" }}</div>
+    <div class="sm:col-span-2 lg:col-span-3"><span class="text-xs text-muted block">Dirección destino</span>{{ seguimiento.direccion_destino|default:"—" }}</div>
+    <div><span class="text-xs text-muted block">Courier</span>{{ seguimiento.courier|default:"—" }}</div>
+    <div>
+      <span class="text-xs text-muted block">OT</span>
+      {% if seguimiento.envio_id %}
+      <a href="{% url 'envios:detalle' seguimiento.envio_id %}" class="font-mono text-brand-ink hover:underline">{{ seguimiento.ot|default:"—" }}</a>
+      {% else %}
+      <span class="text-muted">Sin despachar todavía</span>
+      {% endif %}
+    </div>
+    <div class="sm:col-span-2 lg:col-span-3"><span class="text-xs text-muted block">Observaciones</span>{{ seguimiento.observaciones|default:"—"|linebreaksbr }}</div>
+  </div>
+</div>
+
+<div class="bg-surface border border-line rounded-2xl shadow-sm p-6">
+  <h2 class="text-sm font-bold text-ink mb-3">Seguimiento ONT</h2>
+  {% if puede_editar %}
+  <form hx-post="{% url 'seguimientoOnt:editar' seguimiento.pk %}" class="grid gap-4 sm:grid-cols-2">
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Acción</span>
+      <select name="accion" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2">
+        <option value="">— Sin definir —</option>
+        {% for valor, etiqueta in accion_choices %}
+        <option value="{{ valor }}" {% if valor == seguimiento.accion %}selected{% endif %}>{{ etiqueta }}</option>
+        {% endfor %}
+      </select></label>
+    <div></div>
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Fecha compromiso</span>
+      <input type="date" name="fecha_compromiso" value="{{ seguimiento.fecha_compromiso|date:'Y-m-d' }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2"></label>
+    <label class="flex items-center gap-2 cursor-pointer text-sm mt-6"><input type="checkbox" name="fecha_compromiso_aproximada" {% if seguimiento.fecha_compromiso_aproximada %}checked{% endif %} class="accent-brand w-4 h-4"> Fecha aproximada</label>
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Fecha despacho</span>
+      <input type="date" name="fecha_despacho" value="{{ seguimiento.fecha_despacho|date:'Y-m-d' }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2"></label>
+    <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Guía de despacho</span>
+      <input type="text" name="guia_despacho" value="{{ seguimiento.guia_despacho }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2"></label>
+    <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Observaciones OK</span>
+      <textarea name="observaciones_ok" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2">{{ seguimiento.observaciones_ok }}</textarea></label>
+    <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Observaciones de entrega</span>
+      <textarea name="observaciones_entrega" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2">{{ seguimiento.observaciones_entrega }}</textarea></label>
+    <label class="block sm:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Confirmación carga</span>
+      <input type="text" name="confirmacion_carga" value="{{ seguimiento.confirmacion_carga }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2"></label>
+    <div class="flex flex-col gap-1.5 sm:col-span-2">
+      <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="confirmacion_cliente" {% if seguimiento.confirmacion_cliente %}checked{% endif %} class="accent-brand w-4 h-4"> Confirmación cliente</label>
+      <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="retorno_documento" {% if seguimiento.retorno_documento %}checked{% endif %} class="accent-brand w-4 h-4"> Retorno documento</label>
+      <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="pedido_recibido" {% if seguimiento.pedido_recibido %}checked{% endif %} class="accent-brand w-4 h-4"> Pedido recibido</label>
+      <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="enviar" {% if seguimiento.enviar %}checked{% endif %} class="accent-brand w-4 h-4"> ¿Enviar?</label>
+    </div>
+    <div class="sm:col-span-2">
+      <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Guardar</button>
+    </div>
+  </form>
+  {% else %}
+  <p class="text-sm text-muted">No tienes permiso para editar este seguimiento.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -17,6 +17,9 @@ links y sus permisos vivan en un solo lugar.
   <a href="{% url 'envios:lista' %}" class="{{ clase }}">Envíos Realizados</a>
   <a href="{% url 'envios:lista_incidencias' %}" class="{{ clase }}">Incidencias</a>
 {% endif %}
+{% if user.perfil.rol == 'EJECUTIVO' or user.perfil.rol == 'LOGISTICA' or user.perfil.rol == 'ADMIN' %}
+  <a href="{% url 'seguimientoOnt:lista' %}" class="{{ clase }}">Pedidos ONT</a>
+{% endif %}
 {% if user.perfil.rol == 'EJECUTIVO' or user.perfil.rol == 'ADMIN' %}
   <a href="{% url 'pedidos:anulados' %}" class="{{ clase }}">Anulados</a>
 {% endif %}

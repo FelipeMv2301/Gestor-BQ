@@ -1,6 +1,7 @@
 """ejecutivos/services.py::sincronizar_ejecutivos_desde_sap — mockea SAP en la frontera, nunca red real."""
 from unittest.mock import patch
-from django.test import TestCase
+from django.test import TestCase, Client
+from cuentas.models import PerfilUsuario
 from .models import Ejecutivo
 from .services import sincronizar_ejecutivos_desde_sap
 from pedidos.tests.factories import crear_usuario
@@ -79,3 +80,27 @@ class SincronizarEjecutivosTest(TestCase):
         self.assertEqual(resultado["perfiles_actualizados"], 0)
         sin_vincular.perfil.refresh_from_db()
         self.assertIsNone(sin_vincular.perfil.codigo_empleado_sap)
+
+
+#El rol ADMIN del portal (login Google) nunca entra al /admin/ real de Django — antes es_ont solo era
+#editable ahí (list_editable en EjecutivoAdmin), así que en la práctica nadie podía marcarlo. Este es
+#el panel que sí usa el ADMIN del portal (ejecutivos:panel/editar) — ver backlog-seguimiento-ont.md.
+class PanelEjecutivosEsOntTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.admin = crear_usuario("admin_panel_ejec@bioquimica.cl", PerfilUsuario.Rol.ADMIN)
+        self.ejecutivo = Ejecutivo.objects.create(codigo_sap=44, nombre="Ejecutivo ONT", es_ont=False)
+
+    def test_admin_puede_marcar_es_ont_desde_el_panel_propio(self):
+        self.client.force_login(self.admin)
+        resp = self.client.post(f"/ejecutivos/panel/{self.ejecutivo.pk}/editar/", {
+            "codigo_sap": "44", "nombre": "Ejecutivo ONT", "email": "", "activo": "on", "es_ont": "on",
+        })
+        self.assertEqual(resp.status_code, 204)
+        self.ejecutivo.refresh_from_db()
+        self.assertTrue(self.ejecutivo.es_ont)
+
+    def test_panel_muestra_la_columna_ont(self):
+        self.client.force_login(self.admin)
+        resp = self.client.get("/ejecutivos/panel/")
+        self.assertContains(resp, "ONT")

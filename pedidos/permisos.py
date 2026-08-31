@@ -168,6 +168,32 @@ def incidencias_visibles(usuario):
         return EnvioIncidencia.objects.filter(pk__in=ids).order_by("-registrado_en")
     return EnvioIncidencia.objects.none()
 
+#Si alguno de los códigos SAP del usuario está marcado es_ont — o sea, ¿es parte del equipo ONT?
+def _es_ejecutivo_ont(usuario):
+    from ejecutivos.models import Ejecutivo
+    return Ejecutivo.objects.filter(codigo_sap__in=codigos_sap_usuario(usuario), es_ont=True).exists()
+
+#Quién ve qué en el módulo de Seguimiento ONT: Admin/Logística todo. Ejecutivo: si es parte del
+#equipo ONT (algún código suyo marcado es_ont), ve TODA la cola compartida, no solo lo suyo — es un
+#equipo chico que trabaja la misma cola (pedido de Felipe 2026-08-28). El resto de ejecutivos no ve nada.
+def queryset_ont(usuario):
+    from seguimientoOnt.models import DespachoOnt
+    rol = obtener_rol(usuario)
+    if rol in (PerfilUsuario.Rol.ADMIN, PerfilUsuario.Rol.LOGISTICA):
+        return DespachoOnt.objects.all()
+    if rol == PerfilUsuario.Rol.EJECUTIVO and _es_ejecutivo_ont(usuario):
+        return DespachoOnt.objects.all()
+    return DespachoOnt.objects.none()
+
+#Permiso para editar los campos manuales de un seguimiento ONT — Admin/Logística siempre,
+#Ejecutivo solo si el pedido es suyo (los campos automáticos no se editan nunca, son properties).
+def puede_editar_ont(usuario, seguimiento):
+    if es_logistica(usuario):
+        return True
+    if obtener_rol(usuario) == PerfilUsuario.Rol.EJECUTIVO:
+        return responsable_del_pedido(usuario, seguimiento.pedido)
+    return False
+
 """
 Campos que los usuarios podran editar en el proyecto
 """

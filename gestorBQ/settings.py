@@ -207,6 +207,7 @@ INSTALLED_APPS = [
     'pedidosRechazados',
     'envios',
     'enviosIncidencias',
+    'seguimientoOnt',
     'cotizaciones',
     'django.contrib.sites',
     'allauth',
