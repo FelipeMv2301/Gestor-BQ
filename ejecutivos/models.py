@@ -18,5 +18,11 @@ class Ejecutivo(models.Model):
         default=True
     )
 
+    #Marca los códigos SAP cuyos pedidos deben aparecer en el módulo de Seguimiento ONT
+    #(seguimientoOnt.DespachoOnt) — hoy son los códigos 44 y 42, editable desde /admin/.
+    es_ont = models.BooleanField(
+        default=False
+    )
+
     def __str__(self):
       return self.nombre

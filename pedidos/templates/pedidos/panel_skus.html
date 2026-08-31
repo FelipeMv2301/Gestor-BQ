@@ -55,7 +55,7 @@
             <td class="px-4 py-3 text-right whitespace-nowrap">
               <button type="button" onclick="alternarEdicionSku({{ sku_courier.pk }})"
                       class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-2.5 py-1.5 rounded-lg">Editar</button>
-              <button hx-post="{% url 'pedidos:eliminar_sku' sku_courier.pk %}"
+              <button type="button" hx-post="{% url 'pedidos:eliminar_sku' sku_courier.pk %}"
                       hx-confirm="¿Eliminar el mapeo de {{ sku_courier.sku }}? La próxima ingesta ya no detectará el courier para ese SKU."
                       class="text-sm font-semibold text-rech-ink hover:bg-rech-bg px-2.5 py-1.5 rounded-lg">Eliminar</button>
             </td>

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block titulo %}Pedidos ONT — Portal Bioquímica{% endblock %}
+{% block content %}
+<div class="mb-5">
+  <h1 class="text-2xl font-bold text-ink">Pedidos ONT</h1>
+  <p class="text-sm text-muted mt-1">Seguimiento de despacho para los pedidos del área ONT. Courier, OT y datos de contacto se editan desde "Mis pedidos"/"Pedidos a Despachar" — acá solo el seguimiento.</p>
+</div>
+
+<!-- Div, no <form>: la tabla de abajo trae un <form> propio por fila para editar — anidar <form>
+     dentro de <form> es HTML inválido y el navegador los aplana de forma impredecible. hx-include
+     junta los filtros igual, sin necesidad de que compartan un <form> ancestro. -->
+<div hx-get="{% url 'seguimientoOnt:lista' %}" hx-target="#tabla-ont" hx-push-url="true"
+     hx-trigger="change from:[data-filtro], keyup delay:400ms from:input[type=search]"
+     hx-include="[data-filtro], input[name='q']">
+  <div class="grid gap-5 md:grid-cols-[15rem_minmax(0,1fr)]">
+    <aside class="bg-surface border border-line rounded-2xl p-4 h-max md:sticky md:top-20 flex flex-col gap-4">
+      <span class="text-sm font-bold text-ink">Filtros</span>
+
+      <div class="flex flex-col gap-1.5">
+        <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Acción</span>
+        {% for valor, etiqueta in accion_choices %}
+        <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="accion" value="{{ valor }}" data-filtro class="accent-brand w-4 h-4" {% if valor in sel_accion %}checked{% endif %}> {{ etiqueta }}</label>
+        {% endfor %}
+      </div>
+
+      <div class="flex flex-col gap-1.5 border-t border-line pt-3">
+        <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Fecha compromiso</span>
+        <label class="text-xs text-muted">Desde <input type="date" name="compromiso_desde" value="{{ compromiso_desde }}" data-filtro class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1"></label>
+        <label class="text-xs text-muted">Hasta <input type="date" name="compromiso_hasta" value="{{ compromiso_hasta }}" data-filtro class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1"></label>
+      </div>
+
+      <div class="flex flex-col gap-1.5 border-t border-line pt-3">
+        <span class="text-xs font-bold uppercase tracking-wide text-muted mb-0.5">Fecha despacho</span>
+        <label class="text-xs text-muted">Desde <input type="date" name="despacho_desde" value="{{ despacho_desde }}" data-filtro class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1"></label>
+        <label class="text-xs text-muted">Hasta <input type="date" name="despacho_hasta" value="{{ despacho_hasta }}" data-filtro class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-2 py-1"></label>
+      </div>
+
+      <a href="{% url 'seguimientoOnt:lista' %}" class="text-xs font-semibold text-brand-ink hover:underline mt-1">Limpiar filtros</a>
+    </aside>
+
+    <div class="flex flex-col gap-4 min-w-0">
+      <div class="relative flex-1 min-w-[12rem] max-w-sm">
+        <input type="search" name="q" value="{{ q }}" placeholder="Buscar N° pedido / contacto / RUT / guía…"
+               class="w-full text-sm rounded-lg border border-linestrong bg-field text-body pl-9 pr-3 py-2 focus:border-brand focus:outline-none">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">🔍</span>
+      </div>
+      <div id="tabla-ont">
+        {% include "seguimientoOnt/_tabla_ont.html" %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function alternarEdicionOnt(pk) {
+    document.getElementById('fila-editar-ont-' + pk).classList.toggle('hidden');
+  }
+</script>
+{% endblock %}

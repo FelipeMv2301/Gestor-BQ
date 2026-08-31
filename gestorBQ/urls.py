@@ -27,4 +27,5 @@ urlpatterns = [
     path("ejecutivos/", include("ejecutivos.urls")), #Trae las urls que definimos en Ejecutivos (para gestión del admin)
     path("envios/", include("envios.urls")), #Trae las urls que definimos en Envíos
     path("cotizaciones/", include("cotizaciones.urls")), #Trae las urls que definimos en Cotizaciones
+    path("ont/", include("seguimientoOnt.urls")), #Trae las urls del módulo de Seguimiento ONT
 ]

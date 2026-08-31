@@ -168,6 +168,26 @@ def incidencias_visibles(usuario):
         return EnvioIncidencia.objects.filter(pk__in=ids).order_by("-registrado_en")
     return EnvioIncidencia.objects.none()
 
+#Quién ve qué en el módulo de Seguimiento ONT: Admin/Logística todo, Ejecutivo solo los suyos (mismo
+#criterio que queryset_rechazados, pero acá sí hay FK real — no hace falta filtrar en Python).
+def queryset_ont(usuario):
+    from seguimientoOnt.models import DespachoOnt
+    rol = obtener_rol(usuario)
+    if rol in (PerfilUsuario.Rol.ADMIN, PerfilUsuario.Rol.LOGISTICA):
+        return DespachoOnt.objects.all()
+    if rol == PerfilUsuario.Rol.EJECUTIVO:
+        return DespachoOnt.objects.de_ejecutivo(codigos_sap_usuario(usuario))
+    return DespachoOnt.objects.none()
+
+#Permiso para editar los campos manuales de un seguimiento ONT — Admin/Logística siempre,
+#Ejecutivo solo si el pedido es suyo (los campos automáticos no se editan nunca, son properties).
+def puede_editar_ont(usuario, seguimiento):
+    if es_logistica(usuario):
+        return True
+    if obtener_rol(usuario) == PerfilUsuario.Rol.EJECUTIVO:
+        return responsable_del_pedido(usuario, seguimiento.pedido)
+    return False
+
 """
 Campos que los usuarios podran editar en el proyecto
 """

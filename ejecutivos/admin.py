@@ -7,7 +7,8 @@ from django.shortcuts import redirect
 #Campos que se van a mostrar en el panel de administrador
 @admin.register(Ejecutivo)
 class EjecutivoAdmin(admin.ModelAdmin):
-    list_display=("nombre", "codigo_sap", "email", "activo")
+    list_display=("nombre", "codigo_sap", "email", "activo", "es_ont")
+    list_editable = ("es_ont",)
 
     #definir las urls
     def get_urls(self):

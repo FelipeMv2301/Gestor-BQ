@@ -26,11 +26,11 @@
           <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted">🔍</span>
         </div>
         <div class="flex gap-2.5">
-          <button hx-post="{% url 'pedidos:rechazar_lote' %}" hx-include="input[name='ids']:checked"
+          <button type="button" hx-post="{% url 'pedidos:rechazar_lote' %}" hx-include="input[name='ids']:checked"
                   hx-confirm="¿Anular los pedidos seleccionados? Los que ya se despacharon a courier no se pueden anular, quedan sin cambios."
                   class="text-sm font-semibold px-4 py-2 rounded-full border border-rech-dot bg-rech-dot text-white hover:bg-surface hover:text-rech-ink shadow-sm">Anular</button>
           {% if user.perfil.rol == 'ADMIN' %}
-          <button hx-post="{% url 'pedidos:eliminar_lote' %}" hx-include="input[name='ids']:checked"
+          <button type="button" hx-post="{% url 'pedidos:eliminar_lote' %}" hx-include="input[name='ids']:checked"
                   hx-confirm="¿Eliminar los pedidos seleccionados de forma PERMANENTE? No queda registro, no se puede deshacer."
                   class="text-sm font-semibold px-4 py-2 rounded-full border border-[#e0463a] bg-[#e0463a] text-white hover:bg-white hover:text-[#e0463a] shadow-sm">Eliminar</button>
           {% endif %}
@@ -47,11 +47,11 @@
 
 <div data-barra-acciones class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-[#12262a] text-white rounded-full shadow-lg px-5 py-3">
   <span class="text-sm font-semibold"><span data-conteo>0</span> seleccionados</span>
-  <button hx-post="{% url 'pedidos:rechazar_lote' %}" hx-include="input[name='ids']:checked"
+  <button type="button" hx-post="{% url 'pedidos:rechazar_lote' %}" hx-include="input[name='ids']:checked"
           hx-confirm="¿Anular los pedidos seleccionados? Los que ya se despacharon a courier no se pueden anular, quedan sin cambios."
           class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-rech-ink hover:bg-rech-bg">Anular</button>
   {% if user.perfil.rol == 'ADMIN' %}
-  <button hx-post="{% url 'pedidos:eliminar_lote' %}" hx-include="input[name='ids']:checked"
+  <button type="button" hx-post="{% url 'pedidos:eliminar_lote' %}" hx-include="input[name='ids']:checked"
           hx-confirm="¿Eliminar los pedidos seleccionados de forma PERMANENTE? No queda registro, no se puede deshacer."
           class="text-sm font-semibold px-4 py-2 rounded-full border border-[#e0463a] bg-[#e0463a] text-white hover:bg-white hover:text-[#e0463a]">Eliminar</button>
   {% endif %}

@@ -29,11 +29,11 @@
                   class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Notificar</button>
           <button type="button" data-url="{% url 'pedidos:duplicar_lote' %}" onclick="duplicarSeleccion(this)"
                   class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:border-brand hover:text-brand-ink">Duplicar</button>
-          <button hx-post="{% url 'pedidos:rechazar_lote' %}" hx-include="input[name='ids']:checked"
+          <button type="button" hx-post="{% url 'pedidos:rechazar_lote' %}" hx-include="input[name='ids']:checked"
                   hx-confirm="¿Anular los pedidos seleccionados? Los que ya se despacharon a courier no se pueden anular, quedan sin cambios."
                   class="text-sm font-semibold px-4 py-2 rounded-full border border-rech-dot bg-rech-dot text-white hover:bg-surface hover:text-rech-ink shadow-sm">Anular</button>
           {% if user.perfil.rol == 'ADMIN' %}
-          <button hx-post="{% url 'pedidos:eliminar_lote' %}" hx-include="input[name='ids']:checked"
+          <button type="button" hx-post="{% url 'pedidos:eliminar_lote' %}" hx-include="input[name='ids']:checked"
                   hx-confirm="¿Eliminar los pedidos seleccionados de forma PERMANENTE? No queda registro, no se puede deshacer."
                   class="text-sm font-semibold px-4 py-2 rounded-full border border-[#e0463a] bg-[#e0463a] text-white hover:bg-white hover:text-[#e0463a] shadow-sm">Eliminar</button>
           {% endif %}
@@ -50,15 +50,15 @@
   <span class="text-sm font-semibold mr-1"><span data-conteo>0</span> seleccionados</span>
   <button type="button" data-url="{% url 'pedidos:armar_despacho' %}" onclick="despacharSeleccion(this)"
           class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink">Cargar a courier</button>
-  <button hx-post="{% url 'pedidos:notificar_lote' %}" hx-include="input[name='ids']:checked"
+  <button type="button" hx-post="{% url 'pedidos:notificar_lote' %}" hx-include="input[name='ids']:checked"
           class="text-sm font-semibold px-4 py-2 rounded-full bg-[#00a6d6] text-white hover:bg-[#0090ba]">Notificar Pedido</button>
   <button type="button" data-url="{% url 'pedidos:duplicar_lote' %}" onclick="duplicarSeleccion(this)"
           class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:bg-appbg">Duplicar</button>
-  <button hx-post="{% url 'pedidos:rechazar_lote' %}" hx-include="input[name='ids']:checked"
+  <button type="button" hx-post="{% url 'pedidos:rechazar_lote' %}" hx-include="input[name='ids']:checked"
           hx-confirm="¿Anular los pedidos seleccionados? Los que ya se despacharon a courier no se pueden anular, quedan sin cambios."
           class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-rech-ink hover:bg-rech-bg">Anular</button>
   {% if user.perfil.rol == 'ADMIN' %}
-  <button hx-post="{% url 'pedidos:eliminar_lote' %}" hx-include="input[name='ids']:checked"
+  <button type="button" hx-post="{% url 'pedidos:eliminar_lote' %}" hx-include="input[name='ids']:checked"
           hx-confirm="¿Eliminar los pedidos seleccionados de forma PERMANENTE? No queda registro, no se puede deshacer."
           class="text-sm font-semibold px-4 py-2 rounded-full border border-[#e0463a] bg-[#e0463a] text-white hover:bg-white hover:text-[#e0463a]">Eliminar</button>
   {% endif %}
