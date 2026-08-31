@@ -156,8 +156,15 @@ class QuerysetOntTest(TestCase):
     def test_admin_ve_todo(self):
         self.assertIn(self.seguimiento, permisos.queryset_ont(self.admin))
 
-    def test_dueno_ve_el_suyo(self):
-        self.assertIn(self.seguimiento, permisos.queryset_ont(self.dueno))
+    def test_ejecutivo_ont_ve_toda_la_cola_compartida(self):
+        # No solo lo suyo (código 44) — también lo de otro código ONT (equipo chico, cola compartida).
+        otro_ejec_ont = crear_ejecutivo(codigo_sap=42, nombre="Otro Ejecutivo ONT", es_ont=True)
+        otro_pedido = crear_pedido("3008", ejecutivo=otro_ejec_ont)
+        otro_seguimiento = DespachoOnt.objects.create(pedido=otro_pedido)
+
+        visibles = permisos.queryset_ont(self.dueno)
+        self.assertIn(self.seguimiento, visibles)
+        self.assertIn(otro_seguimiento, visibles)
 
     def test_ajeno_no_ve_nada(self):
         self.assertNotIn(self.seguimiento, permisos.queryset_ont(self.ajeno))

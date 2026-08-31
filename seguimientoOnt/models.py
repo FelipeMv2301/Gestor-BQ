@@ -32,10 +32,6 @@ class DespachoOntQuerySet(models.QuerySet):
             qs = qs.filter(fecha_despacho__lte=hasta)
         return qs
 
-    #Scope del ejecutivo: solo seguimientos de pedidos de estos códigos SAP.
-    def de_ejecutivo(self, codigos_sap):
-        return self.filter(pedido__ejecutivo__codigo_sap__in=codigos_sap) if codigos_sap else self.none()
-
 
 #Extensión 1:1 de un Pedido para el módulo de seguimiento del área ONT (ver
 #backlog_proyecto/backlog-seguimiento-ont.md). Nace como reemplazo de la pestaña "Despachos ONT" de
