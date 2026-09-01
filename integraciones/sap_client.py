@@ -63,7 +63,7 @@ def agregar_rango_fechas(filtro_base, campo_fecha, after=None, before=None):
 #Trae al socio de negocios de SAP para la información de los documentos
 def obtener_business_partner(card_code, cookies):
     url = f"{settings.SAP_URL}/BusinessPartners('{card_code}')"
-    params = {"$select": "CardCode,CardName,EmailAddress,Phone1,ContactEmployees"}
+    params = {"$select": "CardCode,CardName,EmailAddress,Phone1,ContactEmployees,BPAddresses"}
 
     respuesta, cookies_actualizadas = solicitar_sap("GET", url, cookies, params=params)
     if respuesta.status_code != 200:

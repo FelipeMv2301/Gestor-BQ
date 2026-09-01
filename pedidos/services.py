@@ -154,6 +154,17 @@ def _mapear_orden_sap(orden, cache_bp, cookies, mapa_sku=None, mapa_ejecutivos=N
     comentarios = orden.get("Comments") or ""
     obs_entrega = orden.get("U_BQ_ObsEntrega") or ""
     observaciones = f"{comentarios}\n\nObs. entrega: {obs_entrega}".strip() if obs_entrega else comentarios
+
+    #Referencia 1 = TaxOffice (tabla CRD1 del socio de negocios, dirección de despacho). Referencia 2 =
+    #U_BQ_ReferenceS (Ship-to) — este ya viene en AddressExtension, sin llamada adicional a SAP.
+    tax_office = _obtener_tax_office(cache_bp.get(orden.get("CardCode")) or {}, orden.get("ShipToCode"))
+    if tax_office:
+        observaciones = f"{observaciones}\n\nReferencia 1: {tax_office}".strip()
+
+    referencia_2 = addr_ext.get("U_BQ_ReferenceS") or ""
+    if referencia_2:
+        observaciones = f"{observaciones}\n\nReferencia 2: {referencia_2}".strip()
+
     return{
         "estado_comercial": Pedido.EstadoComercial.APROBADO,  # mismo trato que Woo (_mapear_pedido_woo): pasa directo a Logística
         "tipo_entrega": definir_tipo_entrega_sap(orden),
@@ -200,6 +211,17 @@ def detectar_courier_sap(orden, mapa_sku):
         if item_code in mapa_sku:
             return mapa_sku[item_code]
     return {"courier": "", "servicio_codigo": "", "servicio_nombre": ""}
+
+#Busca el TaxOffice (tabla CRD1) de la dirección de despacho usada en el pedido — se matchea por
+#AddressName == ShipToCode entre las direcciones bo_ShipTo del socio de negocios (un socio puede
+#tener varias direcciones ShipTo, y hasta un AddressName repetido entre bo_BillTo/bo_ShipTo).
+def _obtener_tax_office(business_partner, ship_to_code):
+    if not ship_to_code:
+        return ""
+    for direccion in business_partner.get("BPAddresses") or []:
+        if direccion.get("AddressName") == ship_to_code and direccion.get("AddressType") == "bo_ShipTo":
+            return direccion.get("TaxOffice") or ""
+    return ""
 
 def limpiar_rut_sap(card_code):
       if not card_code:
@@ -259,7 +281,7 @@ def guardar_pedidos_sap(after=None, before=None):
 
         f"{settings.SAP_URL}/Orders",
         {
-            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,ContactPersonCode,DocumentLines,U_BQ_ObsEntrega",
+            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,ContactPersonCode,DocumentLines,U_BQ_ObsEntrega,ShipToCode",
             "$filter": filtro,
         },
         cookies,
@@ -306,7 +328,7 @@ def guardar_un_pedido_sap(num_pedido, ignorar_rechazado=False):
     orden = sap_client.obtener_un_resultado(
         f"{settings.SAP_URL}/Orders",
         {
-            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,ContactPersonCode,DocumentLines,U_BQ_ObsEntrega",
+            "$select": "DocNum,TransportationCode,U_BQ_TipoEntrega,U_BQ_CrearEnvio,CardCode,CardName,AddressExtension,SalesPersonCode,Comments,ContactPersonCode,DocumentLines,U_BQ_ObsEntrega,ShipToCode",
             "$filter": f"DocNum eq {num_pedido}",
         },
         cookies,
