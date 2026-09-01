@@ -220,14 +220,14 @@ class GuardarPedidosSapTest(TestCase):
         self.assertFalse(Pedido.objects.filter(num_pedido="8007").exists())
         self.assertTrue(Pedido.objects.filter(num_pedido="8008").exists())
 
-    def test_referencia_1_tax_office_se_agrega_a_observaciones(self):
-        """Referencia 1 = TaxOffice (tabla CRD1), matcheado por ShipToCode == AddressName de la
-        dirección bo_ShipTo del socio de negocios — sondeo en vivo 2026-09-01."""
+    def test_horario_despacho_u_bq_schedules_se_agrega_a_observaciones(self):
+        """Horario de despacho = U_BQ_Schedules (tabla CRD1), matcheado por ShipToCode == AddressName
+        de la dirección bo_ShipTo del socio de negocios — mismo matching que TaxOffice."""
         orden = _orden_sap("8009", ShipToCode="DESPACHO")
         bp = _business_partner()
         bp["BPAddresses"] = [
-            {"AddressName": "FISCAL", "AddressType": "bo_BillTo", "TaxOffice": "NO_DEBE_SALIR"},
-            {"AddressName": "DESPACHO", "AddressType": "bo_ShipTo", "TaxOffice": "OFICINA-123"},
+            {"AddressName": "FISCAL", "AddressType": "bo_BillTo", "U_BQ_Schedules": "NO_DEBE_SALIR"},
+            {"AddressName": "DESPACHO", "AddressType": "bo_ShipTo", "U_BQ_Schedules": "LUN-VIE 09:00-18:00"},
         ]
         with patch("pedidos.services.sap_client.obtener_cookies_sap", return_value={}), \
              patch("pedidos.services.sap_client.obtener_todas_las_paginas", return_value=[orden]), \
@@ -235,7 +235,7 @@ class GuardarPedidosSapTest(TestCase):
             services.guardar_pedidos_sap()
 
         pedido = Pedido.objects.get(num_pedido="8009")
-        self.assertIn("Referencia 1: OFICINA-123", pedido.observaciones)
+        self.assertIn("Horario de despacho: LUN-VIE 09:00-18:00", pedido.observaciones)
         self.assertNotIn("NO_DEBE_SALIR", pedido.observaciones)  # no toma la fiscal, aunque calce el AddressName
 
     def test_referencia_2_u_bq_reference_se_agrega_a_observaciones(self):
@@ -251,13 +251,13 @@ class GuardarPedidosSapTest(TestCase):
         pedido = Pedido.objects.get(num_pedido="8010")
         self.assertIn("Referencia 2: REF-SHIP-99", pedido.observaciones)
 
-    def test_sin_tax_office_ni_referencia_no_agrega_nada(self):
+    def test_sin_horario_ni_referencia_no_agrega_nada(self):
         m1, m2, m3 = self._mockear([_orden_sap("8011")])
         with m1, m2, m3:
             services.guardar_pedidos_sap()
 
         pedido = Pedido.objects.get(num_pedido="8011")
-        self.assertNotIn("Referencia 1", pedido.observaciones)
+        self.assertNotIn("Horario de despacho", pedido.observaciones)
         self.assertNotIn("Referencia 2", pedido.observaciones)
 
 

@@ -155,11 +155,11 @@ def _mapear_orden_sap(orden, cache_bp, cookies, mapa_sku=None, mapa_ejecutivos=N
     obs_entrega = orden.get("U_BQ_ObsEntrega") or ""
     observaciones = f"{comentarios}\n\nObs. entrega: {obs_entrega}".strip() if obs_entrega else comentarios
 
-    #Referencia 1 = TaxOffice (tabla CRD1 del socio de negocios, dirección de despacho). Referencia 2 =
-    #U_BQ_ReferenceS (Ship-to) — este ya viene en AddressExtension, sin llamada adicional a SAP.
-    tax_office = _obtener_tax_office(cache_bp.get(orden.get("CardCode")) or {}, orden.get("ShipToCode"))
-    if tax_office:
-        observaciones = f"{observaciones}\n\nReferencia 1: {tax_office}".strip()
+    #Horario de despacho = U_BQ_Schedules (tabla CRD1 del socio de negocios, dirección de despacho).
+    #Referencia = U_BQ_ReferenceS (Ship-to) — este ya viene en AddressExtension, sin llamada adicional a SAP.
+    horario_despacho = _obtener_horario_despacho(cache_bp.get(orden.get("CardCode")) or {}, orden.get("ShipToCode"))
+    if horario_despacho:
+        observaciones = f"{observaciones}\n\nHorario de despacho: {horario_despacho}".strip()
 
     referencia_2 = addr_ext.get("U_BQ_ReferenceS") or ""
     if referencia_2:
@@ -212,15 +212,15 @@ def detectar_courier_sap(orden, mapa_sku):
             return mapa_sku[item_code]
     return {"courier": "", "servicio_codigo": "", "servicio_nombre": ""}
 
-#Busca el TaxOffice (tabla CRD1) de la dirección de despacho usada en el pedido — se matchea por
+#Busca el U_BQ_Schedules (tabla CRD1) de la dirección de despacho usada en el pedido — se matchea por
 #AddressName == ShipToCode entre las direcciones bo_ShipTo del socio de negocios (un socio puede
 #tener varias direcciones ShipTo, y hasta un AddressName repetido entre bo_BillTo/bo_ShipTo).
-def _obtener_tax_office(business_partner, ship_to_code):
+def _obtener_horario_despacho(business_partner, ship_to_code):
     if not ship_to_code:
         return ""
     for direccion in business_partner.get("BPAddresses") or []:
         if direccion.get("AddressName") == ship_to_code and direccion.get("AddressType") == "bo_ShipTo":
-            return direccion.get("TaxOffice") or ""
+            return direccion.get("U_BQ_Schedules") or ""
     return ""
 
 def limpiar_rut_sap(card_code):
