@@ -55,12 +55,12 @@ def sincronizar_ejecutivos_desde_sap():
         ejecutivo = Ejecutivo.objects.filter(email=perfil.usuario.email, activo=True).first()
         if not ejecutivo:
             continue
-        #Un código = un dueño: no reasignar si ya lo tiene otro perfil (escalar o M2M)
-        if (PerfilUsuario.objects.filter(codigo_empleado_sap=ejecutivo.codigo_sap).exists()
-                or PerfilUsuario.objects.filter(ejecutivos=ejecutivo).exists()):
-            continue
-        perfil.codigo_empleado_sap = ejecutivo.codigo_sap
-        perfil.save(update_fields=["codigo_empleado_sap"])
+        #El escalar es 1:1 (unique=True en DB, legacy): solo se rellena si ningún otro perfil lo tiene
+        #ya. La M2M sí permite que varios perfiles compartan el mismo código (decisión de Felipe
+        #2026-09-02) — se vincula siempre, esté o no ocupado el escalar.
+        if not PerfilUsuario.objects.filter(codigo_empleado_sap=ejecutivo.codigo_sap).exists():
+            perfil.codigo_empleado_sap = ejecutivo.codigo_sap
+            perfil.save(update_fields=["codigo_empleado_sap"])
         perfil.ejecutivos.add(ejecutivo)   # M2M es la fuente de verdad; el escalar queda como fallback
         perfiles_actualizados += 1
 

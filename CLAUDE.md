@@ -138,16 +138,21 @@ Service Layer de SAP con las cookies recibidas; en 401 se invalida y se re-pide 
 
 **Red de Postgres (HU-0.4) — RESUELTO, en producción**: el server Postgres (`192.168.0.165`) es hardware
 propio en la LAN de la oficina (ahorro de nube, sin requisito de compliance). **Django corre en el mismo
-servidor/LAN que Postgres** (Docker + gunicorn + Caddy), no en Railway. Postgres nunca escucha fuera de
-`localhost`/LAN — no se abre 5432 a Internet ni se monta VPN para llegar a la DB. El contenedor llega al
+servidor/LAN que Postgres** (Docker + gunicorn + Caddy), no en Railway. El contenedor llega al
 Postgres nativo del host vía `host.docker.internal` (alias `host-gateway` en `docker-compose.yml`).
+**Ojo (corregido 2026-09-01)**: Postgres sí escucha en todas las interfaces (`0.0.0.0:5432`), no solo
+localhost/LAN como decía antes esta nota — falta confirmar si el firewall del server igual lo acota
+a la LAN/IPs conocidas. No se monta VPN para llegar a la DB desde el codebase de la app.
 
 Se descartó Django-en-Railway + Postgres on-prem por fricción real: Railway sin Pro no da IP de salida
 fija, y el Pro la da **compartida**; Tailscale en contenedor Railway solo corre en modo *userspace* (solo
 proxy SOCKS5, que `psycopg2`/libpq no soporta). Acceso remoto (teletrabajo) de Comercial/Logística:
 **no** por VPN por persona — el server expone solo el **443** (HTTPS) hacia Django y la barrera real es
-el login Google OAuth `@bioquimica.cl`. Excepción: Tailscale (plan free) sí para acceso de
-**administrador** directo a Postgres (`psql`/pgAdmin), pocas personas.
+el login Google OAuth `@bioquimica.cl`. **Corregido 2026-09-01: NO se usa Tailscale** (la nota anterior
+decía que sí, para acceso admin a Postgres — Felipe confirmó que nunca se usó/configuró). Acceso admin
+real hoy: SSH directo al servidor (`bioquimicacl@<IP>`) + `sudo -u postgres psql` en el server mismo —
+ni Felipe ni ningún agente anterior habían dejado esto documentado; ni siquiera Felipe accede seguido,
+así que confirmar credenciales antes de asumir que este camino sigue vigente.
 
 ## Puntos abiertos / spikes (revisar antes de tocar lo relacionado)
 

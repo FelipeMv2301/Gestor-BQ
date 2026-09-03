@@ -12,11 +12,16 @@ class AnuladosListadoTest(TestCase):
     def setUp(self):
         self.client = Client()
         self.ejec_obj = crear_ejecutivo(codigo_sap=10)
+        #Ejecutivo real de nadie en este test (ni dueno ni ajeno lo tienen vinculado) — usar su pk real
+        #en vez de un entero mágico tipo "999": un pk hardcodeado puede coincidir por casualidad con un
+        #Ejecutivo real creado por OTRO test de la suite completa (el autoincrement no se resetea entre
+        #TestCase), lo que hacía este test frágil y dependiente del orden/tamaño total de la suite.
+        self.ejec_ajeno = crear_ejecutivo(codigo_sap=30, nombre="Nadie lo tiene", email="nadie_dueno@bioquimica.cl")
         self.dueno = crear_usuario("dueno@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=10)
         self.ajeno = crear_usuario("ajeno@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=20)
         self.admin = crear_usuario("admin@bioquimica.cl", Rol.ADMIN)
         PedidoRechazado.objects.create(origen="SAP", num_pedido="1", motivo="m1", snapshot={"ejecutivo": self.ejec_obj.pk})
-        PedidoRechazado.objects.create(origen="SAP", num_pedido="2", motivo="m2", snapshot={"ejecutivo": 999})
+        PedidoRechazado.objects.create(origen="SAP", num_pedido="2", motivo="m2", snapshot={"ejecutivo": self.ejec_ajeno.pk})
 
     def test_admin_ve_todos(self):
         self.client.force_login(self.admin)

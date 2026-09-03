@@ -70,16 +70,19 @@ class SincronizarEjecutivosTest(TestCase):
         usuario.perfil.refresh_from_db()
         self.assertEqual(usuario.perfil.codigo_empleado_sap, 10)
 
-    def test_no_vincula_si_el_codigo_ya_esta_usado_por_otro_perfil(self):
+    def test_vincula_por_m2m_aunque_el_escalar_ya_lo_tenga_otro_perfil(self):
+        """Varios perfiles pueden compartir el mismo código SAP (decisión de Felipe 2026-09-02):
+        el escalar sigue siendo 1:1 (unique en DB) y no se pisa, pero la M2M sí vincula al segundo."""
         Ejecutivo.objects.create(codigo_sap=10, nombre="Elsa Martínez", email="elsa@bioquimica.cl", activo=True)
         ya_vinculado = crear_usuario("otra@bioquimica.cl", codigo_sap=10)
         sin_vincular = crear_usuario("elsa@bioquimica.cl")
         m1, m2 = _mockear([_sap_person(10)])
         with m1, m2:
             resultado = sincronizar_ejecutivos_desde_sap()
-        self.assertEqual(resultado["perfiles_actualizados"], 0)
+        self.assertEqual(resultado["perfiles_actualizados"], 1)
         sin_vincular.perfil.refresh_from_db()
-        self.assertIsNone(sin_vincular.perfil.codigo_empleado_sap)
+        self.assertIsNone(sin_vincular.perfil.codigo_empleado_sap)  # escalar sigue 1:1, no se pisa
+        self.assertEqual(sin_vincular.perfil.codigos_sap, [10])     # pero la M2M sí lo vincula
 
 
 #El rol ADMIN del portal (login Google) nunca entra al /admin/ real de Django — antes es_ont solo era
