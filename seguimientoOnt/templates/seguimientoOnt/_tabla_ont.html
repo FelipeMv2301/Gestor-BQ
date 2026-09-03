@@ -1,31 +1,43 @@
+{% with campo_input="w-full text-xs rounded-lg border border-linestrong bg-field text-body px-2 py-1.5 transition-shadow duration-500 focus:border-brand focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-appbg" %}
 <div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
   <div class="overflow-x-auto">
-    <table class="w-full text-sm min-w-[1200px]">
+    <table class="w-full text-sm min-w-[2400px]">
       <thead>
         <tr class="bg-appbg text-xs uppercase tracking-wide text-muted">
-          <th class="text-left font-semibold px-4 py-3">N° pedido</th>
-          <th class="text-left font-semibold px-4 py-3">Contacto</th>
-          <th class="text-left font-semibold px-4 py-3">Courier / OT</th>
-          <th class="text-left font-semibold px-4 py-3">Acción</th>
-          <th class="text-left font-semibold px-4 py-3">F. compromiso</th>
-          <th class="text-left font-semibold px-4 py-3">F. despacho</th>
-          <th class="text-left font-semibold px-4 py-3">Guía</th>
-          <th class="text-left font-semibold px-4 py-3">Confirmaciones</th>
-          <th class="px-4 py-3"></th>
+          <th class="text-left font-semibold px-3 py-3">N° pedido</th>
+          <th class="text-left font-semibold px-3 py-3">Contacto</th>
+          <th class="text-left font-semibold px-3 py-3">Destino</th>
+          <th class="text-left font-semibold px-3 py-3">Courier / OT</th>
+          <th class="text-left font-semibold px-3 py-3">Obs. pedido</th>
+          <th class="text-left font-semibold px-3 py-3 w-32">Acción</th>
+          <th class="text-left font-semibold px-3 py-3 w-32">F. compromiso</th>
+          <th class="text-left font-semibold px-3 py-3 w-28">F. despacho</th>
+          <th class="text-left font-semibold px-3 py-3 w-28">Guía</th>
+          <th class="text-center font-semibold px-2 py-3">Cliente</th>
+          <th class="text-center font-semibold px-2 py-3">Doc</th>
+          <th class="text-center font-semibold px-2 py-3">Recib.</th>
+          <th class="text-center font-semibold px-2 py-3">Enviar</th>
+          <th class="text-left font-semibold px-3 py-3 w-36">Obs. OK</th>
+          <th class="text-left font-semibold px-3 py-3 w-36">Obs. entrega</th>
+          <th class="text-left font-semibold px-3 py-3 w-36">Conf. carga</th>
         </tr>
       </thead>
       <tbody>
         {% for s in seguimientos %}
-        <tr class="border-t border-line hover:bg-appbg" id="fila-ont-{{ s.pk }}">
-          <td class="px-4 py-3 font-mono whitespace-nowrap tabular-nums">
+        <tr class="border-t border-line hover:bg-appbg align-top" id="fila-ont-{{ s.pk }}">
+          <td class="px-3 py-2 font-mono whitespace-nowrap tabular-nums">
             <a href="{% url 'seguimientoOnt:detalle' s.pk %}" class="text-sm font-semibold text-brand-ink hover:underline">{{ s.pedido.num_pedido }}</a>
             <div class="text-xs text-muted">{{ s.pedido.origen }}</div>
           </td>
-          <td class="px-4 py-3">
-            <div class="text-ink">{{ s.nombre_contacto|default:"—" }}</div>
-            <div class="text-xs text-muted">{{ s.ciudad_destino|default:"—" }}</div>
+          <td class="px-3 py-2 max-w-[10rem]">
+            <div class="text-ink truncate" title="{{ s.nombre_contacto }}">{{ s.nombre_contacto|default:"—" }}</div>
+            <div class="text-xs text-muted whitespace-nowrap">{{ s.telefono_contacto|default:"—" }}</div>
           </td>
-          <td class="px-4 py-3 whitespace-nowrap">
+          <td class="px-3 py-2 max-w-[11rem]">
+            <div class="text-ink">{{ s.ciudad_destino|default:"—" }}</div>
+            <div class="text-xs text-muted truncate" title="{{ s.direccion_destino }}">{{ s.direccion_destino|default:"—" }}</div>
+          </td>
+          <td class="px-3 py-2 whitespace-nowrap">
             <div class="text-ink">{{ s.courier|default:"—" }}</div>
             {% if s.envio_id %}
             <a href="{% url 'envios:detalle' s.envio_id %}" class="text-xs font-mono text-brand-ink hover:underline">{{ s.ot|default:"—" }}</a>
@@ -33,63 +45,91 @@
             <div class="text-xs text-muted">Sin OT</div>
             {% endif %}
           </td>
-          <td class="px-4 py-3">
-            {% if s.accion %}<span class="text-xs font-semibold px-2 py-1 rounded-full bg-appbg border border-line">{{ s.get_accion_display }}</span>{% else %}<span class="text-muted">—</span>{% endif %}
+          <td class="px-3 py-2 max-w-[10rem]">
+            <div class="text-xs text-muted truncate" title="{{ s.observaciones }}">{{ s.observaciones|default:"—" }}</div>
           </td>
-          <td class="px-4 py-3 text-xs whitespace-nowrap">
-            {{ s.fecha_compromiso|date:"d/m/y"|default:"—" }}{% if s.fecha_compromiso and s.fecha_compromiso_aproximada %} <span class="text-muted">(aprox.)</span>{% endif %}
+
+          <!-- Desde acá, todo editable en el momento (celda por celda, sin botón Guardar aparte) -->
+          <td class="px-2 py-2">
+            <select {% if not puede_editar %}disabled{% endif %} name="valor"
+                    hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'accion' %}"
+                    hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                    class="{{ campo_input }}">
+              <option value="">—</option>
+              {% for valor, etiqueta in accion_choices %}
+              <option value="{{ valor }}" {% if valor == s.accion %}selected{% endif %}>{{ etiqueta }}</option>
+              {% endfor %}
+            </select>
           </td>
-          <td class="px-4 py-3 text-xs whitespace-nowrap">{{ s.fecha_despacho|date:"d/m/y"|default:"—" }}</td>
-          <td class="px-4 py-3 text-xs font-mono">{{ s.guia_despacho|default:"—" }}</td>
-          <td class="px-4 py-3 text-xs text-muted whitespace-nowrap">
-            Cliente {% if s.confirmacion_cliente %}✅{% else %}❌{% endif %}
-            · Doc {% if s.retorno_documento %}✅{% else %}❌{% endif %}
-            · Recibido {% if s.pedido_recibido %}✅{% else %}❌{% endif %}
+          <td class="px-2 py-2">
+            <input type="date" {% if not puede_editar %}disabled{% endif %} name="valor" value="{{ s.fecha_compromiso|date:'Y-m-d' }}"
+                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'fecha_compromiso' %}"
+                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                   class="{{ campo_input }}">
+            <label class="flex items-center gap-1 text-[0.65rem] text-muted mt-1 cursor-pointer">
+              <input type="checkbox" {% if not puede_editar %}disabled{% endif %} {% if s.fecha_compromiso_aproximada %}checked{% endif %}
+                     hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'fecha_compromiso_aproximada' %}"
+                     hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                     class="accent-brand w-3 h-3"> aprox.
+            </label>
           </td>
-          <td class="px-4 py-3 text-right whitespace-nowrap">
-            <button type="button" onclick="alternarEdicionOnt({{ s.pk }})"
-                    class="text-sm font-semibold text-brand-ink hover:bg-brand-soft px-2.5 py-1.5 rounded-lg">Editar</button>
+          <td class="px-2 py-2">
+            <input type="date" {% if not puede_editar %}disabled{% endif %} name="valor" value="{{ s.fecha_despacho|date:'Y-m-d' }}"
+                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'fecha_despacho' %}"
+                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                   class="{{ campo_input }}">
           </td>
-        </tr>
-        <tr class="hidden border-t border-line bg-appbg" id="fila-editar-ont-{{ s.pk }}">
-          <td colspan="9" class="px-4 py-4">
-            <form hx-post="{% url 'seguimientoOnt:editar' s.pk %}" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Acción</span>
-                <select name="accion" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2">
-                  <option value="">— Sin definir —</option>
-                  {% for valor, etiqueta in accion_choices %}
-                  <option value="{{ valor }}" {% if valor == s.accion %}selected{% endif %}>{{ etiqueta }}</option>
-                  {% endfor %}
-                </select></label>
-              <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Fecha compromiso</span>
-                <input type="date" name="fecha_compromiso" value="{{ s.fecha_compromiso|date:'Y-m-d' }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2"></label>
-              <label class="flex items-center gap-2 cursor-pointer text-sm mt-6"><input type="checkbox" name="fecha_compromiso_aproximada" {% if s.fecha_compromiso_aproximada %}checked{% endif %} class="accent-brand w-4 h-4"> Fecha aproximada</label>
-              <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Fecha despacho</span>
-                <input type="date" name="fecha_despacho" value="{{ s.fecha_despacho|date:'Y-m-d' }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2"></label>
-              <label class="block"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Guía de despacho</span>
-                <input type="text" name="guia_despacho" value="{{ s.guia_despacho }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2"></label>
-              <label class="block lg:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Observaciones OK</span>
-                <textarea name="observaciones_ok" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2">{{ s.observaciones_ok }}</textarea></label>
-              <label class="block lg:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Observaciones de entrega</span>
-                <textarea name="observaciones_entrega" rows="2" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2">{{ s.observaciones_entrega }}</textarea></label>
-              <label class="block lg:col-span-2"><span class="block text-xs font-semibold uppercase tracking-wide text-muted mb-1">Confirmación carga</span>
-                <input type="text" name="confirmacion_carga" value="{{ s.confirmacion_carga }}" class="w-full text-sm rounded-lg border border-linestrong bg-field text-body px-3 py-2"></label>
-              <div class="flex flex-col gap-1.5 lg:col-span-2 justify-center">
-                <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="confirmacion_cliente" {% if s.confirmacion_cliente %}checked{% endif %} class="accent-brand w-4 h-4"> Confirmación cliente</label>
-                <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="retorno_documento" {% if s.retorno_documento %}checked{% endif %} class="accent-brand w-4 h-4"> Retorno documento</label>
-                <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="pedido_recibido" {% if s.pedido_recibido %}checked{% endif %} class="accent-brand w-4 h-4"> Pedido recibido</label>
-                <label class="flex items-center gap-2 cursor-pointer text-sm"><input type="checkbox" name="enviar" {% if s.enviar %}checked{% endif %} class="accent-brand w-4 h-4"> ¿Enviar?</label>
-              </div>
-              <div class="flex items-end gap-2">
-                <button type="submit" class="text-sm font-semibold px-4 py-2 rounded-full bg-brand text-white hover:bg-brand-ink shadow-sm">Guardar</button>
-                <button type="button" onclick="alternarEdicionOnt({{ s.pk }})"
-                        class="text-sm font-semibold px-4 py-2 rounded-full border border-linestrong bg-surface text-body hover:bg-appbg">Cancelar</button>
-              </div>
-            </form>
+          <td class="px-2 py-2">
+            <input type="text" {% if not puede_editar %}disabled{% endif %} name="valor" value="{{ s.guia_despacho }}"
+                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'guia_despacho' %}"
+                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                   class="{{ campo_input }} font-mono">
+          </td>
+          <td class="px-2 py-2 text-center">
+            <input type="checkbox" {% if not puede_editar %}disabled{% endif %} name="valor" {% if s.confirmacion_cliente %}checked{% endif %}
+                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'confirmacion_cliente' %}"
+                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                   class="accent-brand w-4 h-4">
+          </td>
+          <td class="px-2 py-2 text-center">
+            <input type="checkbox" {% if not puede_editar %}disabled{% endif %} name="valor" {% if s.retorno_documento %}checked{% endif %}
+                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'retorno_documento' %}"
+                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                   class="accent-brand w-4 h-4">
+          </td>
+          <td class="px-2 py-2 text-center">
+            <input type="checkbox" {% if not puede_editar %}disabled{% endif %} name="valor" {% if s.pedido_recibido %}checked{% endif %}
+                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'pedido_recibido' %}"
+                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                   class="accent-brand w-4 h-4">
+          </td>
+          <td class="px-2 py-2 text-center">
+            <input type="checkbox" {% if not puede_editar %}disabled{% endif %} name="valor" {% if s.enviar %}checked{% endif %}
+                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'enviar' %}"
+                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                   class="accent-brand w-4 h-4">
+          </td>
+          <td class="px-2 py-2">
+            <input type="text" {% if not puede_editar %}disabled{% endif %} name="valor" value="{{ s.observaciones_ok }}"
+                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'observaciones_ok' %}"
+                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                   class="{{ campo_input }}">
+          </td>
+          <td class="px-2 py-2">
+            <input type="text" {% if not puede_editar %}disabled{% endif %} name="valor" value="{{ s.observaciones_entrega }}"
+                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'observaciones_entrega' %}"
+                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                   class="{{ campo_input }}">
+          </td>
+          <td class="px-2 py-2">
+            <input type="text" {% if not puede_editar %}disabled{% endif %} name="valor" value="{{ s.confirmacion_carga }}"
+                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'confirmacion_carga' %}"
+                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                   class="{{ campo_input }}">
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="9" class="px-4 py-10 text-center text-muted">
+        <tr><td colspan="16" class="px-4 py-10 text-center text-muted">
           <div class="text-sm">No hay pedidos ONT que coincidan.</div>
           <div class="text-xs mt-1">Prueba a quitar filtros o cambiar la búsqueda.</div>
         </td></tr>
@@ -99,3 +139,4 @@
   </div>
 </div>
 {% include "partials/_paginacion.html" with page_obj=seguimientos hx_target="#tabla-ont" %}
+{% endwith %}
