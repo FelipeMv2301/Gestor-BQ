@@ -145,11 +145,14 @@ class AutoAsignaCodigoSapEnPrimerLoginTest(TestCase):
         usuario = User.objects.create(username="elsa@bioquimica.cl", email="elsa@bioquimica.cl")
         self.assertIsNone(usuario.perfil.codigo_empleado_sap)
 
-    def test_codigo_ya_tomado_por_otro_perfil_no_se_duplica(self):
+    def test_codigo_ya_tomado_por_otro_perfil_no_pisa_el_escalar_pero_si_vincula_m2m(self):
+        """El escalar sigue siendo 1:1 (unique en DB) y no se puede repetir, pero varios perfiles SÍ
+        pueden compartir el código vía M2M (decisión de Felipe 2026-09-02)."""
         Ejecutivo.objects.create(codigo_sap=10, nombre="Elsa Martínez", email="elsa@bioquimica.cl", activo=True)
         crear_usuario("primero@bioquimica.cl", codigo_sap=10)  # ya tiene el código 10
         segundo = User.objects.create(username="elsa@bioquimica.cl", email="elsa@bioquimica.cl")
-        self.assertIsNone(segundo.perfil.codigo_empleado_sap)  # no se puede repetir (unique=True)
+        self.assertIsNone(segundo.perfil.codigo_empleado_sap)  # el escalar no se puede repetir (unique=True)
+        self.assertEqual(segundo.perfil.codigos_sap, [10])     # pero la M2M sí lo vincula (multi-dueño)
 
     def test_segundo_login_no_reejecuta_ni_pisa_cambios(self):
         Ejecutivo.objects.create(codigo_sap=10, nombre="Elsa Martínez", email="elsa@bioquimica.cl", activo=True)
@@ -202,3 +205,17 @@ class EditarPerfilTest(TestCase):
                                  {"rol": Rol.EJECUTIVO, "codigos_sap": "999"})
         self.usuario.perfil.refresh_from_db()
         self.assertEqual(self.usuario.perfil.codigos_sap, [])   # no se guardó nada
+
+    def test_admin_puede_asignar_un_codigo_ya_usado_por_otro_perfil(self):
+        """Dos perfiles pueden compartir el mismo código SAP (decisión de Felipe 2026-09-02): ambos
+        quedan con visibilidad sobre los pedidos de ese código. Antes esto tiraba ValidationError."""
+        Ejecutivo.objects.create(codigo_sap=30, nombre="Canal 30", email="c30@bioquimica.cl", activo=True)
+        dueno_original = crear_usuario("original@bioquimica.cl", Rol.EJECUTIVO, codigo_sap=30)
+        self.client.force_login(self.admin)
+        resp = self.client.post(f"/cuentas/panel/perfiles/{self.usuario.perfil.pk}/editar/",
+                                 {"rol": Rol.EJECUTIVO, "codigos_sap": "30"})
+        self.assertEqual(resp.status_code, 200)
+        self.usuario.perfil.refresh_from_db()
+        self.assertEqual(self.usuario.perfil.codigos_sap, [30])
+        dueno_original.perfil.refresh_from_db()
+        self.assertEqual(dueno_original.perfil.codigos_sap, [30])   # el original lo sigue teniendo también

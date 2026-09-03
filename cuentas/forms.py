@@ -31,7 +31,9 @@ class PerfilUsuarioForm(forms.ModelForm):
                 f.widget.attrs["class"] = INPUT
         self.fields["codigos_sap"].widget.attrs["placeholder"] = "10, 20"
 
-    #Parsea el texto → lista de Ejecutivo. Valida que cada código sea numérico, exista, y no lo tenga otro perfil.
+    #Parsea el texto → lista de Ejecutivo. Valida que cada código sea numérico y exista.
+    #Varios perfiles SÍ pueden compartir el mismo código (decisión de Felipe 2026-09-02: visibilidad
+    #compartida de los pedidos de ese código entre todos sus dueños) — ya no se valida "ocupado".
     def clean_codigos_sap(self):
         crudo = (self.cleaned_data.get("codigos_sap") or "").strip()
         if not crudo:
@@ -53,9 +55,6 @@ class PerfilUsuarioForm(forms.ModelForm):
             ejecutivo = Ejecutivo.objects.filter(codigo_sap=codigo).first()
             if not ejecutivo:
                 raise forms.ValidationError(f"No existe un ejecutivo con código SAP {codigo}.")
-            ocupado = PerfilUsuario.objects.filter(ejecutivos=ejecutivo).exclude(pk=self.instance.pk)
-            if ocupado.exists():
-                raise forms.ValidationError(f"El código {codigo} ya está asignado a otro perfil.")
             ejecutivos.append(ejecutivo)
         return ejecutivos
 
