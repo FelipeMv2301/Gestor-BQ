@@ -11,11 +11,15 @@ from pedidos import permisos
 from .models import DespachoOnt
 
 CAMPOS_CHECKBOX = ("confirmacion_cliente", "retorno_documento", "pedido_recibido", "enviar", "fecha_compromiso_aproximada")
+#Usado por editar_ont (form completo del detalle) — ahí SÍ se editan los 4 campos de texto.
 CAMPOS_TEXTO = ("guia_despacho", "observaciones_ok", "observaciones_entrega", "confirmacion_carga")
 CAMPOS_FECHA = ("fecha_compromiso", "fecha_despacho")
-#Whitelist de lo que se puede tocar celda por celda desde la tabla (vista tipo planilla) — nunca
-#confiar en `campo` (viene de la URL) sin chequearlo contra esto antes de hacer setattr().
-CAMPOS_EDITABLES_INLINE = frozenset(CAMPOS_CHECKBOX + CAMPOS_TEXTO + CAMPOS_FECHA + ("accion",))
+#Whitelist de lo que se puede tocar celda por celda desde la TABLA (vista tipo planilla). Los campos
+#de texto largo (observaciones_ok/entrega, confirmacion_carga) quedan afuera a propósito (pedido de
+#Felipe 2026-09-03): en la tabla solo se visualizan, se editan únicamente desde el detalle del
+#pedido — guia_despacho sí se mantiene inline por ser un código corto, no texto largo.
+#Nunca confiar en `campo` (viene de la URL) sin chequearlo contra esto antes de hacer setattr().
+CAMPOS_EDITABLES_INLINE = frozenset(CAMPOS_CHECKBOX + CAMPOS_FECHA + ("accion", "guia_despacho"))
 
 
 def _parsear_fecha(valor):

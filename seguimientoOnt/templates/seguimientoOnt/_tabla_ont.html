@@ -1,15 +1,15 @@
 {% with campo_input="w-full text-xs rounded-lg border border-linestrong bg-field text-body px-2 py-1.5 transition-shadow duration-500 focus:border-brand focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-appbg" %}
 <div class="bg-surface border border-line rounded-2xl shadow-sm overflow-hidden">
   <div class="overflow-x-auto">
-    <table class="w-full text-sm min-w-[2400px]">
+    <table class="w-full text-sm min-w-[1850px]">
       <thead>
         <tr class="bg-appbg text-xs uppercase tracking-wide text-muted">
+          <th class="text-left font-semibold px-3 py-3 w-32">Acción</th>
           <th class="text-left font-semibold px-3 py-3">N° pedido</th>
           <th class="text-left font-semibold px-3 py-3">Contacto</th>
           <th class="text-left font-semibold px-3 py-3">Destino</th>
           <th class="text-left font-semibold px-3 py-3">Courier / OT</th>
           <th class="text-left font-semibold px-3 py-3">Obs. pedido</th>
-          <th class="text-left font-semibold px-3 py-3 w-32">Acción</th>
           <th class="text-left font-semibold px-3 py-3 w-32">F. compromiso</th>
           <th class="text-left font-semibold px-3 py-3 w-28">F. despacho</th>
           <th class="text-left font-semibold px-3 py-3 w-28">Guía</th>
@@ -17,14 +17,23 @@
           <th class="text-center font-semibold px-2 py-3">Doc</th>
           <th class="text-center font-semibold px-2 py-3">Recib.</th>
           <th class="text-center font-semibold px-2 py-3">Enviar</th>
-          <th class="text-left font-semibold px-3 py-3 w-36">Obs. OK</th>
-          <th class="text-left font-semibold px-3 py-3 w-36">Obs. entrega</th>
-          <th class="text-left font-semibold px-3 py-3 w-36">Conf. carga</th>
         </tr>
       </thead>
       <tbody>
         {% for s in seguimientos %}
         <tr class="border-t border-line hover:bg-appbg align-top" id="fila-ont-{{ s.pk }}">
+          <!-- Desde acá, todo editable en el momento (celda por celda, sin botón Guardar aparte) -->
+          <td class="px-2 py-2">
+            <select {% if not puede_editar %}disabled{% endif %} name="valor"
+                    hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'accion' %}"
+                    hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
+                    class="{{ campo_input }}">
+              <option value="">—</option>
+              {% for valor, etiqueta in accion_choices %}
+              <option value="{{ valor }}" {% if valor == s.accion %}selected{% endif %}>{{ etiqueta }}</option>
+              {% endfor %}
+            </select>
+          </td>
           <td class="px-3 py-2 font-mono whitespace-nowrap tabular-nums">
             <a href="{% url 'seguimientoOnt:detalle' s.pk %}" class="text-sm font-semibold text-brand-ink hover:underline">{{ s.pedido.num_pedido }}</a>
             <div class="text-xs text-muted">{{ s.pedido.origen }}</div>
@@ -45,21 +54,8 @@
             <div class="text-xs text-muted">Sin OT</div>
             {% endif %}
           </td>
-          <td class="px-3 py-2 max-w-[10rem]">
-            <div class="text-xs text-muted truncate" title="{{ s.observaciones }}">{{ s.observaciones|default:"—" }}</div>
-          </td>
-
-          <!-- Desde acá, todo editable en el momento (celda por celda, sin botón Guardar aparte) -->
-          <td class="px-2 py-2">
-            <select {% if not puede_editar %}disabled{% endif %} name="valor"
-                    hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'accion' %}"
-                    hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
-                    class="{{ campo_input }}">
-              <option value="">—</option>
-              {% for valor, etiqueta in accion_choices %}
-              <option value="{{ valor }}" {% if valor == s.accion %}selected{% endif %}>{{ etiqueta }}</option>
-              {% endfor %}
-            </select>
+          <td class="px-3 py-2 max-w-[20rem]">
+            <div class="text-xs text-muted whitespace-pre-line">{{ s.observaciones|default:"—" }}</div>
           </td>
           <td class="px-2 py-2">
             <input type="date" {% if not puede_editar %}disabled{% endif %} name="valor" value="{{ s.fecha_compromiso|date:'Y-m-d' }}"
@@ -109,27 +105,9 @@
                    hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
                    class="accent-brand w-4 h-4">
           </td>
-          <td class="px-2 py-2">
-            <input type="text" {% if not puede_editar %}disabled{% endif %} name="valor" value="{{ s.observaciones_ok }}"
-                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'observaciones_ok' %}"
-                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
-                   class="{{ campo_input }}">
-          </td>
-          <td class="px-2 py-2">
-            <input type="text" {% if not puede_editar %}disabled{% endif %} name="valor" value="{{ s.observaciones_entrega }}"
-                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'observaciones_entrega' %}"
-                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
-                   class="{{ campo_input }}">
-          </td>
-          <td class="px-2 py-2">
-            <input type="text" {% if not puede_editar %}disabled{% endif %} name="valor" value="{{ s.confirmacion_carga }}"
-                   hx-post="{% url 'seguimientoOnt:editar_campo' s.pk 'confirmacion_carga' %}"
-                   hx-trigger="change" hx-swap="none" hx-on::after-request="marcarGuardado(this)"
-                   class="{{ campo_input }}">
-          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="16" class="px-4 py-10 text-center text-muted">
+        <tr><td colspan="13" class="px-4 py-10 text-center text-muted">
           <div class="text-sm">No hay pedidos ONT que coincidan.</div>
           <div class="text-xs mt-1">Prueba a quitar filtros o cambiar la búsqueda.</div>
         </td></tr>
