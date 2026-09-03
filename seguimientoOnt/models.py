@@ -46,9 +46,12 @@ class DespachoOnt(models.Model):
     objects = DespachoOntQuerySet.as_manager()
 
     class Accion(models.TextChoices):
-        GUIA_PEDIDA = "GUIA_PEDIDA", "Guía pedida"
         GUIA_LISTA = "GUIA_LISTA", "Guía lista"
+        GUIA_PEDIDA = "GUIA_PEDIDA", "Guía pedida"
+        PEDIR_GUIA = "PEDIR_GUIA", "Pedir guía"
+        NO_ENVIAR_AUN = "NO_ENVIAR_AUN", "No enviar aún"
         ENTREGADO = "ENTREGADO", "Entregado"
+        GARANTIA = "GARANTIA", "Garantía"
 
     pedido = models.OneToOneField(
         "pedidos.Pedido", on_delete=models.CASCADE, related_name="seguimiento_ont"

@@ -186,6 +186,14 @@ class EditarCampoOntViewTest(TestCase):
         resp = self._post("pedido_id", "1")
         self.assertEqual(resp.status_code, 404)
 
+    def test_campos_de_texto_largo_no_editables_desde_la_tabla(self):
+        """observaciones_ok/entrega y confirmacion_carga: solo visualización en la tabla, se editan
+        desde el detalle del pedido (pedido de Felipe 2026-09-03) — no están en la whitelist inline."""
+        self.client.force_login(self.dueno)
+        for campo in ("observaciones_ok", "observaciones_entrega", "confirmacion_carga"):
+            resp = self._post(campo, "intento de edición inline")
+            self.assertEqual(resp.status_code, 404, f"{campo} no debería ser editable desde la tabla")
+
     def test_ajeno_no_puede_editar_campo(self):
         self.client.force_login(self.ajeno)
         resp = self._post("guia_despacho", "HACKEO")
