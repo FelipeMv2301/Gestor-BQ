@@ -174,3 +174,11 @@ class QuerysetOntTest(TestCase):
         self.assertTrue(permisos.puede_editar_ont(self.admin, self.seguimiento))
         self.assertTrue(permisos.puede_editar_ont(self.dueno, self.seguimiento))
         self.assertFalse(permisos.puede_editar_ont(self.ajeno, self.seguimiento))
+
+    def test_ejecutivo_ont_puede_editar_pedido_de_otro_codigo_ont(self):
+        #Mismo criterio que la visibilidad: equipo chico, cola compartida — no solo lo propio.
+        otro_ejec_ont = crear_ejecutivo(codigo_sap=42, nombre="Otro Ejecutivo ONT", es_ont=True)
+        otro_pedido = crear_pedido("3009", ejecutivo=otro_ejec_ont)
+        otro_seguimiento = DespachoOnt.objects.create(pedido=otro_pedido)
+
+        self.assertTrue(permisos.puede_editar_ont(self.dueno, otro_seguimiento))

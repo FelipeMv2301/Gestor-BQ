@@ -12,6 +12,10 @@ from .models import DespachoOnt
 
 CAMPOS_CHECKBOX = ("confirmacion_cliente", "retorno_documento", "pedido_recibido", "enviar", "fecha_compromiso_aproximada")
 CAMPOS_TEXTO = ("guia_despacho", "observaciones_ok", "observaciones_entrega", "confirmacion_carga")
+CAMPOS_FECHA = ("fecha_compromiso", "fecha_despacho")
+#Whitelist de lo que se puede tocar celda por celda desde la tabla (vista tipo planilla) — nunca
+#confiar en `campo` (viene de la URL) sin chequearlo contra esto antes de hacer setattr().
+CAMPOS_EDITABLES_INLINE = frozenset(CAMPOS_CHECKBOX + CAMPOS_TEXTO + CAMPOS_FECHA + ("accion",))
 
 
 def _parsear_fecha(valor):
@@ -36,8 +40,11 @@ def lista_ont(request):
     paginador = Paginator(seguimientos, 20)
     seguimientos = paginador.get_page(request.GET.get("page"))
 
+    #puede_editar_ont ya no depende del seguimiento puntual (mismo criterio binario que queryset_ont:
+    #o ve/edita toda la cola ONT, o ninguna) — se calcula una vez para toda la tabla, no fila por fila.
     contexto = {
         "seguimientos": seguimientos,
+        "puede_editar": permisos.puede_editar_ont(request.user, None),
         "q": request.GET.get("q", ""),
         "sel_accion": request.GET.getlist("accion"),
         "accion_choices": DespachoOnt.Accion.choices,
@@ -87,3 +94,33 @@ def editar_ont(request, pk):
         resp["HX-Redirect"] = referer or reverse("seguimientoOnt:lista")
         return resp
     return redirect("seguimientoOnt:detalle", pk=pk)
+
+
+#Guarda UN campo manual a la vez — lo que dispara cada celda editable de la tabla (vista tipo
+#planilla, HU pedida por Felipe 2026-09-03): sin esto, reusar editar_ont de a un campo pisaría el
+#resto con "" / False, porque ese endpoint asume que SIEMPRE llega el form completo.
+@login_required
+@require_POST
+def editar_campo_ont(request, pk, campo):
+    if campo not in CAMPOS_EDITABLES_INLINE:
+        return HttpResponse(status=404)
+
+    seguimiento = get_object_or_404(DespachoOnt, pk=pk)
+    if not permisos.puede_editar_ont(request.user, seguimiento):
+        return HttpResponse(status=403)
+
+    crudo = request.POST.get("valor", "")
+    if campo in CAMPOS_CHECKBOX:
+        valor = crudo in ("true", "on", "1")
+    elif campo in CAMPOS_FECHA:
+        valor = _parsear_fecha(crudo)
+    elif campo == "accion":
+        valor = crudo.strip()
+        if valor and valor not in DespachoOnt.Accion.values:
+            return HttpResponse(status=400)
+    else:
+        valor = crudo.strip()
+
+    setattr(seguimiento, campo, valor)
+    seguimiento.save(update_fields=[campo])
+    return HttpResponse(status=204)

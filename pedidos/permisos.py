@@ -185,13 +185,15 @@ def queryset_ont(usuario):
         return DespachoOnt.objects.all()
     return DespachoOnt.objects.none()
 
-#Permiso para editar los campos manuales de un seguimiento ONT — Admin/Logística siempre,
-#Ejecutivo solo si el pedido es suyo (los campos automáticos no se editan nunca, son properties).
+#Permiso para editar los campos manuales de un seguimiento ONT — Admin/Logística siempre. Ejecutivo:
+#igual de binario que queryset_ont (equipo ONT edita TODA la cola compartida, no solo lo suyo —
+#pedido de Felipe 2026-09-03; antes solo dejaba editar responsable_del_pedido, ya redundante porque
+#todo DespachoOnt pertenece a un código marcado es_ont).
 def puede_editar_ont(usuario, seguimiento):
     if es_logistica(usuario):
         return True
     if obtener_rol(usuario) == PerfilUsuario.Rol.EJECUTIVO:
-        return responsable_del_pedido(usuario, seguimiento.pedido)
+        return _es_ejecutivo_ont(usuario)
     return False
 
 """

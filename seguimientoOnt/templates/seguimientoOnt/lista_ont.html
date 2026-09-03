@@ -3,7 +3,7 @@
 {% block content %}
 <div class="mb-5">
   <h1 class="text-2xl font-bold text-ink">Pedidos ONT</h1>
-  <p class="text-sm text-muted mt-1">Seguimiento de despacho para los pedidos del área ONT. Courier, OT y datos de contacto se editan desde "Mis pedidos"/"Pedidos a Despachar" — acá solo el seguimiento.</p>
+  <p class="text-sm text-muted mt-1">Seguimiento de despacho para los pedidos del área ONT. Courier, OT y datos de contacto se editan desde "Mis pedidos"/"Pedidos a Despachar" — acá solo el seguimiento. Cada celda se guarda sola al cambiarla.</p>
 </div>
 
 <!-- Div, no <form>: la tabla de abajo trae un <form> propio por fila para editar — anidar <form>
@@ -52,8 +52,11 @@
 </div>
 
 <script>
-  function alternarEdicionOnt(pk) {
-    document.getElementById('fila-editar-ont-' + pk).classList.toggle('hidden');
+  //Feedback visual de "guardado" en la celda que acaba de disparar el hx-post (vista tipo planilla:
+  //cada campo se guarda solo, sin botón Guardar aparte ni fila que se expande).
+  function marcarGuardado(el) {
+    el.classList.add('ring-2', 'ring-lime');
+    setTimeout(function () { el.classList.remove('ring-2', 'ring-lime'); }, 600);
   }
 </script>
 {% endblock %}
